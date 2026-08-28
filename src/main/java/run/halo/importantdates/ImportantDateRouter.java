@@ -2,26 +2,31 @@ package run.halo.importantdates;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import org.springframework.context.annotation.Bean;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
 import run.halo.app.plugin.ReactiveSettingFetcher;
 import run.halo.importantdates.finders.ImportantDateFinder;
+import run.halo.importantdates.support.HtmlRenderer;
+import run.halo.importantdates.vo.ImportantDateVo;
+import run.halo.importantdates.vo.PersonVo;
 
 /**
  * 前台路由：/important-dates。
  *
- * <p>渲染策略（配置化）：
+ * <p>渲染策略：
  * <ul>
- *   <li>默认使用插件自带模板（{@code plugin:plugin-important-dates:important-dates}），
- *       独立页面样式，不依赖主题；</li>
- *   <li>开启插件设置「使用主题模板渲染」后，渲染主题模板 {@code important-dates.html}
- *       （模板放在当前激活主题的 templates/ 目录，自动获得主题布局：导航、页脚等）；
- *       model 中提供 {@code title}/{@code dates}/{@code people}/{@code reminders}/
- *       {@code showImportantTag}，主题模板可直接消费。</li>
+ *   <li>默认：使用插件内部渲染器（{@link HtmlRenderer}）生成完整 HTML，
+ *       不依赖主题、不依赖插件模板机制，兼容全部 Halo 2.x 版本；</li>
+ *   <li>开启插件设置「使用主题模板渲染」后：渲染当前激活主题的
+ *       {@code important-dates.html} 模板（模板需自行放入主题 templates/ 目录且语法正确，
+ *       页面将获得主题布局）；model 中提供 {@code title}/{@code dates}/{@code people}/
+ *       {@code reminders}/{@code showImportantTag}。</li>
  * </ul>
  *
  * @author yyliucha
@@ -31,7 +36,6 @@ import run.halo.importantdates.finders.ImportantDateFinder;
 public class ImportantDateRouter {
 
     private static final String THEME_TEMPLATE = "important-dates";
-    private static final String PLUGIN_TEMPLATE = "plugin:plugin-important-dates:important-dates";
     private static final int DEFAULT_REMIND_DAYS = 3;
 
     private final ImportantDateFinder importantDateFinder;
@@ -50,17 +54,34 @@ public class ImportantDateRouter {
     RouterFunction<ServerResponse> importantDatesRouter() {
         return org.springframework.web.reactive.function.server.RouterFunctions.route(
             org.springframework.web.reactive.function.server.RequestPredicates.GET("/important-dates"),
-            request -> reminderConfig().flatMap(cfg ->
-                Mono.zip(
-                        importantDateFinder.listAll().collectList(),
-                        importantDateFinder.listAllPeople().collectList(),
-                        importantDateFinder.listUpcoming(cfg.remindDays()).collectList()
-                    )
-                    .map(tuple -> buildModel(tuple, cfg))
-                    .flatMap(model -> ServerResponse.ok().render(
-                        cfg.useThemeTemplate() ? THEME_TEMPLATE : PLUGIN_TEMPLATE,
-                        model))
-            )
+            request -> reminderConfig()
+                .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
+                .flatMap(cfg ->
+                    Mono.zip(
+                            importantDateFinder.listAll().collectList(),
+                            importantDateFinder.listAllPeople().collectList(),
+                            importantDateFinder.listUpcoming(cfg.remindDays()).collectList()
+                        )
+                        .flatMap(tuple -> {
+                            List<ImportantDateVo> dates = tuple.getT1();
+                            List<PersonVo> people = tuple.getT2();
+                            List<ImportantDateVo> reminders = tuple.getT3();
+                            if (cfg.useThemeTemplate()) {
+                                Map<String, Object> model = new LinkedHashMap<>();
+                                model.put("title", "重要日期");
+                                model.put("dates", dates);
+                                model.put("people", people);
+                                model.put("reminders", reminders);
+                                model.put("showImportantTag", cfg.showImportantTag());
+                                return ServerResponse.ok().render(THEME_TEMPLATE, model);
+                            }
+                            return ServerResponse.ok()
+                                .contentType(MediaType.TEXT_HTML)
+                                .bodyValue(HtmlRenderer.render(
+                                    "重要日期", dates, people, reminders,
+                                    cfg.showImportantTag()));
+                        })
+                )
         );
     }
 
