@@ -10,7 +10,7 @@ import run.halo.importantdates.vo.PersonVo;
  * <p>在主题模板中通过 {@code $(importantDateFinder.listAll())} 获取全部重要日期，
  * {@code $(importantDateFinder.listAllPeople())} 获取人员列表。
  *
- * @author important-dates
+ * @author yyliucha
  * @since 1.0.5
  */
 public interface ImportantDateFinder {

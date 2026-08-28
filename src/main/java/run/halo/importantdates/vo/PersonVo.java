@@ -5,7 +5,7 @@ import lombok.Data;
 /**
  * 前台展示用人员视图对象（仅公开非隐私字段）。
  *
- * @author important-dates
+ * @author yyliucha
  * @since 1.0.5
  */
 @Data

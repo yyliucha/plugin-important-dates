@@ -6,7 +6,7 @@ import lombok.Data;
 /**
  * 前台展示用重要日期视图对象。
  *
- * @author important-dates
+ * @author yyliucha
  * @since 1.0.5
  */
 @Data

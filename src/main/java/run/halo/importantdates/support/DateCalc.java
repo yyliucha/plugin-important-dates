@@ -9,7 +9,7 @@ import java.time.temporal.ChronoUnit;
 /**
  * 日期计算工具：阳历/农历的每年循环换算与剩余天数。
  *
- * @author important-dates
+ * @author yyliucha
  * @since 1.0.5
  */
 public final class DateCalc {

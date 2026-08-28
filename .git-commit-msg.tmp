@@ -1,6 +1,5 @@
-feat: v1.0.8 前台页面支持在主题内打开
+chore: v1.0.9 插件作者改为 github 账号 yyliucha
 
-- 前台页面升级为 Thymeleaf 插件模板（plugin:plugin-important-dates:important-dates），样式与提醒横幅保留
-- 新增设置项「使用主题模板渲染」（默认关）：开启后 /important-dates 使用当前主题的 important-dates.html 模板，
-  页面在主题布局内打开（导航/页脚随主题）；model 提供 title/dates/people/reminders/showImportantTag
-- README 增加「将页面放入主题内打开」教程与主题模板示例
+- plugin.yaml author: yyliucha + website/homepage/repo/issues 指向仓库
+- 全部 Java 源码 @author 统一为 yyliucha
+- 版本号 1.0.9（1.0.x 开发版本序列）

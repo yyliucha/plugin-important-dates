@@ -12,7 +12,7 @@ import run.halo.app.plugin.PluginContext;
  * <p>负责在插件启动时注册 {@link ImportantDate} 与 {@link OperationLog} 扩展模型，
  * 停止时注销。
  *
- * @author important-dates
+ * @author yyliucha
  * @since 1.0.0
  */
 @Component

@@ -24,7 +24,7 @@ import run.halo.importantdates.finders.ImportantDateFinder;
  *       {@code showImportantTag}，主题模板可直接消费。</li>
  * </ul>
  *
- * @author important-dates
+ * @author yyliucha
  * @since 1.0.5
  */
 @Component

@@ -23,7 +23,7 @@ import run.halo.importantdates.vo.PersonVo;
 /**
  * {@link ImportantDateFinder} 实现。
  *
- * @author important-dates
+ * @author yyliucha
  * @since 1.0.5
  */
 @Finder("importantDateFinder")

@@ -12,7 +12,7 @@ import run.halo.app.extension.GVK;
  * <p>记录一个人的基础信息（姓名、关系、生日、性别、血型、身高、体重、喜好等），
  * 重要日期记录可通过 {@code spec.personNames} 关联到人员。
  *
- * @author important-dates
+ * @author yyliucha
  * @since 1.0.4
  */
 @Data

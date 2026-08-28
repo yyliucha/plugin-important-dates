@@ -12,7 +12,7 @@ import run.halo.app.extension.GVK;
  * <p>用于在后台记录"结婚纪念日"、"孩子出生日期"等重要日子，支持阳历/农历两种日期类型，
  * 每年按记录自动循环。生成用于存储的扩展资源：{@code importantdates.halo.run/v1alpha1}。
  *
- * @author important-dates
+ * @author yyliucha
  * @since 1.0.0
  */
 @Data

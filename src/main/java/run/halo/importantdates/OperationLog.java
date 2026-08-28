@@ -12,7 +12,7 @@ import run.halo.app.extension.GVK;
  * <p>记录对重要日期的新增、编辑、删除操作，包含操作类型、目标名称与操作详情。
  * 数据同样存储于 Halo 扩展存储（即站点数据库）。
  *
- * @author important-dates
+ * @author yyliucha
  * @since 1.1.0
  */
 @Data

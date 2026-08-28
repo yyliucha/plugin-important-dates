@@ -4,11 +4,15 @@ metadata:
   name: plugin-important-dates
 spec:
   enabled: true
-  version: 1.0.8
+  version: 1.0.9
   requires: ">=2.14.0"
   author:
-    name: important-dates
+    name: yyliucha
+    website: https://github.com/yyliucha
   logo: logo.svg
+  homepage: https://github.com/yyliucha/plugin-important-dates#readme
+  repo: https://github.com/yyliucha/plugin-important-dates
+  issues: https://github.com/yyliucha/plugin-important-dates/issues
   displayName: "重要日期"
   description: "在后台记录重要日期（如结婚纪念日、孩子出生日期），支持阳历/农历、每年自动循环、备注信息。"
   settingName: plugin-important-dates-settings
