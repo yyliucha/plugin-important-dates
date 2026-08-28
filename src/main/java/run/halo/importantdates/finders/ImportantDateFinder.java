@@ -1,0 +1,27 @@
+package run.halo.importantdates.finders;
+
+import reactor.core.publisher.Flux;
+import run.halo.importantdates.vo.ImportantDateVo;
+import run.halo.importantdates.vo.PersonVo;
+
+/**
+ * 供主题模板调用的数据查询接口。
+ *
+ * <p>在主题模板中通过 {@code $(importantDateFinder.listAll())} 获取全部重要日期，
+ * {@code $(importantDateFinder.listAllPeople())} 获取人员列表。
+ *
+ * @author important-dates
+ * @since 1.0.5
+ */
+public interface ImportantDateFinder {
+
+    /**
+     * 全部重要日期（按剩余天数升序）。
+     */
+    Flux<ImportantDateVo> listAll();
+
+    /**
+     * 全部人员。
+     */
+    Flux<PersonVo> listAllPeople();
+}

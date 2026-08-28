@@ -1,0 +1,8 @@
+feat: v1.0.5 前台展示页面与 Finder API
+
+- 新增前台独立页面 /important-dates（插件自渲染，不依赖主题）：
+  全部重要日期按即将到来排序（含"还有 X 天"），人员卡片展示公开信息
+- 隐私控制：前台仅展示名称、日期、关联人姓名、生日；体重/备注/操作日志不出现在前台
+- 新增 importantDateFinder Finder API（listAll / listAllPeople），供主题模板自定义调用
+- 后端引入农历换算库（cn.6tail:lunar），农历记录前台自动换算下次阳历日期
+- README 中英更新

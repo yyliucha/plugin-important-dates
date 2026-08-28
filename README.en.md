@@ -12,6 +12,7 @@ A Halo 2.x plugin to **record and manage your important dates from the admin con
 - **People management**: add people (张三, 李四, …) with name, nickname, relation, birthday (solar/lunar), gender, blood type, height, weight (latest value), hobbies and notes; important dates can **link to multiple people** (e.g. a wedding anniversary linked to the couple) and be filtered by person
 - **Custom date picker**: solar mode shows a calendar grid annotated with lunar days; lunar mode lets you pick a year, month (including leap months) and day, with the mapped solar date shown in real time
 - **Operation log**: every create / update / delete (of dates or people) records the time, action, target and details — viewable in the "Operation Log" dialog
+- **Public page**: a theme-independent page at `/important-dates` listing all dates (sorted by next occurrence, with "days left") and people cards — only public fields (name, relation, birthday) are shown; weight, notes and the operation log are never exposed. A `importantDateFinder` Finder API is also provided for themed customization
 - **Export / Import**: export all records (including people) to a JSON file for backup/migration; import validates and skips duplicates by record ID (never overwrites) with a result summary dialog
 - Admin-only: everything happens in the Halo console ("内容 → 重要日期" menu); nothing is shown on the theme side
 
@@ -43,6 +44,7 @@ A Halo 2.x plugin to **record and manage your important dates from the admin con
 - The **操作日志 (Operation Log)** button shows every create/update/delete with time, target and change details.
 - **Export** downloads all records as `important-dates-YYYY-MM-DD.json` (includes people); **Import** restores from that file, skipping duplicates automatically.
 - The **人员 (People)** tab manages people; while creating/editing a date you can tick one or more people in "关联人员" (linked people).
+- **Public page**: visit `https://your-domain/important-dates` (add it to your navigation/menu). The page is rendered by the plugin itself — no theme changes needed; only public info (names, dates, birthdays) is shown.
 - Every record can be **edited / deleted** at any time. Data lives in the site database and survives Halo upgrades.
 
 ## Build from Source (optional)
@@ -54,7 +56,7 @@ cd plugin-important-dates
 ./gradlew build
 ```
 
-The artifact is produced at `build/libs/plugin-important-dates-1.0.4.jar`.
+The artifact is produced at `build/libs/plugin-important-dates-1.0.5.jar`.
 
 > Versioning: this project uses a 1.0.x development version sequence — each iteration bumps the patch version (1.0.0 → 1.0.1 → 1.0.2 → …).
 
