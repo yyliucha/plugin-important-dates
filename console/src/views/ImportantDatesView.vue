@@ -4,7 +4,7 @@
       <VButton @click="openLogs">操作日志</VButton>
       <VButton @click="exportData">导出</VButton>
       <VButton @click="triggerImport">导入</VButton>
-      <VButton type="secondary" @click="openCreate">
+      <VButton type="secondary" @click="activeTab === 'dates' ? openCreate() : openPersonCreate()">
         <span style="margin-right: 4px">＋</span>{{ activeTab === "dates" ? "新增日期" : "新增人员" }}
       </VButton>
     </template>
@@ -257,7 +257,8 @@
 
     <!-- ================= 操作日志 ================= -->
     <VModal :visible="logVisible" title="操作日志" width="760" @close="logVisible = false">
-      <VLoading v-if="logLoading" />
+      <div v-if="logLoading" class="log-state">日志加载中…</div>
+      <div v-else-if="logError" class="log-state">{{ logError }}</div>
       <div v-else-if="!logs.length" style="padding: 40px 0">
         <VEmpty title="暂无操作日志" message="新增、编辑、删除重要日期或人员后，这里会记录明细。" />
       </div>
@@ -374,6 +375,7 @@ const personFilter = ref("");
 
 const logVisible = ref(false);
 const logLoading = ref(false);
+const logError = ref("");
 const logs = ref<OperationLog[]>([]);
 
 const fileInputRef = ref<HTMLInputElement | null>(null);
@@ -898,8 +900,11 @@ function closeImportModal() {
 async function openLogs() {
   logVisible.value = true;
   logLoading.value = true;
+  logError.value = "";
   try {
     logs.value = await listOperationLogs();
+  } catch (error) {
+    logError.value = `日志加载失败：${(error as Error)?.message || "请稍后重试"}`;
   } finally {
     logLoading.value = false;
   }
@@ -1047,6 +1052,13 @@ function formatTime(iso?: string): string {
   margin-top: 14px;
   font-size: 12px;
   color: #9ca3af;
+}
+
+.log-state {
+  padding: 48px 0;
+  text-align: center;
+  color: #6b7280;
+  font-size: 14px;
 }
 
 .form {

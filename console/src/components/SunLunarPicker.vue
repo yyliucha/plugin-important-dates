@@ -18,8 +18,13 @@
       <template v-if="dateType === 'SOLAR'">
         <div class="picker-header">
           <button type="button" class="nav-btn" @click="shiftMonth(-1)">‹</button>
-          <div class="header-title">
-            {{ viewYear }} 年 {{ viewMonth }} 月
+          <div class="header-title fast-select">
+            <select v-model.number="viewYear" class="year-select" aria-label="年份">
+              <option v-for="y in yearOptions" :key="y" :value="y">{{ y }} 年</option>
+            </select>
+            <select v-model.number="viewMonth" class="month-select" aria-label="月份">
+              <option v-for="m in 12" :key="m" :value="m">{{ m }} 月</option>
+            </select>
           </div>
           <button type="button" class="nav-btn" @click="shiftMonth(1)">›</button>
         </div>
@@ -49,7 +54,11 @@
       <template v-else>
         <div class="picker-header">
           <button type="button" class="nav-btn" @click="viewYear--">‹</button>
-          <div class="header-title">{{ viewYear }} 年</div>
+          <div class="header-title fast-select">
+            <select v-model.number="viewYear" class="year-select" aria-label="年份">
+              <option v-for="y in yearOptions" :key="y" :value="y">{{ y }} 年</option>
+            </select>
+          </div>
           <button type="button" class="nav-btn" @click="viewYear++">›</button>
         </div>
         <div class="lunar-months">
@@ -113,6 +122,7 @@ const open = ref(false);
 const popupPos = ref({ top: 0, left: 0 });
 const POPUP_HEIGHT = 440;
 const now = new Date();
+const yearOptions = Array.from({ length: 201 }, (_, i) => 1900 + i);
 const viewYear = ref(now.getFullYear());
 const viewMonth = ref(now.getMonth() + 1);
 const viewLunarMonth = ref(props.lunarMonth || 1);
@@ -386,6 +396,28 @@ onBeforeUnmount(() => {
   font-size: 14px;
   font-weight: 600;
   color: #1f2937;
+}
+
+.fast-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.year-select,
+.month-select {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 3px 6px;
+  font-size: 13px;
+  color: #1f2937;
+  background: #fff;
+  cursor: pointer;
+}
+
+.year-select:hover,
+.month-select:hover {
+  border-color: #4f7cff;
 }
 
 .nav-btn {
