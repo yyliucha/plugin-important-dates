@@ -58,38 +58,43 @@ public final class ThemeTemplateGenerator {
             sb.append("  <head th:fragment=\"head\">\n")
                 .append("    <title th:text=\"${title}\">重要日期</title>\n")
                 .append("    <style>")
+                .append(".id-wrap{max-width:920px;margin:0 auto;padding:24px 16px 8px;}")
                 .append(".id-hero{padding:6px 0 2px;}")
-                .append(".id-hero-title{font-size:1.8rem;margin:0 0 4px;}")
+                .append(".id-hero-title{font-size:1.8rem;margin:0 0 4px;font-family:'Kaiti SC','KaiTi','STKaiti','STXihei','PingFang SC',sans-serif;}")
                 .append(".id-hero-sub{opacity:.62;margin:0 0 20px;}")
-                .append(".id-block-title{font-size:1.15rem;margin:26px 0 12px;display:flex;align-items:center;gap:8px;}")
+                .append(".id-block-title{font-size:1.15rem;margin:26px 0 14px;display:flex;align-items:center;gap:8px;}")
                 .append(".id-count{opacity:.5;font-weight:400;font-size:.9em;}")
-                .append(".id-date-card{display:flex;align-items:center;gap:14px;border:1px solid rgba(128,128,128,.2);")
-                .append("border-radius:14px;padding:12px 16px;margin-bottom:10px;background:rgba(255,255,255,.02);}")
-                .append(".id-date-chip{min-width:58px;text-align:center;background:rgba(79,124,255,.14);color:#6b93ff;")
-                .append("border-radius:10px;padding:7px 8px;flex:none;}")
-                .append(".id-chip-md{font-size:1rem;font-weight:700;display:block;line-height:1.2;}")
-                .append(".id-chip-lu{font-size:.72em;display:block;opacity:.75;line-height:1.2;margin-top:2px;}")
-                .append(".id-date-info{flex:1;min-width:0;}")
-                .append(".id-date-title{font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}")
-                .append(".id-imp{font-size:.72em;color:#f59e0b;border:1px solid rgba(245,158,11,.5);")
-                .append("border-radius:999px;padding:0 8px;line-height:1.6;}")
-                .append(".id-date-sub{opacity:.6;font-size:.85em;margin-top:3px;}")
-                .append(".id-date-days{text-align:right;white-space:nowrap;flex:none;}")
-                .append(".id-days-num{font-size:1.05rem;font-weight:700;color:#6b93ff;display:block;line-height:1.2;}")
-                .append(".id-days-unit{font-size:.74em;opacity:.6;display:block;margin-top:2px;}")
-                .append(".id-people{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;}")
-                .append(".id-person{display:flex;align-items:center;gap:12px;border:1px solid rgba(128,128,128,.2);")
-                .append("border-radius:14px;padding:12px 14px;background:rgba(255,255,255,.02);}")
-                .append(".id-avatar{width:44px;height:44px;border-radius:50%;background:rgba(79,124,255,.15);color:#6b93ff;")
-                .append("display:flex;align-items:center;justify-content:center;font-size:1.15rem;font-weight:700;flex:none;}")
-                .append(".id-person-info{flex:1;min-width:0;}")
-                .append(".id-person-name{font-weight:600;display:flex;align-items:center;gap:6px;}")
-                .append(".id-person-sub{opacity:.6;font-size:.8em;margin-top:2px;}")
-                .append(".id-person-days{font-size:.84em;color:#6b93ff;opacity:.92;flex:none;white-space:nowrap;}")
-                .append("@media (prefers-color-scheme: light){.id-date-card,.id-person{background:#fff;}}")
-                .append("@media (max-width: 560px){.id-date-card{flex-wrap:wrap;gap:8px 12px;}.id-date-days{width:100%;text-align:left;}}")
-                .append(".id-remind{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);")
-                .append("border-radius:12px;padding:10px 16px;margin-bottom:14px;}")
+                .append(".id-board{columns:3 230px;column-gap:14px;}")
+                .append("@media (max-width:860px){.id-board{columns:2 200px;}}")
+                .append("@media (max-width:560px){.id-board{columns:1 170px;}}")
+                .append(".id-memo{break-inside:avoid;-webkit-column-break-inside:avoid;margin:0 0 16px;position:relative;")
+                .append("border-radius:4px 4px 4px 14px;padding:18px 16px 14px;box-shadow:0 3px 8px rgba(0,0,0,.16);")
+                .append("background:var(--paper,#fff8c5);color:#3f3f46;transform:rotate(var(--tilt,-1deg));transition:transform .16s ease;}")
+                .append(".id-memo:hover{transform:rotate(0deg) scale(1.04);box-shadow:0 6px 16px rgba(0,0,0,.22);}")
+                .append(".id-memo::before{content:'';position:absolute;top:-9px;left:50%;transform:translateX(-50%) rotate(-2deg);")
+                .append("width:66px;height:17px;background:rgba(255,255,255,.5);border:1px solid rgba(128,128,128,.18);")
+                .append("box-shadow:0 1px 2px rgba(0,0,0,.12);}")
+                .append(".id-memo:nth-child(6n+1){--tilt:-1deg;--paper:#fff8c5;}")
+                .append(".id-memo:nth-child(6n+2){--tilt:1.1deg;--paper:#ffd9e1;}")
+                .append(".id-memo:nth-child(6n+3){--tilt:-.6deg;--paper:#d7f0ff;}")
+                .append(".id-memo:nth-child(6n+4){--tilt:.9deg;--paper:#dcf5d3;}")
+                .append(".id-memo:nth-child(6n+5){--tilt:-1.2deg;--paper:#ece2ff;}")
+                .append(".id-memo:nth-child(6n+6){--tilt:.6deg;--paper:#ffe9c7;}")
+                .append(".id-memo-title{font-weight:700;font-size:1.04rem;display:flex;align-items:center;gap:6px;flex-wrap:wrap;")
+                .append("font-family:'Kaiti SC','KaiTi','STKaiti','PingFang SC',sans-serif;padding-right:56px;}")
+                .append(".id-pin{flex:none;width:11px;height:11px;border-radius:50%;background:linear-gradient(135deg,#f43f5e,#be123c);")
+                .append("box-shadow:0 2px 3px rgba(0,0,0,.3);}")
+                .append(".id-memo-date{font-size:.86rem;opacity:.78;margin-top:7px;}")
+                .append(".id-memo-days{position:absolute;top:10px;right:12px;text-align:right;color:#b45309;font-weight:800;")
+                .append("font-size:1.2rem;line-height:1.05;}")
+                .append(".id-memo-days small{display:block;font-size:.62rem;font-weight:600;opacity:.72;text-transform:uppercase;letter-spacing:.04em;}")
+                .append(".id-memo-people{font-size:.8rem;opacity:.78;margin-top:8px;}")
+                .append(".id-memo-avatar{width:34px;height:34px;border-radius:8px;background:rgba(255,255,255,.55);")
+                .append("color:#3f3f46;display:flex;align-items:center;justify-content:center;font-weight:700;")
+                .append("margin-right:10px;flex:none;box-shadow:inset 0 0 0 1px rgba(128,128,128,.2);}")
+                .append("@media (prefers-color-scheme: dark){.id-memo{box-shadow:0 3px 10px rgba(0,0,0,.5);}}")
+                .append(".id-remind{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);border-radius:12px;")
+                .append("padding:10px 16px;margin-bottom:14px;}")
                 .append(".id-remind-item{color:#d97706;line-height:1.9;}")
                 .append("@media (prefers-color-scheme: dark){.id-remind{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.4);}.id-remind-item{color:#fbbf24;}}")
                 .append("</style>\n")
@@ -144,7 +149,7 @@ public final class ThemeTemplateGenerator {
      * 内置内容模板（重要日期页面主体；数据来自插件 model）。
      */
     private static final String CONTENT_FRAGMENT = """
-        <div style="max-width: 860px; margin: 0 auto; padding: 20px 16px 8px;">
+        <div class="id-wrap">
           <div class="id-hero">
             <h1 class="id-hero-title">重要日期</h1>
             <p class="id-hero-sub">记录值得纪念的日子，以及身边重要的人。</p>
@@ -160,44 +165,42 @@ public final class ThemeTemplateGenerator {
 
           <h2 class="id-block-title">重要日期 <span class="id-count" th:text="${#lists.size(dates)}">5</span></h2>
           <p class="id-hero-sub" th:if="${#lists.isEmpty(dates)}">还没有记录。</p>
-          <div class="id-date-card" th:each="d : ${dates}">
-            <div class="id-date-chip">
-              <span class="id-chip-md" th:text="${d.nextSolarDate != null ? #strings.substring(d.nextSolarDate, 5) : '—'}">10-02</span>
-              <span class="id-chip-lu" th:if="${d.dateType == 'LUNAR'}" th:text="${d.dateText}">六月初六</span>
-            </div>
-            <div class="id-date-info">
-              <div class="id-date-title">
+          <div class="id-board" th:unless="${#lists.isEmpty(dates)}">
+            <div class="id-memo" th:each="d : ${dates}">
+              <div class="id-memo-days">
+                <span th:text="${d.daysUntil}">35</span>
+                <small th:if="${d.nextSolarDate != null}" th:text="|天后 · ${d.nextSolarDate}|">天后 · 2026-10-02</small>
+              </div>
+              <div class="id-memo-title">
+                <span class="id-pin" th:if="${showImportantTag != null and showImportantTag and d.important}"></span>
                 <span th:text="${d.title}">结婚纪念日</span>
-                <span class="id-imp" th:if="${showImportantTag != null and showImportantTag and d.important}">重要</span>
               </div>
-              <div class="id-date-sub">
+              <div class="id-memo-date">
                 <span th:text="${d.dateText}">2021-10-02</span>
-                <span th:if="${d.personNames != null && !d.personNames.isEmpty()}"
-                      th:text="| · ${#strings.listJoin(d.personNames, '、')}|"> · 老婆</span>
+                <span th:if="${d.dateType == 'LUNAR'}" th:text="（农历）">（农历）</span>
               </div>
-            </div>
-            <div class="id-date-days">
-              <span class="id-days-num" th:text="${d.daysUntil}">35</span>
-              <span class="id-days-unit" th:if="${d.nextSolarDate != null}" th:text="|天后 · ${d.nextSolarDate}|">天后 · 2026-10-02</span>
+              <div class="id-memo-people" th:if="${d.personNames != null && !d.personNames.isEmpty()}"
+                   th:text="|❤ ${#strings.listJoin(d.personNames, '、')}|">❤ 老婆</div>
             </div>
           </div>
 
           <h2 class="id-block-title">重要的人 <span class="id-count" th:text="${#lists.size(people)}">1</span></h2>
           <p class="id-hero-sub" th:if="${#lists.isEmpty(people)}">还没有添加。</p>
-          <div class="id-people" th:unless="${#lists.isEmpty(people)}">
-            <div class="id-person" th:each="p : ${people}">
-              <span class="id-avatar" th:text="${#strings.substring(p.displayName, 0, 1)}">老</span>
-              <div class="id-person-info">
-                <div class="id-person-name">
-                  <span th:text="${p.displayName}">老婆</span>
-                  <span th:if="${p.relation}" class="id-imp" th:text="${p.relation}">配偶</span>
-                </div>
-                <div class="id-person-sub">
-                  生日 <span th:text="${p.birthdayText}">1999-10-28</span>
-                  <span th:if="${p.nextSolarDate != null}" th:text="|（${p.nextSolarDate}）|">（2026-10-28）</span>
-                </div>
+          <div class="id-board" th:unless="${#lists.isEmpty(people)}">
+            <div class="id-memo" th:each="p : ${people}">
+              <div class="id-memo-days" th:if="${p.daysUntil >= 0}">
+                <span th:text="${p.daysUntil}">61</span>
+                <small>天后</small>
               </div>
-              <span class="id-person-days" th:if="${p.daysUntil >= 0}" th:text="|还有 ${p.daysUntil} 天|">还有 61 天</span>
+              <div class="id-memo-title" style="padding-right:0;">
+                <span class="id-memo-avatar" th:text="${#strings.substring(p.displayName, 0, 1)}">老</span>
+                <span th:text="${p.displayName}">老婆</span>
+                <span th:if="${p.relation}" style="font-size:.8em;opacity:.75;" th:text="|（${p.relation}）|">（配偶）</span>
+              </div>
+              <div class="id-memo-date">
+                生日 <span th:text="${p.birthdayText}">1999-10-28</span>
+                <span th:if="${p.nextSolarDate != null}" th:text="|（${p.nextSolarDate}）|">（2026-10-28）</span>
+              </div>
             </div>
           </div>
         </div>
