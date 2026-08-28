@@ -50,7 +50,9 @@ cd plugin-important-dates
 ./gradlew build
 ```
 
-构建结果位于 `build/libs/plugin-important-dates-1.2.0.jar`。
+构建结果位于 `build/libs/plugin-important-dates-1.0.2.jar`。
+
+> 版本说明：插件使用 1.0.x 开发版本序列，每轮迭代版本号递增（1.0.0 → 1.0.1 → 1.0.2 → …）。
 
 ## 数据说明
 
