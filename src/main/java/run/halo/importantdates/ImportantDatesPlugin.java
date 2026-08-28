@@ -9,7 +9,8 @@ import run.halo.app.plugin.PluginContext;
 /**
  * 插件生命周期管理。
  *
- * <p>负责在插件启动时注册 {@link ImportantDate} 扩展模型，停止时注销。
+ * <p>负责在插件启动时注册 {@link ImportantDate} 与 {@link OperationLog} 扩展模型，
+ * 停止时注销。
  *
  * @author important-dates
  * @since 1.0.0
@@ -27,10 +28,12 @@ public class ImportantDatesPlugin extends BasePlugin {
     @Override
     public void start() {
         schemeManager.register(ImportantDate.class);
+        schemeManager.register(OperationLog.class);
     }
 
     @Override
     public void stop() {
         schemeManager.unregister(Scheme.buildFromType(ImportantDate.class));
+        schemeManager.unregister(Scheme.buildFromType(OperationLog.class));
     }
 }

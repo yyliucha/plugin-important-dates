@@ -1,6 +1,7 @@
 <template>
   <VPageHeader title="重要日期">
     <template #actions>
+      <VButton @click="openLogs">操作日志</VButton>
       <VButton type="secondary" @click="openCreate">
         <span style="margin-right: 4px">＋</span>新增
       </VButton>
@@ -75,6 +76,10 @@
       </VCard>
     </template>
 
+    <div class="storage-note">
+      数据存储于 Halo 扩展存储（与站点数据库一致：H2 / MySQL / PostgreSQL）；操作日志会记录每一次新增、编辑与删除。
+    </div>
+
     <VModal
       :visible="modalVisible"
       :title="editingName ? '编辑重要日期' : '新增重要日期'"
@@ -89,33 +94,27 @@
 
         <label class="field">
           <span class="label">日期类型</span>
-          <select v-model="form.dateType" class="input">
+          <select v-model="form.dateType" class="input" @change="resetDateFields">
             <option value="SOLAR">阳历</option>
             <option value="LUNAR">农历</option>
           </select>
         </label>
 
-        <label v-if="form.dateType === 'SOLAR'" class="field">
-          <span class="label">阳历日期 *</span>
-          <input v-model="form.solarDate" type="date" class="input" />
-        </label>
-
-        <div v-else class="field">
-          <span class="label">农历日期 *</span>
-          <div class="lunar-row">
-            <select v-model.number="form.lunarMonth" class="input">
-              <option v-for="m in 12" :key="m" :value="m">{{ m }}月</option>
-            </select>
-            <select v-model.number="form.lunarDay" class="input">
-              <option v-for="d in 30" :key="d" :value="d">{{ d }}日</option>
-            </select>
-            <label class="leap">
-              <input v-model="form.isLeapMonth" type="checkbox" />
-              闰月
-            </label>
-          </div>
+        <div class="field">
+          <span class="label">{{ form.dateType === "SOLAR" ? "日期 *" : "农历日期 *" }}</span>
+          <SunLunarPicker
+            :date-type="form.dateType"
+            :solar-date="form.solarDate"
+            :lunar-month="form.lunarMonth"
+            :lunar-day="form.lunarDay"
+            :is-leap-month="form.isLeapMonth"
+            @update:solar-date="(v: string) => (form.solarDate = v)"
+            @update:lunar-month="(v: number) => (form.lunarMonth = v)"
+            @update:lunar-day="(v: number) => (form.lunarDay = v)"
+            @update:is-leap-month="(v: boolean) => (form.isLeapMonth = v)"
+          />
           <div class="hint">
-            当前记录：{{ lunarText(form.lunarMonth, form.lunarDay, !!form.isLeapMonth) }}
+            阳历：日历网格中选择，网格中标注农历；农历：选择年、月（含闰月）与日。
           </div>
         </div>
 
@@ -136,6 +135,34 @@
           <VButton type="secondary" :loading="saving" @click="save">保存</VButton>
         </VSpace>
       </template>
+    </VModal>
+
+    <!-- 操作日志 -->
+    <VModal :visible="logVisible" title="操作日志" width="760" @close="logVisible = false">
+      <VLoading v-if="logLoading" />
+      <div v-else-if="!logs.length" style="padding: 40px 0">
+        <VEmpty title="暂无操作日志" message="新增、编辑、删除重要日期后，这里会记录明细。" />
+      </div>
+      <table v-else class="dates-table">
+        <thead>
+          <tr>
+            <th style="width: 24%">时间</th>
+            <th style="width: 12%">操作</th>
+            <th style="width: 18%">目标</th>
+            <th>详情</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="log in logs" :key="log.metadata.name">
+            <td>{{ formatTime(log.metadata.creationTimestamp) }}</td>
+            <td>
+              <VTag :theme="logTheme(log.spec.action)">{{ logActionText(log.spec.action) }}</VTag>
+            </td>
+            <td>{{ log.spec.targetTitle || "—" }}</td>
+            <td><span class="note">{{ log.spec.detail || "—" }}</span></td>
+          </tr>
+        </tbody>
+      </table>
     </VModal>
   </div>
 </template>
@@ -158,9 +185,12 @@ import {
   createImportantDate,
   deleteImportantDate,
   listImportantDates,
+  listOperationLogs,
   updateImportantDate,
+  writeOperationLog,
 } from "@/api";
-import type { DateType, ImportantDate } from "@/types";
+import SunLunarPicker from "@/components/SunLunarPicker.vue";
+import type { DateType, ImportantDate, LogAction, OperationLog } from "@/types";
 import { lunarMonthDayText, nextSolarDate } from "@/utils/lunar";
 
 const loading = ref(true);
@@ -169,6 +199,10 @@ const dates = ref<ImportantDate[]>([]);
 
 const modalVisible = ref(false);
 const editingName = ref<string | null>(null);
+
+const logVisible = ref(false);
+const logLoading = ref(false);
+const logs = ref<OperationLog[]>([]);
 
 interface DateForm {
   title: string;
@@ -203,6 +237,13 @@ async function load() {
 
 onMounted(load);
 
+function resetDateFields() {
+  form.solarDate = "";
+  form.lunarMonth = 1;
+  form.lunarDay = 1;
+  form.isLeapMonth = false;
+}
+
 function openCreate() {
   Object.assign(form, emptyForm());
   editingName.value = null;
@@ -232,6 +273,13 @@ function lunarText(month: number, day: number, isLeap: boolean) {
   return lunarMonthDayText(month, day, isLeap);
 }
 
+function dateText(spec: ImportantDate["spec"]): string {
+  if (spec.dateType === "SOLAR") {
+    return spec.solarDate || "—";
+  }
+  return lunarMonthDayText(spec.lunarMonth || 1, spec.lunarDay || 1, !!spec.isLeapMonth);
+}
+
 function nextSolar(spec: ImportantDate["spec"]) {
   if (!spec.lunarMonth || !spec.lunarDay) {
     return null;
@@ -249,8 +297,40 @@ function yearlySolar(solarDate?: string) {
   if (!solarDate) {
     return "—";
   }
-  // 阳历每年同日循环，展示包含年份的完整日期
   return `${currentYear.value}-${solarDate.slice(5)}`;
+}
+
+// ---------- 操作日志 ----------
+async function appendLog(action: LogAction, targetTitle: string, targetName: string, detail: string) {
+  try {
+    await writeOperationLog(action, targetTitle, targetName, detail);
+  } catch {
+    // 日志写入失败不影响主流程
+  }
+}
+
+function summaryOf(spec: ImportantDate["spec"]): string {
+  return `日期：${dateText(spec)}；备注：${spec.note?.trim() ? spec.note.trim() : "无"}`;
+}
+
+function diffOf(oldSpec: ImportantDate["spec"], newSpec: ImportantDate["spec"]): string {
+  const parts: string[] = [];
+  if (oldSpec.title !== newSpec.title) {
+    parts.push(`名称：${oldSpec.title} → ${newSpec.title}`);
+  }
+  if (oldSpec.dateType !== newSpec.dateType) {
+    parts.push(`类型：${oldSpec.dateType === "SOLAR" ? "阳历" : "农历"} → ${newSpec.dateType === "SOLAR" ? "阳历" : "农历"}`);
+  }
+  if (dateText(oldSpec) !== dateText(newSpec)) {
+    parts.push(`日期：${dateText(oldSpec)} → ${dateText(newSpec)}`);
+  }
+  if ((oldSpec.note || "") !== (newSpec.note || "")) {
+    parts.push(`备注：${oldSpec.note?.trim() || "无"} → ${newSpec.note?.trim() || "无"}`);
+  }
+  if (!parts.length) {
+    return "无内容变化";
+  }
+  return parts.join("；");
 }
 
 async function save() {
@@ -269,10 +349,9 @@ async function save() {
       apiVersion: "importantdates.halo.run/v1alpha1",
       kind: "ImportantDate",
       metadata: {
-        name: editingName.value || `important-date-${Date.now()}`,
+        name: editingName.value || `important-date-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         ...(editingName.value
           ? {
-              // 保留原元数据（版本号、创建时间等）
               ...(dates.value.find((d) => d.metadata.name === editingName.value)?.metadata || {}),
             }
           : {}),
@@ -289,11 +368,19 @@ async function save() {
     };
 
     if (editingName.value) {
+      const oldItem = dates.value.find((d) => d.metadata.name === editingName.value);
       await updateImportantDate(payload);
       Toast.success("已保存");
+      await appendLog(
+        "UPDATE",
+        payload.spec.title,
+        payload.metadata.name,
+        diffOf(oldItem?.spec || ({} as ImportantDate["spec"]), payload.spec)
+      );
     } else {
       await createImportantDate(payload);
       Toast.success("已新增");
+      await appendLog("CREATE", payload.spec.title, payload.metadata.name, summaryOf(payload.spec));
     }
     closeModal();
     await load();
@@ -314,12 +401,36 @@ function remove(item: ImportantDate) {
       try {
         await deleteImportantDate(item.metadata.name);
         Toast.success("已删除");
+        await appendLog("DELETE", item.spec.title, item.metadata.name, summaryOf(item.spec));
         await load();
       } catch (error) {
         Toast.error(`删除失败：${(error as Error)?.message || "未知错误"}`);
       }
     },
   });
+}
+
+async function openLogs() {
+  logVisible.value = true;
+  logLoading.value = true;
+  try {
+    logs.value = await listOperationLogs();
+  } finally {
+    logLoading.value = false;
+  }
+}
+
+function logTheme(action: LogAction): "primary" | "secondary" | "danger" {
+  return action === "CREATE" ? "primary" : action === "UPDATE" ? "secondary" : "danger";
+}
+
+function logActionText(action: LogAction): string {
+  return action === "CREATE" ? "新增" : action === "UPDATE" ? "编辑" : "删除";
+}
+
+function formatTime(iso?: string): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("zh-CN", { hour12: false });
 }
 </script>
 
@@ -359,6 +470,12 @@ function remove(item: ImportantDate) {
   word-break: break-word;
 }
 
+.storage-note {
+  margin-top: 14px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
 .form {
   display: flex;
   flex-direction: column;
@@ -389,25 +506,6 @@ function remove(item: ImportantDate) {
 .textarea {
   resize: vertical;
   font-family: inherit;
-}
-
-.lunar-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.lunar-row .input {
-  width: 110px;
-}
-
-.leap {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 14px;
-  color: #374151;
-  cursor: pointer;
 }
 
 .hint {

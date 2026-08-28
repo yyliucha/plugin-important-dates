@@ -33,3 +33,19 @@ export interface ListResult<T> {
   total: number;
   items: T[];
 }
+
+export type LogAction = "CREATE" | "UPDATE" | "DELETE";
+
+export interface OperationLogSpec {
+  action: LogAction;
+  targetTitle?: string;
+  targetName?: string;
+  detail?: string;
+}
+
+export interface OperationLog {
+  apiVersion: string;
+  kind: string;
+  metadata: Metadata;
+  spec: OperationLogSpec;
+}
