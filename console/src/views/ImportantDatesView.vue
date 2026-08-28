@@ -2,11 +2,15 @@
   <VPageHeader title="重要日期">
     <template #actions>
       <VButton @click="openLogs">操作日志</VButton>
+      <VButton @click="exportData">导出</VButton>
+      <VButton @click="triggerImport">导入</VButton>
       <VButton type="secondary" @click="openCreate">
         <span style="margin-right: 4px">＋</span>新增
       </VButton>
     </template>
   </VPageHeader>
+
+  <input ref="fileInputRef" type="file" accept=".json,application/json" style="display: none" @change="onImportFile" />
 
   <div class="page-content">
     <VLoading v-if="loading" />
@@ -164,6 +168,48 @@
         </tbody>
       </table>
     </VModal>
+
+    <!-- 导入 -->
+    <VModal :visible="importModalVisible" title="导入重要日期" width="520" @close="closeImportModal">
+      <div v-if="!importResult" class="form">
+        <div class="import-row">
+          <span class="label">文件</span>
+          <span class="hint">{{ importFileName }}</span>
+        </div>
+        <div class="import-row">
+          <span class="label">校验结果</span>
+          <span class="hint">
+            可导入 <b>{{ importValidCount }}</b> 条；已存在将跳过 <b>{{ importDuplicateCount }}</b> 条；
+            格式无效 <b>{{ importInvalidCount }}</b> 条。
+          </span>
+        </div>
+        <div class="hint">导入不会覆盖已有数据（按记录标识判重，已存在的自动跳过）。</div>
+      </div>
+      <div v-else class="form">
+        <div class="import-row">
+          <span class="label">导入结果</span>
+          <span class="hint">
+            成功新增 <b>{{ importResult.imported }}</b> 条；跳过重复 <b>{{ importResult.skipped }}</b> 条；
+            失败 <b>{{ importResult.failed }}</b> 条。
+          </span>
+        </div>
+      </div>
+      <template #footer>
+        <VSpace>
+          <VButton @click="closeImportModal">取消</VButton>
+          <VButton
+            v-if="!importResult"
+            type="secondary"
+            :loading="importing"
+            :disabled="!importValidCount"
+            @click="doImport"
+          >
+            开始导入
+          </VButton>
+          <VButton v-else type="secondary" @click="closeImportModal">完成</VButton>
+        </VSpace>
+      </template>
+    </VModal>
   </div>
 </template>
 
@@ -203,6 +249,16 @@ const editingName = ref<string | null>(null);
 const logVisible = ref(false);
 const logLoading = ref(false);
 const logs = ref<OperationLog[]>([]);
+
+const fileInputRef = ref<HTMLInputElement | null>(null);
+const importModalVisible = ref(false);
+const importing = ref(false);
+const importFileName = ref("");
+const importValidCount = ref(0);
+const importDuplicateCount = ref(0);
+const importInvalidCount = ref(0);
+const importItems = ref<Array<{ name: string; spec: ImportantDate["spec"] }>>([]);
+const importResult = ref<{ imported: number; skipped: number; failed: number } | null>(null);
 
 interface DateForm {
   title: string;
@@ -331,6 +387,138 @@ function diffOf(oldSpec: ImportantDate["spec"], newSpec: ImportantDate["spec"]):
     return "无内容变化";
   }
   return parts.join("；");
+}
+
+// ---------- 导出 / 导入 ----------
+function exportData() {
+  const items = dates.value.map((d) => ({ name: d.metadata.name, spec: d.spec }));
+  const payload = {
+    app: "plugin-important-dates",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    items,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `important-dates-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  Toast.success(`已导出 ${items.length} 条记录`);
+}
+
+function triggerImport() {
+  importResult.value = null;
+  fileInputRef.value?.click();
+}
+
+async function onImportFile(e: Event) {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  importFileName.value = file.name;
+  try {
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    const rawItems = Array.isArray(parsed) ? parsed : parsed?.items;
+    if (!Array.isArray(rawItems)) {
+      throw new Error("items 不是数组");
+    }
+    const existing = new Set(dates.value.map((d) => d.metadata.name));
+    const seen = new Set<string>();
+    let valid = 0;
+    let dup = 0;
+    let invalid = 0;
+    const list: Array<{ name: string; spec: ImportantDate["spec"] }> = [];
+    for (const it of rawItems) {
+      const spec = it?.spec;
+      if (!spec || typeof spec.title !== "string" || !spec.title.trim()) {
+        invalid++;
+        continue;
+      }
+      if (spec.dateType === "LUNAR") {
+        const m = spec.lunarMonth;
+        const d = spec.lunarDay;
+        if (!Number.isInteger(m) || m < 1 || m > 12 || !Number.isInteger(d) || d < 1 || d > 30) {
+          invalid++;
+          continue;
+        }
+      } else if (spec.dateType === "SOLAR") {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(spec.solarDate || "")) {
+          invalid++;
+          continue;
+        }
+      } else {
+        invalid++;
+        continue;
+      }
+      const name =
+        typeof it.name === "string" && it.name
+          ? it.name
+          : `important-date-import-${Date.now()}-${valid}`;
+      if (existing.has(name) || seen.has(name)) {
+        dup++;
+        continue;
+      }
+      seen.add(name);
+      list.push({ name, spec: { ...spec } });
+      valid++;
+    }
+    importItems.value = list;
+    importValidCount.value = valid;
+    importDuplicateCount.value = dup;
+    importInvalidCount.value = invalid;
+    importModalVisible.value = true;
+    if (!valid) {
+      Toast.warning("文件中没有可导入的记录");
+    }
+  } catch {
+    Toast.error("导入失败：不是有效的导出文件（JSON）");
+  } finally {
+    input.value = "";
+  }
+}
+
+async function doImport() {
+  importing.value = true;
+  let imported = 0;
+  let failed = 0;
+  try {
+    for (const item of importItems.value) {
+      try {
+        const created = await createImportantDate({
+          apiVersion: "importantdates.halo.run/v1alpha1",
+          kind: "ImportantDate",
+          metadata: { name: item.name },
+          spec: item.spec,
+        });
+        imported++;
+        await appendLog("CREATE", created.spec.title, created.metadata.name, `导入：${summaryOf(created.spec)}`);
+      } catch {
+        failed++;
+      }
+    }
+  } finally {
+    importing.value = false;
+    importResult.value = {
+      imported,
+      skipped: importDuplicateCount.value,
+      failed,
+    };
+    if (imported > 0) {
+      await load();
+    }
+    Toast.success(`导入完成：新增 ${imported} 条`);
+  }
+}
+
+function closeImportModal() {
+  importModalVisible.value = false;
+  importResult.value = null;
+  importItems.value = [];
 }
 
 async function save() {
@@ -511,5 +699,19 @@ function formatTime(iso?: string): string {
 .hint {
   font-size: 13px;
   color: #9ca3af;
+}
+
+.import-row {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.import-row .label {
+  flex: 0 0 56px;
+}
+
+.import-row .hint {
+  word-break: break-all;
 }
 </style>
