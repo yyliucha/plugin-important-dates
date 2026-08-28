@@ -34,5 +34,5 @@ spec:
         - $formkit: checkbox
           name: useThemeTemplate
           label: 使用主题模板渲染
-          value: false
-          help: 开启后 /important-dates 使用当前主题的 important-dates.html 渲染（页面获得主题布局）。注意：必须先把模板文件放入主题 templates/ 目录且语法正确（不同主题的布局片段不同，见 README）；否则该页面会 500。默认关闭（插件自带页面，全版本兼容）。
+          value: true
+          help: 推荐开启（默认）。插件启动时会自动为当前主题生成适配模板（themes/主题名/templates/important-dates.html），页面将在主题布局内打开；若主题无布局或模板异常，将自动回退到插件自带页面（不会报 500）。取消勾选则始终使用插件自带页面。

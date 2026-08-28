@@ -13,6 +13,7 @@ import reactor.core.publisher.Mono;
 import run.halo.app.plugin.ReactiveSettingFetcher;
 import run.halo.importantdates.finders.ImportantDateFinder;
 import run.halo.importantdates.support.HtmlRenderer;
+import run.halo.importantdates.support.ThemeTemplateSupport;
 import run.halo.importantdates.vo.ImportantDateVo;
 import run.halo.importantdates.vo.PersonVo;
 
@@ -40,11 +41,14 @@ public class ImportantDateRouter {
 
     private final ImportantDateFinder importantDateFinder;
     private final ReactiveSettingFetcher settingFetcher;
+    private final ThemeTemplateSupport themeTemplateSupport;
 
     public ImportantDateRouter(ImportantDateFinder importantDateFinder,
-        ReactiveSettingFetcher settingFetcher) {
+        ReactiveSettingFetcher settingFetcher,
+        ThemeTemplateSupport themeTemplateSupport) {
         this.importantDateFinder = importantDateFinder;
         this.settingFetcher = settingFetcher;
+        this.themeTemplateSupport = themeTemplateSupport;
     }
 
     /**
@@ -56,8 +60,12 @@ public class ImportantDateRouter {
             org.springframework.web.reactive.function.server.RequestPredicates.GET("/important-dates"),
             request -> reminderConfig()
                 .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
-                .flatMap(cfg ->
-                    Mono.zip(
+                .zipWith(themeTemplateSupport.ensureThemeTemplate()
+                    .then(themeTemplateSupport.templateExists()))
+                .flatMap(zip -> {
+                    ReminderConfig cfg = zip.getT1();
+                    boolean themeTemplateReady = zip.getT2() && cfg.useThemeTemplate();
+                    return Mono.zip(
                             importantDateFinder.listAll().collectList(),
                             importantDateFinder.listAllPeople().collectList(),
                             importantDateFinder.listUpcoming(cfg.remindDays()).collectList()
@@ -66,7 +74,7 @@ public class ImportantDateRouter {
                             List<ImportantDateVo> dates = tuple.getT1();
                             List<PersonVo> people = tuple.getT2();
                             List<ImportantDateVo> reminders = tuple.getT3();
-                            if (cfg.useThemeTemplate()) {
+                            if (themeTemplateReady) {
                                 Map<String, Object> model = new LinkedHashMap<>();
                                 model.put("title", "重要日期");
                                 model.put("dates", dates);
@@ -80,8 +88,8 @@ public class ImportantDateRouter {
                                 .bodyValue(HtmlRenderer.render(
                                     "重要日期", dates, people, reminders,
                                     cfg.showImportantTag()));
-                        })
-                )
+                        });
+                })
         );
     }
 
@@ -113,7 +121,7 @@ public class ImportantDateRouter {
             int days = intValue(r, "remindDays", DEFAULT_REMIND_DAYS);
             boolean frontendReminder = boolValue(r, "frontendReminder", true);
             boolean showImportantTag = boolValue(b, "showImportantTag", true);
-            boolean useThemeTemplate = boolValue(b, "useThemeTemplate", false);
+            boolean useThemeTemplate = boolValue(b, "useThemeTemplate", true);
             return new ReminderConfig(days, frontendReminder, showImportantTag, useThemeTemplate);
         });
     }
