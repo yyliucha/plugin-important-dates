@@ -1,8 +1,9 @@
 import { axiosInstance } from "@halo-dev/api-client";
-import type { ImportantDate, ListResult, LogAction, OperationLog } from "@/types";
+import type { ImportantDate, ListResult, LogAction, OperationLog, Person } from "@/types";
 
 const BASE = "/apis/importantdates.halo.run/v1alpha1/importantdates";
 const LOG_BASE = "/apis/importantdates.halo.run/v1alpha1/operationlogs";
+const PERSON_BASE = "/apis/importantdates.halo.run/v1alpha1/persons";
 
 export async function listImportantDates(): Promise<ImportantDate[]> {
   const { data } = await axiosInstance.get<ListResult<ImportantDate>>(BASE, {
@@ -54,4 +55,29 @@ export async function listOperationLogs(): Promise<OperationLog[]> {
     },
   });
   return data.items || [];
+}
+
+export async function listPersons(): Promise<Person[]> {
+  const { data } = await axiosInstance.get<ListResult<Person>>(PERSON_BASE, {
+    params: {
+      page: 1,
+      size: 500,
+      sort: "metadata.creationTimestamp,desc",
+    },
+  });
+  return data.items || [];
+}
+
+export async function createPerson(item: Person): Promise<Person> {
+  const { data } = await axiosInstance.post<Person>(PERSON_BASE, item);
+  return data;
+}
+
+export async function updatePerson(item: Person): Promise<Person> {
+  const { data } = await axiosInstance.put<Person>(`${PERSON_BASE}/${item.metadata.name}`, item);
+  return data;
+}
+
+export async function deletePerson(name: string): Promise<void> {
+  await axiosInstance.delete(`${PERSON_BASE}/${name}`);
 }

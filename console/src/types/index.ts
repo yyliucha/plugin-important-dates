@@ -18,6 +18,8 @@ export interface ImportantDateSpec {
   lunarDay?: number;
   isLeapMonth?: boolean;
   note?: string;
+  /** 关联的人员（Person metadata.name 列表） */
+  personNames?: string[];
 }
 
 export interface ImportantDate {
@@ -48,4 +50,28 @@ export interface OperationLog {
   kind: string;
   metadata: Metadata;
   spec: OperationLogSpec;
+}
+
+export interface PersonSpec {
+  displayName: string;
+  nickname?: string;
+  relation?: string;
+  dateType: DateType;
+  solarDate?: string;
+  lunarMonth?: number;
+  lunarDay?: number;
+  isLeapMonth?: boolean;
+  gender?: string;
+  bloodType?: string;
+  heightCm?: number;
+  weightKg?: number;
+  hobbies?: string;
+  note?: string;
+}
+
+export interface Person {
+  apiVersion: string;
+  kind: string;
+  metadata: Metadata;
+  spec: PersonSpec;
 }

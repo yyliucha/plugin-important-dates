@@ -10,7 +10,7 @@ metadata:
     rbac.authorization.halo.run/display-name: "重要日期查看"
 rules:
   - apiGroups: [ "importantdates.halo.run" ]
-    resources: [ "importantdates", "operationlogs" ]
+    resources: [ "importantdates", "operationlogs", "persons" ]
     verbs: [ "get", "list" ]
 ---
 apiVersion: v1alpha1
@@ -26,5 +26,5 @@ metadata:
     rbac.authorization.halo.run/display-name: "重要日期管理"
 rules:
   - apiGroups: [ "importantdates.halo.run" ]
-    resources: [ "importantdates", "operationlogs" ]
+    resources: [ "importantdates", "operationlogs", "persons" ]
     verbs: [ "create", "patch", "update", "delete", "deletecollection" ]

@@ -29,11 +29,13 @@ public class ImportantDatesPlugin extends BasePlugin {
     public void start() {
         schemeManager.register(ImportantDate.class);
         schemeManager.register(OperationLog.class);
+        schemeManager.register(Person.class);
     }
 
     @Override
     public void stop() {
         schemeManager.unregister(Scheme.buildFromType(ImportantDate.class));
         schemeManager.unregister(Scheme.buildFromType(OperationLog.class));
+        schemeManager.unregister(Scheme.buildFromType(Person.class));
     }
 }

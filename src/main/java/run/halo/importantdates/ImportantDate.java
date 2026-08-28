@@ -72,5 +72,11 @@ public class ImportantDate extends AbstractExtension {
          */
         @Schema(description = "备注信息")
         private String note;
+
+        /**
+         * 关联的人员（Person metadata.name 列表），可关联多人。
+         */
+        @Schema(description = "关联的人员")
+        private java.util.List<String> personNames;
     }
 }
