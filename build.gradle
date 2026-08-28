@@ -1,0 +1,47 @@
+plugins {
+    id 'java'
+    id "io.freefair.lombok" version "9.2.0"
+    id "run.halo.plugin.devtools" version "0.6.2"
+}
+
+group 'run.halo.importantdates'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation platform('run.halo.tools.platform:plugin:2.20.20')
+    compileOnly 'run.halo.app:api'
+}
+
+java {
+    // 使用当前 JDK（23）编译，目标字节码 Java 17，兼容 Java 17/21 的 Halo 运行环境
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+    options.release = 17
+}
+
+// 构建后台管理界面（前端），依赖 Node.js/npm 环境。
+// 注意：前端产物默认已构建并提交在 src/main/resources/console 中，
+// 只有修改了 console/ 下的源码时才需要手动执行本任务。
+tasks.register('buildFrontend', Exec) {
+    group = 'build'
+    description = 'Build the console UI with npm (vite build)'
+    workingDir file("console")
+    commandLine 'npm', 'run', 'build'
+    inputs.dir(layout.projectDirectory.dir('console/src'))
+    inputs.files(fileTree(
+        dir: layout.projectDirectory.dir('console'),
+        includes: ['package.json', 'package-lock.json', 'vite.config.ts', 'tsconfig.json']
+    ))
+    outputs.dir(layout.projectDirectory.file('src/main/resources/console'))
+}
+
+halo {
+    version = '2.20.20'
+}

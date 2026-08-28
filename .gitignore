@@ -1,0 +1,7 @@
+.gradle/
+build/
+.idea/
+*.iml
+console/node_modules/
+console/dist/
+console/.vite/

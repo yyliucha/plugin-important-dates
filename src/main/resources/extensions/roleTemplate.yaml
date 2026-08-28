@@ -1,0 +1,30 @@
+apiVersion: v1alpha1
+kind: Role
+metadata:
+  name: role-template-important-dates-view
+  labels:
+    halo.run/role-template: "true"
+  annotations:
+    rbac.authorization.halo.run/module: "重要日期"
+    rbac.authorization.halo.run/ui-permissions: '["plugin:important-dates:view"]'
+    rbac.authorization.halo.run/display-name: "重要日期查看"
+rules:
+  - apiGroups: [ "importantdates.halo.run" ]
+    resources: [ "importantdates" ]
+    verbs: [ "get", "list" ]
+---
+apiVersion: v1alpha1
+kind: Role
+metadata:
+  name: role-template-important-dates-manage
+  labels:
+    halo.run/role-template: "true"
+  annotations:
+    rbac.authorization.halo.run/dependencies: '["role-template-important-dates-view"]'
+    rbac.authorization.halo.run/ui-permissions: '["plugin:important-dates:manage"]'
+    rbac.authorization.halo.run/module: "重要日期"
+    rbac.authorization.halo.run/display-name: "重要日期管理"
+rules:
+  - apiGroups: [ "importantdates.halo.run" ]
+    resources: [ "importantdates" ]
+    verbs: [ "create", "patch", "update", "delete", "deletecollection" ]
