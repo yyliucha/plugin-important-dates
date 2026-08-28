@@ -13,6 +13,13 @@
   <input ref="fileInputRef" type="file" accept=".json,application/json" style="display: none" @change="onImportFile" />
 
   <div class="page-content">
+    <!-- 到期提醒横幅（后台） -->
+    <div v-if="showBackendReminder && reminders.length" class="remind-banner">
+      <div v-for="r in reminders" :key="r.metadata.name" class="remind-item">
+        {{ remindText(r) }}
+      </div>
+    </div>
+
     <!-- 页签 -->
     <div class="tabs">
       <button
@@ -65,11 +72,13 @@
           <table class="dates-table">
             <thead>
               <tr>
-                <th style="width: 16%">名称</th>
-                <th style="width: 9%">类型</th>
-                <th style="width: 17%">日期</th>
-                <th style="width: 18%">最近一次</th>
-                <th style="width: 14%">关联人</th>
+                <th style="width: 14%">名称</th>
+                <th style="width: 8%">类型</th>
+                <th style="width: 15%">日期</th>
+                <th style="width: 16%">最近一次</th>
+                <th style="width: 12%">关联人</th>
+                <th style="width: 8%">重要</th>
+                <th style="width: 8%">前台</th>
                 <th>备注</th>
                 <th style="width: 110px">操作</th>
               </tr>
@@ -107,6 +116,16 @@
                   <span v-else>—</span>
                 </td>
                 <td>
+                  <VTag v-if="item.spec.important !== false" theme="secondary">重要</VTag>
+                  <span v-else class="muted">普通</span>
+                </td>
+                <td>
+                  <VSwitch
+                    :model-value="item.spec.visible !== false"
+                    @change="(v: boolean) => toggleDateVisible(item, v)"
+                  />
+                </td>
+                <td>
                   <span class="note">{{ item.spec.note || "—" }}</span>
                 </td>
                 <td>
@@ -137,7 +156,10 @@
       <div v-else class="persons-grid">
         <VCard v-for="p in persons" :key="p.metadata.name" class="person-card">
           <div class="person-head">
-            <div class="person-name">{{ p.spec.displayName }}</div>
+            <div class="person-name">
+              {{ p.spec.displayName }}
+              <VTag v-if="p.spec.visible === false" theme="danger" class="hidden-tag">已隐藏</VTag>
+            </div>
             <VSpace>
               <VTag v-if="p.spec.relation" theme="secondary">{{ p.spec.relation }}</VTag>
               <VTag v-if="p.spec.gender" theme="default">{{ p.spec.gender }}</VTag>
@@ -161,6 +183,13 @@
           <div class="person-actions">
             <VSpace>
               <VButton size="sm" @click="openPersonEdit(p)">编辑</VButton>
+              <label class="visible-toggle">
+                <VSwitch
+                  :model-value="p.spec.visible !== false"
+                  @change="(v: boolean) => togglePersonVisible(p, v)"
+                />
+                <span class="muted">前台展示</span>
+              </label>
               <VButton size="sm" type="danger" @click="removePerson(p)">删除</VButton>
             </VSpace>
           </div>
@@ -225,6 +254,20 @@
           </div>
           <div v-else class="hint">
             暂无人员，请先到「人员」页签添加（如张三），再回来关联。
+          </div>
+        </div>
+
+        <div class="field">
+          <span class="label">属性</span>
+          <div class="person-checks">
+            <label class="person-check">
+              <input v-model="form.important" type="checkbox" />
+              <span>重要（参与到期提醒）</span>
+            </label>
+            <label class="person-check">
+              <input v-model="form.visible" type="checkbox" />
+              <span>前台展示（/important-dates 页面）</span>
+            </label>
           </div>
         </div>
 
@@ -340,6 +383,7 @@ import {
   VModal,
   VPageHeader,
   VSpace,
+  VSwitch,
   VTag,
 } from "@halo-dev/components";
 import {
@@ -347,6 +391,7 @@ import {
   createPerson,
   deleteImportantDate,
   deletePerson,
+  fetchPluginJsonConfig,
   listImportantDates,
   listOperationLogs,
   listPersons,
@@ -408,6 +453,8 @@ interface DateForm {
   isLeapMonth: boolean;
   note: string;
   personNames: string[];
+  important: boolean;
+  visible: boolean;
 }
 
 const emptyForm = (): DateForm => ({
@@ -419,6 +466,8 @@ const emptyForm = (): DateForm => ({
   isLeapMonth: false,
   note: "",
   personNames: [],
+  important: true,
+  visible: true,
 });
 
 const form = reactive<DateForm>(emptyForm());
@@ -429,6 +478,7 @@ async function load() {
     const [dateList, personList] = await Promise.all([listImportantDates(), listPersons()]);
     dates.value = dateList;
     persons.value = personList;
+    await loadRemindConfig();
   } finally {
     loading.value = false;
   }
@@ -550,6 +600,8 @@ function openEdit(item: ImportantDate) {
     isLeapMonth: !!spec.isLeapMonth,
     note: spec.note || "",
     personNames: [...(spec.personNames || [])],
+    important: spec.important !== false,
+    visible: spec.visible !== false,
   });
   editingName.value = item.metadata.name;
   modalVisible.value = true;
@@ -584,6 +636,107 @@ function yearlySolar(solarDate?: string) {
     return "—";
   }
   return `${currentYear.value}-${solarDate.slice(5)}`;
+}
+
+// ---------- 到期提醒 ----------
+const remindConfig = ref({ remindDays: 3, backendReminder: true });
+
+async function loadRemindConfig() {
+  try {
+    const config = await fetchPluginJsonConfig("plugin-important-dates");
+    const days = Number.parseInt(config["remindDays"] || "", 10);
+    remindConfig.value = {
+      remindDays: Number.isFinite(days) ? Math.max(0, Math.min(30, days)) : 3,
+      backendReminder: config["backendReminder"] !== "false",
+    };
+  } catch {
+    remindConfig.value = { remindDays: 3, backendReminder: true };
+  }
+}
+
+function daysUntilOf(spec: ImportantDate["spec"]): number | null {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let next: Date | null = null;
+  if (spec.dateType === "SOLAR" && spec.solarDate) {
+    const [, m, d] = spec.solarDate.split("-").map(Number);
+    let cand = new Date(today.getFullYear(), m - 1, d);
+    if (cand.getTime() < today.getTime()) {
+      cand = new Date(today.getFullYear() + 1, m - 1, d);
+    }
+    next = cand;
+  } else if (spec.dateType === "LUNAR") {
+    const r = nextSolarDate(spec.lunarMonth || 1, spec.lunarDay || 1, !!spec.isLeapMonth);
+    if (r) {
+      next = new Date(`${r.solarDate}T00:00:00`);
+    }
+  }
+  if (!next) return null;
+  return Math.round((next.getTime() - today.getTime()) / 86400000);
+}
+
+const reminders = computed(() => {
+  const days = remindConfig.value.remindDays;
+  return dates.value
+    .filter(
+      (d) =>
+        d.spec.important !== false &&
+        d.spec.visible !== false &&
+        (() => {
+          const n = daysUntilOf(d.spec);
+          return n !== null && n >= 0 && n <= days;
+        })()
+    )
+    .sort((a, b) => (daysUntilOf(a.spec) ?? 9999) - (daysUntilOf(b.spec) ?? 9999));
+});
+
+const showBackendReminder = computed(() => remindConfig.value.backendReminder);
+
+function remindText(item: ImportantDate): string {
+  const n = daysUntilOf(item.spec) ?? 0;
+  if (n <= 0) return `今天是「${item.spec.title}」`;
+  if (n === 1) return `明天是「${item.spec.title}」`;
+  return `还有 ${n} 天是「${item.spec.title}」`;
+}
+
+async function toggleDateVisible(item: ImportantDate, visibleValue: boolean) {
+  try {
+    const next: ImportantDate = {
+      ...item,
+      spec: { ...item.spec, visible: visibleValue },
+    };
+    await updateImportantDate(next);
+    await appendLog(
+      "UPDATE",
+      item.spec.title,
+      item.metadata.name,
+      `前台展示：${item.spec.visible !== false ? "是" : "否"} → ${visibleValue ? "是" : "否"}`
+    );
+    await load();
+  } catch (error) {
+    Toast.error(`切换失败：${(error as Error)?.message || "未知错误"}`);
+    await load();
+  }
+}
+
+async function togglePersonVisible(p: Person, visibleValue: boolean) {
+  try {
+    const next: Person = {
+      ...p,
+      spec: { ...p.spec, visible: visibleValue },
+    };
+    await updatePerson(next);
+    await appendLog(
+      "UPDATE",
+      p.spec.displayName,
+      p.metadata.name,
+      `前台展示：${p.spec.visible !== false ? "是" : "否"} → ${visibleValue ? "是" : "否"}`
+    );
+    await load();
+  } catch (error) {
+    Toast.error(`切换失败：${(error as Error)?.message || "未知错误"}`);
+    await load();
+  }
 }
 
 // ---------- 操作日志 ----------
@@ -623,6 +776,16 @@ function diffOf(oldSpec: ImportantDate["spec"] | undefined, newSpec: ImportantDa
   if ((oldSpecSafe.note || "") !== (newSpec.note || "")) {
     parts.push(`备注：${oldSpecSafe.note?.trim() || "无"} → ${newSpec.note?.trim() || "无"}`);
   }
+  const oldImportant = oldSpecSafe.important !== false;
+  const newImportant = newSpec.important !== false;
+  if (oldImportant !== newImportant) {
+    parts.push(`重要：${oldImportant ? "是" : "否"} → ${newImportant ? "是" : "否"}`);
+  }
+  const oldVisible = oldSpecSafe.visible !== false;
+  const newVisible = newSpec.visible !== false;
+  if (oldVisible !== newVisible) {
+    parts.push(`前台展示：${oldVisible ? "是" : "否"} → ${newVisible ? "是" : "否"}`);
+  }
   if (!parts.length) {
     return "无内容变化";
   }
@@ -659,6 +822,8 @@ async function save() {
         isLeapMonth: form.dateType === "LUNAR" ? form.isLeapMonth : false,
         note: form.note.trim() || undefined,
         personNames: form.personNames.length ? [...form.personNames] : undefined,
+        important: form.important,
+        visible: form.visible,
       },
     };
 
@@ -1052,6 +1217,41 @@ function formatTime(iso?: string): string {
   margin-top: 14px;
   font-size: 12px;
   color: #9ca3af;
+}
+
+.remind-banner {
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  border-radius: 10px;
+  padding: 10px 16px;
+  margin-bottom: 12px;
+}
+
+.remind-item {
+  color: #9a3412;
+  font-size: 14px;
+  line-height: 1.9;
+}
+
+.remind-item::before {
+  content: "★ ";
+  color: #f59e0b;
+}
+
+.muted {
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.hidden-tag {
+  margin-left: 6px;
+}
+
+.visible-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
 }
 
 .log-state {

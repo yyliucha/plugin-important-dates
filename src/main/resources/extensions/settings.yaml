@@ -1,0 +1,33 @@
+apiVersion: v1alpha1
+kind: Setting
+metadata:
+  name: plugin-important-dates-settings
+spec:
+  forms:
+    - group: reminder
+      label: 提醒设置
+      formSchema:
+        - $formkit: number
+          name: remindDays
+          label: 提前提醒天数
+          value: 3
+          validation: required|Number
+          help: 距到期 N 天内显示提醒（含当天，0 表示仅当天提醒）
+        - $formkit: checkbox
+          name: backendReminder
+          label: 后台提醒
+          value: true
+          help: 在后台「重要日期」页面顶部显示到期提醒
+        - $formkit: checkbox
+          name: frontendReminder
+          label: 前台提醒
+          value: true
+          help: 在前台 /important-dates 页面顶部显示到期提醒
+    - group: basic
+      label: 展示设置
+      formSchema:
+        - $formkit: checkbox
+          name: showImportantTag
+          label: 前台显示"重要"标记
+          value: true
+          help: 在 /important-dates 页面为重要日期显示"重要"标记

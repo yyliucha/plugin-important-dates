@@ -81,3 +81,16 @@ export async function updatePerson(item: Person): Promise<Person> {
 export async function deletePerson(name: string): Promise<void> {
   await axiosInstance.delete(`${PERSON_BASE}/${name}`);
 }
+
+/**
+ * 读取插件配置（json-config 接口），返回配置数据对象。
+ */
+export async function fetchPluginJsonConfig(
+  pluginName: string
+): Promise<Record<string, string>> {
+  const { data } = await axiosInstance.get(
+    `/apis/api.console.halo.run/v1alpha1/plugins/${pluginName}/json-config`
+  );
+  const config = data?.data ?? data ?? {};
+  return config as Record<string, string>;
+}

@@ -114,5 +114,11 @@ public class Person extends AbstractExtension {
          */
         @Schema(description = "备注")
         private String note;
+
+        /**
+         * 是否在前台展示。默认 true；false 表示仅后台可见。
+         */
+        @Schema(description = "是否在前台展示")
+        private Boolean visible = true;
     }
 }

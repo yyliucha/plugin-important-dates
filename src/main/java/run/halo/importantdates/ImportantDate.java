@@ -78,5 +78,17 @@ public class ImportantDate extends AbstractExtension {
          */
         @Schema(description = "关联的人员")
         private java.util.List<String> personNames;
+
+        /**
+         * 是否重要（用于全站到期提醒等场景）。默认 true。
+         */
+        @Schema(description = "是否重要")
+        private Boolean important = true;
+
+        /**
+         * 是否在前台展示。默认 true；false 表示仅后台可见。
+         */
+        @Schema(description = "是否在前台展示")
+        private Boolean visible = true;
     }
 }

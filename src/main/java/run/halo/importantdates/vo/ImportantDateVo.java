@@ -46,4 +46,19 @@ public class ImportantDateVo {
      * 关联人员姓名（显示用，不含隐私字段）。
      */
     private List<String> personNames;
+
+    /**
+     * 是否重要。
+     */
+    private boolean important;
+
+    /**
+     * 前台是否可见。
+     */
+    private boolean frontendVisible;
+
+    /**
+     * 剩余天数是否有效（nextSolarDate 非空即有效）。
+     */
+    private boolean daysValid;
 }

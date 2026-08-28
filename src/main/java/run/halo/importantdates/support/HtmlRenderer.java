@@ -18,7 +18,8 @@ public final class HtmlRenderer {
     private HtmlRenderer() {
     }
 
-    public static String render(String title, List<ImportantDateVo> dates, List<PersonVo> people) {
+    public static String render(String title, List<ImportantDateVo> dates, List<PersonVo> people,
+        List<ImportantDateVo> reminders, boolean showImportantTag) {
         StringBuilder sb = new StringBuilder(8192);
         sb.append("<!DOCTYPE html>\n<html lang=\"zh-CN\">\n<head>\n<meta charset=\"UTF-8\"/>\n")
             .append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"/>\n")
@@ -37,11 +38,33 @@ public final class HtmlRenderer {
             .append(".id-meta{color:var(--id-muted);font-size:13px;}")
             .append(".id-days{color:var(--id-primary);font-size:14px;font-weight:600;white-space:nowrap;}")
             .append(".id-tag{display:inline-block;background:#eef2ff;color:#4338ca;border-radius:999px;padding:1px 10px;font-size:12px;margin-left:6px;}")
+            .append(".id-badge{display:inline-block;background:#fef3c7;color:#b45309;border-radius:999px;padding:1px 10px;font-size:12px;margin-left:8px;font-weight:500;}")
+            .append(".id-remind{background:#fff7ed;border:1px solid #fdba74;border-radius:12px;padding:12px 18px;margin-bottom:16px;}")
+            .append(".id-remind-item{color:#9a3412;font-size:14px;line-height:1.9;}")
+            .append(".id-remind-item::before{content:'★ ';color:#f59e0b;}")
             .append(".id-empty{color:var(--id-muted);text-align:center;padding:40px 0;}")
             .append(".id-people-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;}")
             .append("</style>\n</head>\n<body>\n<div class=\"id-wrap\">\n")
             .append("<h1 class=\"id-heading\">").append(esc(title)).append("</h1>\n")
             .append("<p class=\"id-sub\">记录值得纪念的日子，以及身边重要的人。</p>\n");
+
+        // 到期提醒
+        if (reminders != null && !reminders.isEmpty()) {
+            sb.append("<div class=\"id-remind\">\n");
+            for (ImportantDateVo r : reminders) {
+                sb.append("<div class=\"id-remind-item\">");
+                String prefix;
+                if (r.getDaysUntil() <= 0) {
+                    prefix = "今天是";
+                } else if (r.getDaysUntil() == 1) {
+                    prefix = "明天是";
+                } else {
+                    prefix = "还有 " + r.getDaysUntil() + " 天是";
+                }
+                sb.append(prefix).append("「").append(esc(r.getTitle())).append("」</div>\n");
+            }
+            sb.append("</div>\n");
+        }
 
         // 重要日期
         sb.append("<h2 class=\"id-section-title\">重要日期</h2>\n");
@@ -50,7 +73,11 @@ public final class HtmlRenderer {
         } else {
             for (ImportantDateVo d : dates) {
                 sb.append("<div class=\"id-card\"><div class=\"id-row\"><div>")
-                    .append("<span class=\"id-name\">").append(esc(d.getTitle())).append("</span>\n")
+                    .append("<span class=\"id-name\">").append(esc(d.getTitle())).append("</span>");
+                if (showImportantTag && d.isImportant()) {
+                    sb.append("<span class=\"id-badge\">重要</span>");
+                }
+                sb.append("\n")
                     .append("<div class=\"id-meta\">").append(esc(d.getDateText()));
                 if ("LUNAR".equals(d.getDateType())) {
                     sb.append("<span class=\"id-tag\">农历</span>");

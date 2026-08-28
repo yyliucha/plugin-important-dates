@@ -97,6 +97,16 @@
         <span class="label">备注</span>
         <textarea v-model="form.note" class="input textarea" rows="2" placeholder="其他想记录的信息"></textarea>
       </label>
+
+      <div class="field">
+        <span class="label">属性</span>
+        <div class="checks">
+          <label class="check">
+            <input v-model="form.visible" type="checkbox" />
+            <span>前台展示（/important-dates 页面）</span>
+          </label>
+        </div>
+      </div>
     </div>
 
     <template #footer>
@@ -142,6 +152,7 @@ interface PersonForm {
   weightKg: number | null;
   hobbies: string;
   note: string;
+  visible: boolean;
 }
 
 const empty = (): PersonForm => ({
@@ -159,6 +170,7 @@ const empty = (): PersonForm => ({
   weightKg: null,
   hobbies: "",
   note: "",
+  visible: true,
 });
 
 const form = reactive<PersonForm>(empty());
@@ -184,6 +196,7 @@ watch(
         weightKg: p.spec.weightKg ?? null,
         hobbies: p.spec.hobbies || "",
         note: p.spec.note || "",
+        visible: p.spec.visible !== false,
       });
     } else {
       Object.assign(form, empty());
@@ -228,6 +241,7 @@ async function save() {
         weightKg: form.weightKg ?? undefined,
         hobbies: form.hobbies.trim() || undefined,
         note: form.note.trim() || undefined,
+        visible: form.visible,
       },
     };
     if (props.person) {
@@ -287,6 +301,24 @@ async function save() {
 .textarea {
   resize: vertical;
   font-family: inherit;
+}
+
+.checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: #374151;
+  cursor: pointer;
 }
 
 .type-select {

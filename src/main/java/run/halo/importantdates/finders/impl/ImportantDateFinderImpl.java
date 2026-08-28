@@ -35,6 +35,17 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
 
     @Override
     public Flux<ImportantDateVo> listAll() {
+        return listDateVos(false);
+    }
+
+    @Override
+    public Flux<ImportantDateVo> listUpcoming(int days) {
+        LocalDate today = LocalDate.now();
+        return listDateVos(true)
+            .filter(vo -> vo.getDaysUntil() >= 0 && vo.getDaysUntil() <= days);
+    }
+
+    private Flux<ImportantDateVo> listDateVos(boolean importantOnly) {
         LocalDate today = LocalDate.now();
         return client.listAll(Person.class, ListOptions.builder().build(), Sort.unsorted())
             .collectList()
@@ -44,6 +55,8 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
                 return client.listAll(ImportantDate.class, ListOptions.builder().build(), Sort.unsorted())
                     .map(d -> toDateVo(d, byName, today))
                     .filter(vo -> vo.getNextSolarDate() != null)
+                    .filter(vo -> vo.isFrontendVisible())
+                    .filter(vo -> !importantOnly || vo.isImportant())
                     .sort(Comparator.comparing(ImportantDateVo::getDaysUntil)
                         .thenComparing(ImportantDateVo::getTitle));
             });
@@ -78,11 +91,14 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
         }
         vo.setNextSolarDate(next == null ? null : next.toString());
         vo.setDaysUntil(DateCalc.daysUntil(today, next));
+        vo.setDaysValid(next != null);
+        vo.setImportant(!Boolean.FALSE.equals(spec.getImportant()));
+        vo.setFrontendVisible(!Boolean.FALSE.equals(spec.getVisible()));
         List<String> names = new ArrayList<>();
         if (spec.getPersonNames() != null) {
             for (String name : spec.getPersonNames()) {
                 Person p = people.get(name);
-                if (p != null && p.getSpec() != null) {
+                if (p != null && p.getSpec() != null && !Boolean.FALSE.equals(p.getSpec().getVisible())) {
                     names.add(p.getSpec().getDisplayName());
                 }
             }

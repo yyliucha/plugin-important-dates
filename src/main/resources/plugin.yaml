@@ -4,12 +4,14 @@ metadata:
   name: plugin-important-dates
 spec:
   enabled: true
-  version: 1.0.6
+  version: 1.0.7
   requires: ">=2.14.0"
   author:
     name: important-dates
   logo: logo.svg
   displayName: "重要日期"
   description: "在后台记录重要日期（如结婚纪念日、孩子出生日期），支持阳历/农历、每年自动循环、备注信息。"
+  settingName: plugin-important-dates-settings
+  configMapName: plugin-important-dates-configmap
   license:
     - name: "MIT"

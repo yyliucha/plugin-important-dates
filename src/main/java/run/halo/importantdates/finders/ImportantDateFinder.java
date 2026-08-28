@@ -16,12 +16,19 @@ import run.halo.importantdates.vo.PersonVo;
 public interface ImportantDateFinder {
 
     /**
-     * 全部重要日期（按剩余天数升序）。
+     * 全部重要日期（按剩余天数升序，仅前台可见项）。
      */
     Flux<ImportantDateVo> listAll();
 
     /**
-     * 全部人员。
+     * 即将到来的重要日期（重要 + 前台可见 + N 天内），按剩余天数升序。
+     *
+     * @param days 提前天数（>= 0，含当天）
+     */
+    Flux<ImportantDateVo> listUpcoming(int days);
+
+    /**
+     * 全部人员（仅前台可见项）。
      */
     Flux<PersonVo> listAllPeople();
 }
