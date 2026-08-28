@@ -1,21 +1,28 @@
 package run.halo.importantdates;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.springframework.context.annotation.Bean;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
 import run.halo.app.plugin.ReactiveSettingFetcher;
 import run.halo.importantdates.finders.ImportantDateFinder;
-import run.halo.importantdates.support.HtmlRenderer;
 
 /**
- * 前台路由：/important-dates 独立页面，展示全部重要日期与人员（不含隐私字段）。
+ * 前台路由：/important-dates。
  *
- * <p>页面由插件自身渲染（HtmlRenderer），不依赖主题模板；同时提供 Finder API 供主题自由自定义。
- * 顶部显示到期提醒（由插件设置中的"提前提醒天数/前台提醒"控制）。
+ * <p>渲染策略（配置化）：
+ * <ul>
+ *   <li>默认使用插件自带模板（{@code plugin:plugin-important-dates:important-dates}），
+ *       独立页面样式，不依赖主题；</li>
+ *   <li>开启插件设置「使用主题模板渲染」后，渲染主题模板 {@code important-dates.html}
+ *       （模板放在当前激活主题的 templates/ 目录，自动获得主题布局：导航、页脚等）；
+ *       model 中提供 {@code title}/{@code dates}/{@code people}/{@code reminders}/
+ *       {@code showImportantTag}，主题模板可直接消费。</li>
+ * </ul>
  *
  * @author important-dates
  * @since 1.0.5
@@ -23,6 +30,8 @@ import run.halo.importantdates.support.HtmlRenderer;
 @Component
 public class ImportantDateRouter {
 
+    private static final String THEME_TEMPLATE = "important-dates";
+    private static final String PLUGIN_TEMPLATE = "plugin:plugin-important-dates:important-dates";
     private static final int DEFAULT_REMIND_DAYS = 3;
 
     private final ImportantDateFinder importantDateFinder;
@@ -47,18 +56,26 @@ public class ImportantDateRouter {
                         importantDateFinder.listAllPeople().collectList(),
                         importantDateFinder.listUpcoming(cfg.remindDays()).collectList()
                     )
-                    .map(tuple -> HtmlRenderer.render(
-                        "重要日期",
-                        tuple.getT1(),
-                        tuple.getT2(),
-                        tuple.getT3(),
-                        cfg.showImportantTag()
-                    ))
-                    .flatMap(html -> ServerResponse.ok()
-                        .contentType(MediaType.TEXT_HTML)
-                        .bodyValue(html))
+                    .map(tuple -> buildModel(tuple, cfg))
+                    .flatMap(model -> ServerResponse.ok().render(
+                        cfg.useThemeTemplate() ? THEME_TEMPLATE : PLUGIN_TEMPLATE,
+                        model))
             )
         );
+    }
+
+    private Map<String, Object> buildModel(
+        reactor.util.function.Tuple3<java.util.List<run.halo.importantdates.vo.ImportantDateVo>,
+            java.util.List<run.halo.importantdates.vo.PersonVo>,
+            java.util.List<run.halo.importantdates.vo.ImportantDateVo>> tuple,
+        ReminderConfig cfg) {
+        Map<String, Object> model = new LinkedHashMap<>();
+        model.put("title", "重要日期");
+        model.put("dates", tuple.getT1());
+        model.put("people", tuple.getT2());
+        model.put("reminders", tuple.getT3());
+        model.put("showImportantTag", cfg.showImportantTag());
+        return model;
     }
 
     /**
@@ -75,7 +92,8 @@ public class ImportantDateRouter {
             int days = intValue(r, "remindDays", DEFAULT_REMIND_DAYS);
             boolean frontendReminder = boolValue(r, "frontendReminder", true);
             boolean showImportantTag = boolValue(b, "showImportantTag", true);
-            return new ReminderConfig(days, frontendReminder, showImportantTag);
+            boolean useThemeTemplate = boolValue(b, "useThemeTemplate", false);
+            return new ReminderConfig(days, frontendReminder, showImportantTag, useThemeTemplate);
         });
     }
 
@@ -99,6 +117,7 @@ public class ImportantDateRouter {
         return value == null || value.isNull() ? fallback : value.asBoolean(fallback);
     }
 
-    record ReminderConfig(int remindDays, boolean frontendReminder, boolean showImportantTag) {
+    record ReminderConfig(int remindDays, boolean frontendReminder, boolean showImportantTag,
+        boolean useThemeTemplate) {
     }
 }

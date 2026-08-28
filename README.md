@@ -17,6 +17,7 @@
 - **重要标识与到期提醒**：日期可标记"重要/普通"；后台「重要日期」页与前台 `/important-dates` 页顶部显示到期提醒（"明天是「结婚纪念日」"/"还有 3 天是「宝宝生日」"）；**提前提醒天数、后台/前台提醒开关可在 插件设置 中配置**（默认提前 3 天）
 - **前台可见性**：日期和人员各有"前台展示"开关（默认开），关闭后仅后台可见，不出现在前台（含提醒）
 - **前台页面**：`/important-dates` 独立页面（不依赖主题），展示全部重要日期（按"即将到来"排序，含"还有 X 天"）与人员卡片；仅公开姓名、关系、生日等，**不展示体重、备注、操作日志**；同时提供 `importantDateFinder` Finder API 供主题自定义展示
+- **在主题内打开**（可选）：开启插件设置「使用主题模板渲染」后，`/important-dates` 会改用当前主题的 `important-dates.html` 模板渲染，页面自动获得主题布局（导航、页脚等）。模板文件放在主题的 `templates/` 目录即可，可参考 [主题模板示例](#将页面放入主题内打开可选)
 - **导出 / 导入**：一键导出全部记录为 JSON 文件（含人员，可用于备份或迁移）；导入时按记录标识判重，已存在的自动跳过、不覆盖，结果弹窗汇报
 - 纯后台管理：在 Halo 后台左侧菜单"内容 → 重要日期"中进行增删改查，不涉及前台显示
 
@@ -51,6 +52,55 @@
 - **重要/普通**：新增或编辑日期时可勾选"重要"（默认重要），重要日期才会出现在到期提醒中（列表开关可随时切换）。
 - **前台展示**：日期与人员的"前台"开关控制是否出现在 `/important-dates`；关闭后仅后台可见。访问链接：`https://你的域名/important-dates`（页面由插件自身渲染，不依赖主题；仅展示公开信息）。
 - **提醒配置**：后台「插件 → 重要日期 → 设置」可调整提前提醒天数（默认 3 天）与后台/前台提醒开关。
+
+## 将页面放入主题内打开（可选）
+
+默认 `/important-dates` 由插件自带模板渲染（独立样式，不依赖主题）。若希望页面**在主题布局内打开**（带导航、页脚等）：
+
+1. 在**当前激活主题**的 `templates/` 目录下新建 `important-dates.html`，参考以下模板（使用插件传入的数据）：
+
+```html
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title th:text="${title}">重要日期</title>
+    <!-- 可在主题布局中替换为 th:replace 等主题片段，例如：th:replace="~{modules/layout}" -->
+</head>
+<body>
+    <!-- 这里为页面主体，可按需替换为当前主题的布局片段 -->
+    <h1 th:text="${title}">重要日期</h1>
+
+    <div th:if="${reminders != null && !reminders.isEmpty()}" style="background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:10px 16px;">
+        <div th:each="r : ${reminders}">
+            今天是「<span th:text="${r.title}">结婚纪念日</span>」
+            <span th:if="${r.daysUntil > 0}" th:text="'（还有 ' + ${r.daysUntil} + ' 天）'"></span>
+        </div>
+    </div>
+
+    <ul>
+        <li th:each="d : ${dates}">
+            <strong th:text="${d.title}">结婚纪念日</strong>
+            <span th:text="' — ' + ${d.dateText}"></span>
+            <span th:if="${d.showImportantTag != null}"></span>
+            <em th:text="'还有 ' + ${d.daysUntil} + ' 天'">还有 3 天</em>
+        </li>
+    </ul>
+
+    <ul>
+        <li th:each="p : ${people}">
+            <strong th:text="${p.displayName}">张三</strong>
+            <span th:text="'（' + ${p.birthdayText} + '）'">（六月初六）</span>
+        </li>
+    </ul>
+</body>
+</html>
+```
+
+2. 打开后台「插件 → 重要日期 → 设置」，勾选 **使用主题模板渲染** 并保存；
+3. 访问 `/important-dates`，页面即按主题模板渲染（在主题布局内）。
+
+说明：主题模板可访问的数据：`title`（页面标题）、`dates`（重要日期列表：title/dateText/nextSolarDate/daysUntil/personNames/important）、`people`（人员：displayName/nickname/relation/birthdayText/nextSolarDate/daysUntil）、`reminders`（即将到来的重要日期）、`showImportantTag`（是否显示"重要"标记）；如需完全自定义也可以在主题模板中直接调用 `importantDateFinder` Finder API。
+
 - 每条记录可随时 **编辑** / **删除**，数据保存在站点数据库中，升级 Halo 不影响。
 
 ## 重新构建（可选）

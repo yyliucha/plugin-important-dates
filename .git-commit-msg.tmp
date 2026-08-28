@@ -1,8 +1,6 @@
-feat: v1.0.7 重要标识、到期提醒与前台可见性
+feat: v1.0.8 前台页面支持在主题内打开
 
-- 日期新增"重要/普通"标识（默认重要），作为到期提醒的条件
-- 到期提醒：后台「重要日期」页与前台 /important-dates 页顶部横幅（"明天是「XX」"/"还有 N 天是「XX」"）
-- 提醒配置：插件设置页可配置提前提醒天数（默认3）、后台/前台提醒开关（settings.yaml 标准表单）
-- 前台可见性：日期与人员新增"前台展示"开关（默认开），关闭后仅后台可见且不参与提醒
-- Finder 新增 listUpcoming(days)；前台额外支持"重要"标记显示开关
-- README 中英更新
+- 前台页面升级为 Thymeleaf 插件模板（plugin:plugin-important-dates:important-dates），样式与提醒横幅保留
+- 新增设置项「使用主题模板渲染」（默认关）：开启后 /important-dates 使用当前主题的 important-dates.html 模板，
+  页面在主题布局内打开（导航/页脚随主题）；model 提供 title/dates/people/reminders/showImportantTag
+- README 增加「将页面放入主题内打开」教程与主题模板示例

@@ -31,3 +31,8 @@ spec:
           label: 前台显示"重要"标记
           value: true
           help: 在 /important-dates 页面为重要日期显示"重要"标记
+        - $formkit: checkbox
+          name: useThemeTemplate
+          label: 使用主题模板渲染
+          value: false
+          help: 开启后 /important-dates 使用当前主题的 important-dates.html 模板渲染（页面在主题布局内打开）。使用时请先把模板文件放入主题的 templates/ 目录（见 README）。
