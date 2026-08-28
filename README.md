@@ -1,6 +1,10 @@
 # 重要日期（plugin-important-dates）
 
+[![build](https://github.com/yyliucha/plugin-important-dates/actions/workflows/build.yaml/badge.svg)](https://github.com/yyliucha/plugin-important-dates/actions/workflows/build.yaml)
+
 一个 Halo 2.x 插件：在**后台**记录并管理自己的重要日期，例如结婚纪念日、孩子出生日期等。
+
+[English README](README.en.md)
 
 ## 功能
 
@@ -25,7 +29,7 @@
 
 ## 安装
 
-1. 将构建产物 `plugin-important-dates-1.0.0.jar` 上传到服务器；
+1. 从 [Releases](https://github.com/yyliucha/plugin-important-dates/releases) 下载最新的 `plugin-important-dates-*.jar` 并上传到服务器；
 2. 打开 Halo 后台 → **插件** → 右上角 **安装** → 选择 **本地安装**，上传 jar 文件；
 3. 安装完成后在"已安装"列表中找到 **重要日期**，点击 **启用**；
 4. 启用后，左侧菜单 **内容** 分组下会出现 **重要日期**，即可开始记录。
