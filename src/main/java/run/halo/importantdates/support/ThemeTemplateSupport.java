@@ -162,11 +162,19 @@ public class ThemeTemplateSupport {
     private static String genVersionOf(Path target) {
         try {
             String head = Files.readString(target, StandardCharsets.UTF_8);
-            if (head.length() > 200) {
-                head = head.substring(0, 200);
+            if (head.length() > 800) {
+                head = head.substring(0, 800);
             }
             Matcher matcher = GEN_MARK.matcher(head);
-            return matcher.find() ? matcher.group(1) : null;
+            if (matcher.find()) {
+                return matcher.group(1);
+            }
+            // 兼容 1.0.11 及更早版本自动生成的模板（无版本标记，但含生成器特征）：
+            // 含 id-remind 样式且引用了主题布局 → 视为插件自动生成的老版本，允许自动升级
+            if (head.contains("id-remind") && head.contains("th:replace")) {
+                return "1.0.11";
+            }
+            return null;
         } catch (IOException e) {
             return null;
         }
