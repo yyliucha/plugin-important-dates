@@ -6,8 +6,14 @@
       <span class="caret" :class="{ open: open }">▾</span>
     </button>
 
-    <!-- 弹出面板 -->
-    <div v-if="open" class="picker-popup">
+    <!-- 弹出面板：Teleport 到 body，fixed 定位，避免被弹窗容器裁剪 -->
+    <Teleport to="body">
+      <div
+        v-if="open"
+        ref="popupRef"
+        class="picker-popup"
+        :style="{ top: popupPos.top + 'px', left: popupPos.left + 'px' }"
+      >
       <!-- 阳历模式：公历网格 + 农历标注 -->
       <template v-if="dateType === 'SOLAR'">
         <div class="picker-header">
@@ -76,7 +82,8 @@
           </button>
         </div>
       </template>
-    </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -101,7 +108,10 @@ const emit = defineEmits<{
 }>();
 
 const rootRef = ref<HTMLDivElement | null>(null);
+const popupRef = ref<HTMLDivElement | null>(null);
 const open = ref(false);
+const popupPos = ref({ top: 0, left: 0 });
+const POPUP_HEIGHT = 440;
 const now = new Date();
 const viewYear = ref(now.getFullYear());
 const viewMonth = ref(now.getMonth() + 1);
@@ -258,23 +268,58 @@ const displayText = computed(() => {
 });
 
 // ---------- 弹层开关 ----------
+function computePopupPos() {
+  const el = rootRef.value;
+  if (!el) return;
+  const rect = el.getBoundingClientRect();
+  const width = 300;
+  let top = rect.bottom + 6;
+  let left = rect.left;
+  if (top + POPUP_HEIGHT > window.innerHeight) {
+    // 下方空间不足，向上翻
+    top = Math.max(8, rect.top - POPUP_HEIGHT - 6);
+  }
+  if (left + width > window.innerWidth) {
+    left = Math.max(8, window.innerWidth - width - 8);
+  }
+  popupPos.value = { top, left };
+}
+
 function toggle() {
   // 打开时与当前选择同步
   viewYear.value = now.getFullYear();
   viewMonth.value = now.getMonth() + 1;
   viewLunarMonth.value = props.lunarMonth || 1;
   viewLunarLeap.value = !!props.isLeapMonth;
+  if (!open.value) {
+    computePopupPos();
+  }
   open.value = !open.value;
-}
-
-function onDocClick(e: MouseEvent) {
-  if (rootRef.value && !rootRef.value.contains(e.target as Node)) {
-    open.value = false;
+  if (open.value) {
+    window.addEventListener("scroll", close, { capture: true, once: false });
+  } else {
+    window.removeEventListener("scroll", close, { capture: true });
   }
 }
 
+function close() {
+  open.value = false;
+  window.removeEventListener("scroll", close, { capture: true });
+}
+
+function onDocClick(e: MouseEvent) {
+  const target = e.target as Node;
+  if (rootRef.value?.contains(target) || popupRef.value?.contains(target)) {
+    return;
+  }
+  close();
+}
+
 onMounted(() => document.addEventListener("click", onDocClick));
-onBeforeUnmount(() => document.removeEventListener("click", onDocClick));
+onBeforeUnmount(() => {
+  document.removeEventListener("click", onDocClick);
+  window.removeEventListener("scroll", close, { capture: true });
+});
 </script>
 
 <style scoped>
@@ -319,16 +364,14 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocClick));
 }
 
 .picker-popup {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 20;
+  position: fixed;
+  z-index: 3000;
   width: 300px;
   box-sizing: border-box;
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   padding: 10px;
 }
 

@@ -87,7 +87,7 @@
     <VModal
       :visible="modalVisible"
       :title="editingName ? '编辑重要日期' : '新增重要日期'"
-      width="520"
+      width="600"
       @close="closeModal"
     >
       <div class="form">
