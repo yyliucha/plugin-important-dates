@@ -36,3 +36,11 @@ spec:
           label: 使用主题模板渲染
           value: true
           help: 推荐开启（默认）。插件启动时会自动为当前主题生成适配模板（themes/主题名/templates/important-dates.html），页面将在主题布局内打开；若主题无布局或模板异常，将自动回退到插件自带页面（不会报 500）。取消勾选则始终使用插件自带页面。
+    - group: privacy
+      label: 隐私设置
+      formSchema:
+        - $formkit: checkbox
+          name: showBirthday
+          label: 前台展示生日
+          value: false
+          help: 默认关闭：前台（/important-dates 页面、主题模板、数据接口）中人员生日一律脱敏显示（如 1999-10-** / 腊月**）；开启后前台展示完整生日。后台管理端始终显示完整信息，不受影响。
