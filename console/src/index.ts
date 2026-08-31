@@ -33,7 +33,7 @@ export default definePlugin({
       {
         id: "important-dates-reminder",
         component: markRaw(ReminderWidget),
-        group: "plugin-important-dates",
+        group: "重要日期",
         defaultSize: { w: 6, h: 5, minW: 3, minH: 3, maxW: 12, maxH: 8 },
       },
     ],

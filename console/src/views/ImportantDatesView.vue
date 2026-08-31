@@ -716,9 +716,9 @@ const showBackendReminder = computed(() => remindConfig.value.backendReminder);
 
 function remindText(item: ImportantDate): string {
   const n = daysUntilOf(item.spec) ?? 0;
-  if (n <= 0) return `今天是「${item.spec.title}」`;
-  if (n === 1) return `明天是「${item.spec.title}」`;
-  return `还有 ${n} 天是「${item.spec.title}」`;
+  if (n <= 0) return `「${item.spec.title}」就是今天呀 🎉`;
+  if (n === 1) return `「${item.spec.title}」明天就到啦～`;
+  return `「${item.spec.title}」还有 ${n} 天就到啦～`;
 }
 
 async function toggleDateVisible(item: ImportantDate, visibleValue: boolean) {

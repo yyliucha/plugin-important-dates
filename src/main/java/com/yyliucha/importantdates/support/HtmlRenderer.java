@@ -53,15 +53,16 @@ public final class HtmlRenderer {
             sb.append("<div class=\"id-remind\">\n");
             for (ImportantDateVo r : reminders) {
                 sb.append("<div class=\"id-remind-item\">");
-                String prefix;
-                if (r.getDaysUntil() <= 0) {
-                    prefix = "今天是";
-                } else if (r.getDaysUntil() == 1) {
-                    prefix = "明天是";
+                String itemTitle = "「" + esc(r.getTitle()) + "」";
+                long n = r.getDaysUntil();
+                if (n <= 0) {
+                    sb.append(itemTitle).append("就是今天呀 🎉");
+                } else if (n == 1) {
+                    sb.append(itemTitle).append("明天就到啦～");
                 } else {
-                    prefix = "还有 " + r.getDaysUntil() + " 天是";
+                    sb.append(itemTitle).append("还有 ").append(n).append(" 天就到啦～");
                 }
-                sb.append(prefix).append("「").append(esc(r.getTitle())).append("」</div>\n");
+                sb.append("</div>\n");
             }
             sb.append("</div>\n");
         }

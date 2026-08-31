@@ -158,9 +158,9 @@ public final class ThemeTemplateGenerator {
 
           <div class="id-remind" th:if="${reminders != null && !reminders.isEmpty()}">
             <div class="id-remind-item" th:each="r : ${reminders}">
-              <span th:if="${r.daysUntil <= 0}" th:text="|今天是「${r.title}」|">今天是「结婚纪念日」</span>
-              <span th:if="${r.daysUntil == 1}" th:text="|明天是「${r.title}」|">明天是「结婚纪念日」</span>
-              <span th:if="${r.daysUntil > 1}" th:text="|还有 ${r.daysUntil} 天是「${r.title}」|">还有 3 天是「结婚纪念日」</span>
+              <span th:if="${r.daysUntil <= 0}" th:text="|「${r.title}」就是今天呀 🎉|">「结婚纪念日」就是今天呀 🎉</span>
+              <span th:if="${r.daysUntil == 1}" th:text="|「${r.title}」明天就到啦～|">「结婚纪念日」明天就到啦～</span>
+              <span th:if="${r.daysUntil > 1}" th:text="|「${r.title}」还有 ${r.daysUntil} 天就到啦～|">「结婚纪念日」还有 3 天就到啦～</span>
             </div>
           </div>
 
