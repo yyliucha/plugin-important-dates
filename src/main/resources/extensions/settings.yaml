@@ -52,6 +52,8 @@ spec:
               value: top-left
             - label: 底部居中
               value: bottom-center
+            - label: 屏幕中间
+              value: center
           help: 电脑端按所选位置固定显示；移动端固定显示在底部居中
         - $formkit: text
           name: toastTitle

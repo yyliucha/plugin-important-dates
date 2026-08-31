@@ -29,6 +29,7 @@
       "top-left": "top:16px;left:16px;",
       "bottom-left": "bottom:16px;left:16px;",
       "bottom-center": "bottom:16px;left:50%;transform:translateX(-50%);",
+      "center": "top:50%;left:50%;transform:translate(-50%,-50%);",
       "bottom-right": "bottom:16px;right:16px;"
     };
     return map[pos] || map["bottom-right"];
