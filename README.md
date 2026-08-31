@@ -21,6 +21,7 @@
 **🔔 到期提醒**
 - 后台「重要日期」页与前台 `/important-dates` 页顶部显示提醒横幅："明天是「结婚纪念日」" / "还有 3 天是「宝宝生日」"
 - 提醒条件：**重要 + 前台可见 + 提前 N 天内（含当天）**；提前天数与后台/前台提醒开关均在**插件设置**中配置（默认提前 3 天）
+- **全站悬浮提醒**（可选）：设置驱动的弹窗（启用/位置/标题/模板/无提醒文案），开启后自动注入站点代码，无需手动粘贴（见下文）
 
 **👁 前台可见性**
 - 日期与人员各有「**前台展示**」开关（默认开）：关闭后仅后台可见，不出现在前台（含提醒），适合私人记录
@@ -64,40 +65,19 @@
 - **导出 / 导入**：右上角按钮备份与恢复（导入会先校验，重复自动跳过）
 - **提醒配置**：后台「插件 → 重要日期 → 设置」：提前提醒天数（默认 3）、后台提醒、前台提醒、前台"重要"标记、主题模板渲染（一般保持默认开启）
 
-## 全站悬浮提醒（可选，右下角气球，全站生效）
+## 全站悬浮提醒（可选，设置驱动，和主题弹窗一样可配置）
 
-后台与 `/important-dates` 页的提醒横幅是插件内置的。想在**博客每个页面**看到**悬浮提醒**（右下角浮出气球、按配置秒数自动淡出、可点 ×），在 Halo 系统设置（`系统 → 代码注入 → 全局 head 或 footer`）粘贴一次下面的脚本——插件提供公开数据接口 `GET /important-dates-reminders`（含 `toastCloseSeconds`，来自插件设置「悬浮提示自动关闭秒数」；无提醒时脚本不做任何事）：
+插件设置 →「**全站悬浮提醒**」组（与主题内弹窗设置同一套交互形态）：
 
-```html
-<script>
-(function(){
-  fetch('/important-dates-reminders').then(function(r){return r.json();}).then(function(d){
-    if(!d.enabled || !d.reminders || !d.reminders.length) return;
-    function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-    var box=document.createElement('div');
-    box.style.cssText='position:fixed;right:16px;bottom:16px;z-index:99999;max-width:340px;background:#fff7ed;border:1px solid #fdba74;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.22);padding:14px 40px 14px 16px;font-size:14px;color:#9a3412;font-family:inherit;opacity:0;transform:translateY(12px);transition:opacity .3s,transform .3s;';
-    box.innerHTML='<div style="font-weight:600;margin-bottom:4px;">📅 重要日期提醒</div>'+
-      d.reminders.map(function(r){
-        var t=r.daysUntil<=0?'今天是':(r.daysUntil===1?'明天是':'还有 '+r.daysUntil+' 天是');
-        return '<div>★ '+t+'「'+esc(r.title)+'」</div>';
-      }).join('')+
-      '<span style="position:absolute;right:12px;top:8px;cursor:pointer;opacity:.6;font-size:18px;">×</span>';
-    var close=function(){box.style.opacity='0';box.style.transform='translateY(12px)';setTimeout(function(){box.remove();},320);};
-    box.querySelector('span').onclick=close;
-    document.body.appendChild(box);
-    requestAnimationFrame(function(){box.style.opacity='1';box.style.transform='translateY(0)';});
-    var secs=Number(d.toastCloseSeconds||8);
-    if(secs>0){setTimeout(close, secs*1000);}
-  }).catch(function(){});
-})();
-</script>
-```
+- **启用**：开启后插件自动在站点「系统设置 → 代码注入 → 页脚」维护一段脚本（只增删自己的片段，不影响你手动写入的其他注入内容）；**关闭后自动移除**
+- **弹窗位置**：右下角 / 左下角 / 右上角 / 左上角 / 底部居中（默认右下角）
+- **提醒标题**：弹窗标题文字（默认"重要日期提醒"）
+- **提醒模板**：每条提醒的显示模板，占位符 `{title}` 名称、`{daysUntil}` 剩余天数、`{dateText}` 日期文本、`{nextSolarDate}` 下一次阳历日期
+- **无提醒时文案**：没有到期提醒时弹窗显示的文案（留空则无提醒时不弹出）
 
-- 提醒内容与配置和插件页完全一致（重要 + 前台可见 + 提前 N 天内；在插件设置里改天数/开关即同步生效）
-- **自动关闭秒数**：插件设置「悬浮提示自动关闭秒数」可调（默认 8 秒；0 = 不自动关闭，手动点 ×）
-- 想改为顶部横幅式：把脚本里 `box` 样式换成 `top:0;left:0;right:0;` 并加 `text-align:center` 即可
-- 想关闭全站提醒：插件设置里关闭「前台提醒」（接口返回空，脚本不显示）
-- 说明：通过 Halo 官方「代码注入」机制生效（站点级配置，由你粘贴启用，非插件自动写入）；后台（控制台）整站暂无官方注入机制，保持「重要日期」插件页顶部提醒即可
+行为：访客访问任意页面时按所选位置浮出提醒，点 × 后**本次会话不再弹出**；按「提醒设置 → 悬浮提示自动关闭秒数」自动关闭（默认 8 秒）。
+
+> 升级说明：1.0.21 及以前版本使用「手动粘贴脚本（代码注入）」的方式，若已粘贴过旧脚本，请到「系统设置 → 代码注入 → 页脚」删除它，避免与新弹窗重复显示；新版本无需任何手动粘贴。
 
 ## 主题模板（自定义展示，可选）
 
@@ -114,7 +94,7 @@ cd plugin-important-dates
 ./gradlew build
 ```
 
-构建结果位于 `build/libs/plugin-important-dates-1.0.21.jar`。
+构建结果位于 `build/libs/plugin-important-dates-1.0.22.jar`。
 
 > 版本说明：插件使用 **1.0.x 开发版本序列**，每轮迭代版本号 +0.0.1（1.0.0 → 1.0.1 → 1.0.2 → …）。
 

@@ -102,7 +102,13 @@ public class ImportantDateRouter {
                     result.put("enabled", cfg.frontendReminder());
                     result.put("remindDays", cfg.remindDays());
                     result.put("toastCloseSeconds", cfg.toastCloseSeconds());
-                    if (!cfg.frontendReminder()) {
+                    result.put("toastEnabled", cfg.toastEnabled());
+                    result.put("toastPosition", cfg.toastPosition());
+                    result.put("toastTitle", cfg.toastTitle());
+                    result.put("toastTemplate", cfg.toastTemplate());
+                    result.put("toastEmptyText", cfg.toastEmptyText());
+                    // 页面横幅由 frontendReminder 控制；全站悬浮提醒由 toastEnabled 控制
+                    if (!cfg.frontendReminder() && !cfg.toastEnabled()) {
                         result.put("reminders", java.util.Collections.emptyList());
                         return ServerResponse.ok()
                             .contentType(MediaType.APPLICATION_JSON)
@@ -145,23 +151,34 @@ public class ImportantDateRouter {
     }
 
     /**
-     * 读取提醒配置（默认：提前 3 天、前台提醒开启、显示重要标记）。
+     * 读取提醒与悬浮提示配置（默认：提前 3 天、前台提醒开启、显示重要标记、
+     * 悬浮提醒关闭、右下角、标题"重要日期提醒"）。
      */
     private Mono<ReminderConfig> reminderConfig() {
         Mono<JsonNode> reminder = settingFetcher.get("reminder")
             .switchIfEmpty(Mono.just(emptyNode()));
         Mono<JsonNode> basic = settingFetcher.get("basic")
             .switchIfEmpty(Mono.just(emptyNode()));
-        return Mono.zip(reminder, basic).map(tuple -> {
+        Mono<JsonNode> toast = settingFetcher.get("toast")
+            .switchIfEmpty(Mono.just(emptyNode()));
+        return Mono.zip(reminder, basic, toast).map(tuple -> {
             JsonNode r = tuple.getT1();
             JsonNode b = tuple.getT2();
+            JsonNode t = tuple.getT3();
             int days = intValue(r, "remindDays", DEFAULT_REMIND_DAYS);
             boolean frontendReminder = boolValue(r, "frontendReminder", true);
             int toastCloseSeconds = intValue(r, "toastCloseSeconds", DEFAULT_TOAST_CLOSE_SECONDS);
             boolean showImportantTag = boolValue(b, "showImportantTag", true);
             boolean useThemeTemplate = boolValue(b, "useThemeTemplate", true);
+            boolean toastEnabled = boolValue(t, "toastEnabled", false);
+            String toastPosition = textValue(t, "toastPosition", "bottom-right");
+            String toastTitle = textValue(t, "toastTitle", "重要日期提醒");
+            String toastTemplate = textValue(t, "toastTemplate",
+                "「{title}」还有 {daysUntil} 天（{dateText}）");
+            String toastEmptyText = textValue(t, "toastEmptyText", "最近没有重要日期提醒");
             return new ReminderConfig(days, frontendReminder, showImportantTag, useThemeTemplate,
-                toastCloseSeconds);
+                toastCloseSeconds, toastEnabled, toastPosition, toastTitle, toastTemplate,
+                toastEmptyText);
         });
     }
 
@@ -185,7 +202,21 @@ public class ImportantDateRouter {
         return value == null || value.isNull() ? fallback : value.asBoolean(fallback);
     }
 
+    private static String textValue(JsonNode node, String field, String fallback) {
+        if (node == null) {
+            return fallback;
+        }
+        JsonNode value = node.get(field);
+        if (value == null || value.isNull()) {
+            return fallback;
+        }
+        String text = value.asText("");
+        return text.isBlank() ? fallback : text;
+    }
+
     record ReminderConfig(int remindDays, boolean frontendReminder, boolean showImportantTag,
-        boolean useThemeTemplate, int toastCloseSeconds) {
+        boolean useThemeTemplate, int toastCloseSeconds,
+        boolean toastEnabled, String toastPosition, String toastTitle,
+        String toastTemplate, String toastEmptyText) {
     }
 }

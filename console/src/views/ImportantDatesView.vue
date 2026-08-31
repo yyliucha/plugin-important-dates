@@ -1,7 +1,7 @@
 <template>
   <VPageHeader title="重要日期">
     <template #actions>
-      <VButton @click="openLogs">操作日志</VButton>
+      <VButton :loading="logLoading" @click="openLogs">操作日志</VButton>
       <VButton @click="exportData">导出</VButton>
       <VButton @click="triggerImport">导入</VButton>
       <VButton type="secondary" @click="activeTab === 'dates' ? openCreate() : openPersonCreate()">
@@ -307,13 +307,9 @@
 
     <!-- ================= 操作日志 ================= -->
     <VModal :visible="logVisible" title="操作日志" width="760" @close="logVisible = false">
-      <div v-if="logLoading" class="log-state">日志加载中…</div>
-      <div v-else-if="logError" class="log-state">{{ logError }}</div>
-      <div v-else-if="!logs.length" class="log-empty">
-        <div class="log-empty-title">暂无操作日志</div>
-        <div class="log-empty-sub">新增、编辑、删除重要日期或人员后，这里会记录明细。</div>
-      </div>
-      <table v-else class="dates-table">
+      <!-- 保持单一 table 结构：内容分支只发生在 tbody 内，避免弹窗过渡/滚动条初始化期间
+           切换节点导致 Vue insertBefore 报错（NotFoundError） -->
+      <table class="dates-table">
         <thead>
           <tr>
             <th style="width: 24%">时间</th>
@@ -323,16 +319,32 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="log in logs" :key="log.metadata.name">
-            <td>{{ formatTime(log.metadata.creationTimestamp) }}</td>
-            <td>
-              <span class="log-action" :class="`log-action-${(log.spec.action || 'CREATE').toLowerCase()}`">
-                {{ logActionText(log.spec.action) }}
-              </span>
-            </td>
-            <td>{{ log.spec.targetTitle || "—" }}</td>
-            <td><span class="note">{{ log.spec.detail || "—" }}</span></td>
+          <tr v-if="logError">
+            <td colspan="4" class="log-state">{{ logError }}</td>
           </tr>
+          <template v-else-if="!logs.length">
+            <tr>
+              <td colspan="4" class="log-empty">
+                <div class="log-empty-title">暂无操作日志</div>
+                <div class="log-empty-sub">新增、编辑、删除重要日期或人员后，这里会记录明细。</div>
+              </td>
+            </tr>
+          </template>
+          <template v-else>
+            <tr v-for="log in logs" :key="log.metadata.name">
+              <td>{{ formatTime(log.metadata.creationTimestamp) }}</td>
+              <td>
+                <span
+                  class="log-action"
+                  :class="`log-action-${(log.spec.action || 'CREATE').toLowerCase()}`"
+                >
+                  {{ logActionText(log.spec.action) }}
+                </span>
+              </td>
+              <td>{{ log.spec.targetTitle || "—" }}</td>
+              <td><span class="note">{{ log.spec.detail || "—" }}</span></td>
+            </tr>
+          </template>
         </tbody>
       </table>
     </VModal>
@@ -1073,7 +1085,7 @@ function closeImportModal() {
 
 // ---------- 日志弹窗 ----------
 async function openLogs() {
-  logVisible.value = true;
+  // 先加载数据再打开弹窗：内容在弹窗打开前定型，避免打开动画期间切换节点
   logLoading.value = true;
   logError.value = "";
   try {
@@ -1083,6 +1095,7 @@ async function openLogs() {
   } finally {
     logLoading.value = false;
   }
+  logVisible.value = true;
 }
 
 function logTheme(action: LogAction): "primary" | "secondary" | "danger" {

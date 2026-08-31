@@ -28,7 +28,46 @@ spec:
           label: 悬浮提示自动关闭秒数
           value: 8
           validation: required|Number
-          help: 全站悬浮提醒（右下角气球）自动关闭时间（秒），0 = 不自动关闭（需手动点 ×）
+          help: 全站悬浮提醒自动关闭时间（秒），0 = 不自动关闭（需手动点 ×）
+    - group: toast
+      label: 全站悬浮提醒
+      formSchema:
+        - $formkit: checkbox
+          name: toastEnabled
+          label: 启用
+          value: false
+          help: 开启后插件自动在站点「系统设置 → 代码注入 → 页脚」维护一段脚本（只增删自己的片段，不影响其他注入内容）：访客访问任意页面时浮出重要日期提醒，点 × 后本次会话不再弹出；关闭后自动移除该脚本。
+        - $formkit: select
+          name: toastPosition
+          label: 弹窗位置
+          value: bottom-right
+          options:
+            - label: 右下角
+              value: bottom-right
+            - label: 左下角
+              value: bottom-left
+            - label: 右上角
+              value: top-right
+            - label: 左上角
+              value: top-left
+            - label: 底部居中
+              value: bottom-center
+          help: 电脑端按所选位置固定显示；移动端固定显示在底部居中
+        - $formkit: text
+          name: toastTitle
+          label: 提醒标题
+          value: 重要日期提醒
+          help: 弹窗标题文字
+        - $formkit: textarea
+          name: toastTemplate
+          label: 提醒模板
+          value: 「{title}」还有 {daysUntil} 天（{dateText}）
+          help: 每条提醒的显示模板，可用占位符：{title} 名称、{daysUntil} 剩余天数、{dateText} 日期文本、{nextSolarDate} 下一次阳历日期
+        - $formkit: text
+          name: toastEmptyText
+          label: 无提醒时文案
+          value: 最近没有重要日期提醒
+          help: 没有到期提醒时弹窗显示的文案；留空则无提醒时不弹出
     - group: basic
       label: 展示设置
       formSchema:

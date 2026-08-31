@@ -1,0 +1,11 @@
+apiVersion: plugin.halo.run/v1alpha1
+kind: ReverseProxy
+metadata:
+  name: plugin-important-dates-reverse-proxy
+  labels:
+    plugin.halo.run/plugin-name: plugin-important-dates
+rules:
+  # 全站悬浮提醒脚本（由 ToastCodeInjector 注入站点「代码注入 → 页脚」引用）
+  - path: /static/**
+    file:
+      directory: static
