@@ -175,6 +175,7 @@
     function hide() {
       if (closed) return;
       closed = true;
+      if (countdownTimer) clearInterval(countdownTimer);
       box.style.opacity = "0";
       setTimeout(function () {
         if (box.parentNode) box.parentNode.removeChild(box);
@@ -192,8 +193,33 @@
     requestAnimationFrame(function () {
       box.style.opacity = "1";
     });
+    // 自动关闭倒计时：秒数文字 + 底部进度条
+    var countdownTimer = null;
     var secs = Number(d.toastCloseSeconds);
     if (secs > 0) {
+      box.style.paddingBottom = "22px";
+      var cdText = document.createElement("div");
+      cdText.style.cssText =
+        "position:absolute;left:16px;right:40px;bottom:6px;font-size:11px;" +
+        "opacity:.55;color:#9a3412;text-align:right;line-height:1;";
+      var cdBar = document.createElement("div");
+      cdBar.style.cssText =
+        "position:absolute;left:0;bottom:0;height:3px;background:#f97316;" +
+        "opacity:.55;border-radius:0 0 0 14px;width:100%;transition:width 1s linear;";
+      var left = secs;
+      cdText.textContent = left + " 秒后自动收起";
+      box.appendChild(cdText);
+      box.appendChild(cdBar);
+      countdownTimer = setInterval(function () {
+        left -= 1;
+        if (left <= 0) {
+          clearInterval(countdownTimer);
+          countdownTimer = null;
+          return;
+        }
+        cdText.textContent = left + " 秒后自动收起";
+        cdBar.style.width = Math.round((left / secs) * 100) + "%";
+      }, 1000);
       setTimeout(hide, secs * 1000);
     }
   }
