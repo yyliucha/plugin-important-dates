@@ -309,8 +309,9 @@
     <VModal :visible="logVisible" title="操作日志" width="760" @close="logVisible = false">
       <div v-if="logLoading" class="log-state">日志加载中…</div>
       <div v-else-if="logError" class="log-state">{{ logError }}</div>
-      <div v-else-if="!logs.length" style="padding: 40px 0">
-        <VEmpty title="暂无操作日志" message="新增、编辑、删除重要日期或人员后，这里会记录明细。" />
+      <div v-else-if="!logs.length" class="log-empty">
+        <div class="log-empty-title">暂无操作日志</div>
+        <div class="log-empty-sub">新增、编辑、删除重要日期或人员后，这里会记录明细。</div>
       </div>
       <table v-else class="dates-table">
         <thead>
@@ -325,7 +326,9 @@
           <tr v-for="log in logs" :key="log.metadata.name">
             <td>{{ formatTime(log.metadata.creationTimestamp) }}</td>
             <td>
-              <VTag :theme="logTheme(log.spec.action)">{{ logActionText(log.spec.action) }}</VTag>
+              <span class="log-action" :class="`log-action-${(log.spec.action || 'CREATE').toLowerCase()}`">
+                {{ logActionText(log.spec.action) }}
+              </span>
             </td>
             <td>{{ log.spec.targetTitle || "—" }}</td>
             <td><span class="note">{{ log.spec.detail || "—" }}</span></td>
@@ -1278,6 +1281,46 @@ function formatTime(iso?: string): string {
   text-align: center;
   color: #6b7280;
   font-size: 14px;
+}
+
+.log-empty {
+  padding: 48px 0;
+  text-align: center;
+}
+
+.log-empty-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.log-empty-sub {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.log-action {
+  display: inline-block;
+  font-size: 12px;
+  line-height: 1.6;
+  border-radius: 999px;
+  padding: 1px 10px;
+}
+
+.log-action-create {
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.log-action-update {
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.log-action-delete {
+  background: #fef2f2;
+  color: #b91c1c;
 }
 
 .form {
