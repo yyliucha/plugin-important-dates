@@ -1,4 +1,4 @@
-package run.halo.importantdates;
+package com.yyliucha.importantdates;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;

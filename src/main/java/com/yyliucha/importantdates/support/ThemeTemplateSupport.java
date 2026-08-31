@@ -1,4 +1,4 @@
-package run.halo.importantdates.support;
+package com.yyliucha.importantdates.support;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

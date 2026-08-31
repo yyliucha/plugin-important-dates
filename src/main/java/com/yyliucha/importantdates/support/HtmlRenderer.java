@@ -1,8 +1,8 @@
-package run.halo.importantdates.support;
+package com.yyliucha.importantdates.support;
 
 import java.util.List;
-import run.halo.importantdates.vo.ImportantDateVo;
-import run.halo.importantdates.vo.PersonVo;
+import com.yyliucha.importantdates.vo.ImportantDateVo;
+import com.yyliucha.importantdates.vo.PersonVo;
 
 /**
  * 前台页面 HTML 渲染器（不依赖主题、不依赖插件模板机制，兼容所有 Halo 2.x 版本）。

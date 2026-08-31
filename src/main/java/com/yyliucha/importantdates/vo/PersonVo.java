@@ -1,4 +1,4 @@
-package run.halo.importantdates.vo;
+package com.yyliucha.importantdates.vo;
 
 import lombok.Data;
 

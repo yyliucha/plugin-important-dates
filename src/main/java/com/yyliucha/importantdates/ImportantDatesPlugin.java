@@ -1,11 +1,11 @@
-package run.halo.importantdates;
+package com.yyliucha.importantdates;
 
 import org.springframework.stereotype.Component;
 import run.halo.app.extension.Scheme;
 import run.halo.app.extension.SchemeManager;
 import run.halo.app.plugin.BasePlugin;
 import run.halo.app.plugin.PluginContext;
-import run.halo.importantdates.support.ThemeTemplateSupport;
+import com.yyliucha.importantdates.support.ThemeTemplateSupport;
 
 /**
  * 插件生命周期管理。
