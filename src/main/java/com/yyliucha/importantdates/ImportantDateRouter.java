@@ -107,6 +107,8 @@ public class ImportantDateRouter {
                     result.put("toastTitle", cfg.toastTitle());
                     result.put("toastTemplate", cfg.toastTemplate());
                     result.put("toastEmptyText", cfg.toastEmptyText());
+                    result.put("toastDefaultClose", cfg.toastDefaultClose());
+                    result.put("toastCloseMenu", cfg.toastCloseMenu());
                     // 页面横幅由 frontendReminder 控制；全站悬浮提醒由 toastEnabled 控制
                     if (!cfg.frontendReminder() && !cfg.toastEnabled()) {
                         result.put("reminders", java.util.Collections.emptyList());
@@ -175,10 +177,12 @@ public class ImportantDateRouter {
             String toastTitle = textValue(t, "toastTitle", "重要日期提醒");
             String toastTemplate = textValue(t, "toastTemplate",
                 "「{title}」还有 {daysUntil} 天（{dateText}）");
-            String toastEmptyText = textValue(t, "toastEmptyText", "最近没有重要日期提醒");
+            String toastEmptyText = textValue(t, "toastEmptyText", "最近没有重要日期，生活照常美好～");
+            String toastDefaultClose = textValue(t, "toastDefaultClose", "once");
+            boolean toastCloseMenu = boolValue(t, "toastCloseMenu", true);
             return new ReminderConfig(days, frontendReminder, showImportantTag, useThemeTemplate,
                 toastCloseSeconds, toastEnabled, toastPosition, toastTitle, toastTemplate,
-                toastEmptyText);
+                toastEmptyText, toastDefaultClose, toastCloseMenu);
         });
     }
 
@@ -217,6 +221,7 @@ public class ImportantDateRouter {
     record ReminderConfig(int remindDays, boolean frontendReminder, boolean showImportantTag,
         boolean useThemeTemplate, int toastCloseSeconds,
         boolean toastEnabled, String toastPosition, String toastTitle,
-        String toastTemplate, String toastEmptyText) {
+        String toastTemplate, String toastEmptyText, String toastDefaultClose,
+        boolean toastCloseMenu) {
     }
 }

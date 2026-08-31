@@ -70,6 +70,31 @@ spec:
           label: 无提醒时文案
           value: 最近没有重要日期，生活照常美好～
           help: 没有到期提醒时弹窗显示的文案；留空则无提醒时不弹出
+        - $formkit: select
+          name: toastDefaultClose
+          label: × 关闭默认行为
+          value: once
+          options:
+            - label: 本次关闭（刷新/换页重新弹出）
+              value: once
+            - label: 1 天内不显示
+              value: 1d
+            - label: 3 天内不显示
+              value: 3d
+            - label: 7 天内不显示
+              value: 7d
+            - label: 10 天内不显示
+              value: 10d
+            - label: 30 天内不显示
+              value: 30d
+            - label: 永久关闭
+              value: forever
+          help: 访客点 × 后的默认关闭行为；开启「关闭方式菜单」时，点 × 会先弹出选择菜单，5 秒未选择则按此默认执行（本次关闭仅收起当前弹窗，不记任何状态）
+        - $formkit: checkbox
+          name: toastCloseMenu
+          label: 关闭方式菜单
+          value: true
+          help: 点 × 弹出「本次关闭 / 3 天内不显示 / 10 天内不显示 / 永久关闭」选择；关闭后直接按「× 关闭默认行为」执行。时长与永久记录在访客浏览器 localStorage，到期自动恢复（清浏览器站点数据可重置）
     - group: basic
       label: 展示设置
       formSchema:
