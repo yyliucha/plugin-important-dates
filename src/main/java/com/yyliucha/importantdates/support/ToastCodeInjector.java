@@ -14,11 +14,20 @@ import run.halo.app.infra.SystemSetting;
  * 全站悬浮提醒的站点代码注入支持。
  *
  * <p>在插件设置「全站悬浮提醒」开启时，向系统配置 {@code system} ConfigMap 的
- * {@code codeInjection.footer}（即「系统设置 → 代码注入 → 页脚」）追加插件脚本片段；
- * 关闭时仅移除该片段。片段以 {@code id-toast} 标记包裹，互不影响用户手动写入的其他
- * 注入内容；内容相同时不会重复写入（避免版本号膨胀与并发冲突）。
+ * {@code codeInjection.globalHead}（即「系统设置 → 代码注入 → 全局 head 标签」）
+ * 追加插件脚本片段；关闭时仅移除该片段。
  *
- * <p>脚本本身位于插件静态资源 {@code /plugins/plugin-important-dates/assets/reminder-toast.js}，
+ * <p>注入位置选择 {globalHead} 而非「页脚」：页脚注入（{@code footer}）只在主题
+ * 模板包含 &lt;footer&gt; 元素时才会渲染，部分自定义主题不提供该元素导致注入即便
+ * 写入也不会出现在页面里；而全局 head 注入对所有 Thymeleaf 渲染的页面（任何主题）
+ * 都会生效，从而保证任意主题下悬浮提醒可见。
+ *
+ * <p>片段以 {@code id-toast} 标记包裹，互不影响用户手动写入的其他注入内容；
+ * 内容相同时不会重复写入（避免版本号膨胀与并发冲突）。历史版本曾写入「页脚」，
+ * 同步时会一并清理。
+ *
+ * <p>脚本本身位于插件静态资源（ReverseProxy 扩展提供）
+ * {@code /plugins/plugin-important-dates/assets/static/reminder-toast.js}，
  * 随插件版本升级自动更新，无需改动站点注入内容。
  *
  * @author yyliucha
@@ -41,61 +50,67 @@ public class ToastCodeInjector {
     private final ReactiveExtensionClient client;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    private static final org.slf4j.Logger log =
+        org.slf4j.LoggerFactory.getLogger(ToastCodeInjector.class);
+
     public ToastCodeInjector(ReactiveExtensionClient client) {
         this.client = client;
     }
 
     /**
-     * 同步站点代码注入：enabled 时确保片段存在，关闭时移除片段。
-     * 内容无变化时不写库。
+     * 同步站点代码注入：enabled 时确保脚本片段存在于全局 head，关闭时移除。
+     * 同时清理旧版本曾写入「页脚」的片段。内容无变化时不写库。
      */
     public Mono<Void> sync(boolean enabled) {
         return client.fetch(ConfigMap.class, SYSTEM_CONFIG_NAME)
             .flatMap(cm -> {
-                String current = footerOf(cm);
-                String desired = enabled ? withSegment(current) : withoutSegment(current);
-                if (desired.equals(current)) {
-                    log.debug("[important-dates] toast injection unchanged (enabled={})", enabled);
+                SystemSetting.CodeInjection codeInjection = readCodeInjection(cm);
+                String currentHead = nullableText(codeInjection == null ? null
+                    : codeInjection.getGlobalHead());
+                String currentFooter = nullableText(codeInjection == null ? null
+                    : codeInjection.getFooter());
+                String desiredHead = enabled ? withSegment(currentHead)
+                    : withoutSegment(currentHead);
+                boolean footerHasOldSegment = currentFooter.contains(TOAST_START)
+                    || currentFooter.contains(TOAST_END);
+                if (desiredHead.equals(currentHead) && !footerHasOldSegment) {
                     return Mono.empty();
                 }
                 try {
-                    ObjectNode codeInjection = parseCodeInjection(cm);
-                    codeInjection.put("footer", desired);
+                    String desiredFooter = withoutSegment(currentFooter);
+                    ObjectNode ci = parseCodeInjection(cm);
+                    ci.put("globalHead", desiredHead);
+                    ci.put("footer", desiredFooter);
                     cm.getData().put(SystemSetting.CodeInjection.GROUP,
-                        objectMapper.writeValueAsString(codeInjection));
-                    log.info("[important-dates] updating system configmap: footer len {} → {}",
-                        current.length(), desired.length());
+                        objectMapper.writeValueAsString(ci));
                     return client.update(cm)
                         .doOnNext(saved -> log.info(
-                            "[important-dates] system configmap updated, footer len: {}",
-                            footerOf(saved).length()))
+                            "[important-dates] code injection synced (enabled={})", enabled))
                         .then();
                 } catch (Exception e) {
                     log.warn("[important-dates] toast injection update failed", e);
                     return Mono.empty();
                 }
             })
+            // 冲突（乐观锁）时重试：整体重订阅，重新读取最新 ConfigMap
+            .retry(2)
             .onErrorResume(e -> {
-                log.warn("[important-dates] toast injection error", e);
+                log.warn("[important-dates] toast injection sync failed", e);
                 return Mono.empty();
-            })
-            .retry(1);
+            });
     }
 
-    private static final org.slf4j.Logger log =
-        org.slf4j.LoggerFactory.getLogger(ToastCodeInjector.class);
-
-    private static String footerOf(ConfigMap cm) {
+    private static SystemSetting.CodeInjection readCodeInjection(ConfigMap cm) {
         try {
-            SystemSetting.CodeInjection codeInjection = SystemSetting.get(
-                cm, SystemSetting.CodeInjection.GROUP, SystemSetting.CodeInjection.class);
-            if (codeInjection == null || codeInjection.getFooter() == null) {
-                return "";
-            }
-            return codeInjection.getFooter();
+            return SystemSetting.get(cm, SystemSetting.CodeInjection.GROUP,
+                SystemSetting.CodeInjection.class);
         } catch (Exception e) {
-            return "";
+            return null;
         }
+    }
+
+    private static String nullableText(String s) {
+        return s == null ? "" : s;
     }
 
     private ObjectNode parseCodeInjection(ConfigMap cm) throws Exception {
@@ -111,14 +126,14 @@ public class ToastCodeInjector {
         }
     }
 
-    static String withSegment(String footer) {
-        String base = withoutSegment(footer);
+    static String withSegment(String content) {
+        String base = withoutSegment(content);
         String segment = TOAST_START + "\n" + TOAST_SCRIPT + "\n" + TOAST_END;
         return base.isEmpty() ? segment : base + "\n\n" + segment;
     }
 
-    static String withoutSegment(String footer) {
-        String s = footer == null ? "" : footer;
+    static String withoutSegment(String content) {
+        String s = content == null ? "" : content;
         Matcher matcher = TOAST_SEGMENT.matcher(s);
         if (!matcher.find()) {
             return s;

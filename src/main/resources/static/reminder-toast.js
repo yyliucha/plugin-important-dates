@@ -1,6 +1,6 @@
 /**
  * 重要日期 · 全站悬浮提醒
- * 由 plugin-important-dates 维护（系统设置 → 代码注入 → 页脚），
+ * 由 plugin-important-dates 维护（系统设置 → 代码注入 → 全局 head 标签），
  * 配置全部来自 GET /important-dates-reminders（公开接口）。
  */
 (function () {
