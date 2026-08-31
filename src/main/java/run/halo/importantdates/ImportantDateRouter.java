@@ -38,6 +38,7 @@ public class ImportantDateRouter {
 
     private static final String THEME_TEMPLATE = "important-dates";
     private static final int DEFAULT_REMIND_DAYS = 3;
+    private static final int DEFAULT_TOAST_CLOSE_SECONDS = 8;
 
     private final ImportantDateFinder importantDateFinder;
     private final ReactiveSettingFetcher settingFetcher;
@@ -100,6 +101,7 @@ public class ImportantDateRouter {
                     Map<String, Object> result = new LinkedHashMap<>();
                     result.put("enabled", cfg.frontendReminder());
                     result.put("remindDays", cfg.remindDays());
+                    result.put("toastCloseSeconds", cfg.toastCloseSeconds());
                     if (!cfg.frontendReminder()) {
                         result.put("reminders", java.util.Collections.emptyList());
                         return ServerResponse.ok()
@@ -155,9 +157,11 @@ public class ImportantDateRouter {
             JsonNode b = tuple.getT2();
             int days = intValue(r, "remindDays", DEFAULT_REMIND_DAYS);
             boolean frontendReminder = boolValue(r, "frontendReminder", true);
+            int toastCloseSeconds = intValue(r, "toastCloseSeconds", DEFAULT_TOAST_CLOSE_SECONDS);
             boolean showImportantTag = boolValue(b, "showImportantTag", true);
             boolean useThemeTemplate = boolValue(b, "useThemeTemplate", true);
-            return new ReminderConfig(days, frontendReminder, showImportantTag, useThemeTemplate);
+            return new ReminderConfig(days, frontendReminder, showImportantTag, useThemeTemplate,
+                toastCloseSeconds);
         });
     }
 
@@ -182,6 +186,6 @@ public class ImportantDateRouter {
     }
 
     record ReminderConfig(int remindDays, boolean frontendReminder, boolean showImportantTag,
-        boolean useThemeTemplate) {
+        boolean useThemeTemplate, int toastCloseSeconds) {
     }
 }

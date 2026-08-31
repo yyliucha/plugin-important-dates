@@ -23,6 +23,12 @@ spec:
           label: 前台提醒
           value: true
           help: 在前台 /important-dates 页面顶部显示到期提醒
+        - $formkit: number
+          name: toastCloseSeconds
+          label: 悬浮提示自动关闭秒数
+          value: 8
+          validation: required|Number
+          help: 全站悬浮提醒（右下角气球）自动关闭时间（秒），0 = 不自动关闭（需手动点 ×）
     - group: basic
       label: 展示设置
       formSchema:

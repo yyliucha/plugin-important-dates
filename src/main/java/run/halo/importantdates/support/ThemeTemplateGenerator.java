@@ -85,6 +85,7 @@ public final class ThemeTemplateGenerator {
                 .append(".id-pin{flex:none;width:11px;height:11px;border-radius:50%;background:linear-gradient(135deg,#f43f5e,#be123c);")
                 .append("box-shadow:0 2px 3px rgba(0,0,0,.3);}")
                 .append(".id-memo-date{font-size:.86rem;opacity:.78;margin-top:7px;}")
+                .append(".id-memo-sub{font-size:.8rem;opacity:.72;margin-top:6px;}")
                 .append(".id-memo-days{position:absolute;top:16px;right:12px;text-align:right;color:#b45309;font-weight:800;")
                 .append("font-size:1.2rem;line-height:1.05;padding-top:4px;background:rgba(255,255,255,.28);border-radius:8px;padding-left:6px;padding-right:6px;}")
                 .append(".id-memo-days small{display:block;font-size:.62rem;font-weight:600;opacity:.72;text-transform:uppercase;letter-spacing:.04em;margin-top:1px;}")
@@ -197,9 +198,11 @@ public final class ThemeTemplateGenerator {
                 <span th:text="${p.displayName}">老婆</span>
                 <span th:if="${p.relation}" style="font-size:.8em;opacity:.75;" th:text="|（${p.relation}）|">（配偶）</span>
               </div>
+              <div class="id-memo-sub" th:if="${p.nickname != null && !p.nickname.isBlank()}"
+                   th:text="|昵称：${p.nickname}|">昵称：三哥</div>
               <div class="id-memo-date">
-                生日 <span th:text="${p.birthdayText}">1999-10-28</span>
-                <span th:if="${p.nextSolarDate != null}" th:text="|（${p.nextSolarDate}）|">（2026-10-28）</span>
+                生日 <span th:text="${p.birthdayText}">1999-10-**</span>
+                <span th:if="${p.nextSolarDate != null}" th:text="|（${p.nextSolarDate}）|">（2026-10-**）</span>
               </div>
             </div>
           </div>

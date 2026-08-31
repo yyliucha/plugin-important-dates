@@ -64,9 +64,9 @@
 - **导出 / 导入**：右上角按钮备份与恢复（导入会先校验，重复自动跳过）
 - **提醒配置**：后台「插件 → 重要日期 → 设置」：提前提醒天数（默认 3）、后台提醒、前台提醒、前台"重要"标记、主题模板渲染（一般保持默认开启）
 
-## 全站提醒（可选，横幅显示在博客所有页面）
+## 全站悬浮提醒（可选，右下角气球，全站生效）
 
-后台与 `/important-dates` 页的提醒横幅是插件内置的。想在**博客每个页面**（首页、文章、页面…）顶部显示提醒横幅，只需在 Halo 系统设置（`系统 → 代码注入 → 全局 head 或 footer`）粘贴一次下面的脚本——插件已提供公开数据接口 `GET /important-dates-reminders`（无提醒时自动隐藏，不显示任何内容）：
+后台与 `/important-dates` 页的提醒横幅是插件内置的。想在**博客每个页面**看到**悬浮提醒**（右下角浮出气球、按配置秒数自动淡出、可点 ×），在 Halo 系统设置（`系统 → 代码注入 → 全局 head 或 footer`）粘贴一次下面的脚本——插件提供公开数据接口 `GET /important-dates-reminders`（含 `toastCloseSeconds`，来自插件设置「悬浮提示自动关闭秒数」；无提醒时脚本不做任何事）：
 
 ```html
 <script>
@@ -74,23 +74,29 @@
   fetch('/important-dates-reminders').then(function(r){return r.json();}).then(function(d){
     if(!d.enabled || !d.reminders || !d.reminders.length) return;
     function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-    var bar=document.createElement('div');
-    bar.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#fff7ed;border-bottom:1px solid #fdba74;box-shadow:0 2px 8px rgba(0,0,0,.15);padding:10px 48px;text-align:center;font-size:14px;color:#9a3412;font-family:inherit;';
-    var html=d.reminders.map(function(r){
-      var t=r.daysUntil<=0?'今天是':(r.daysUntil===1?'明天是':'还有 '+r.daysUntil+' 天是');
-      return '<div>★ '+t+'「'+esc(r.title)+'」</div>';
-    }).join('');
-    bar.innerHTML=html+'<span style="position:absolute;right:14px;top:6px;cursor:pointer;opacity:.6;font-size:18px;">×</span>';
-    bar.querySelector('span').onclick=function(){bar.remove();document.body.style.paddingTop='0';};
-    document.body.style.paddingTop=(document.body.style.paddingTop?parseInt(document.body.style.paddingTop)+36:36)+'px';
-    document.body.appendChild(bar);
+    var box=document.createElement('div');
+    box.style.cssText='position:fixed;right:16px;bottom:16px;z-index:99999;max-width:340px;background:#fff7ed;border:1px solid #fdba74;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.22);padding:14px 40px 14px 16px;font-size:14px;color:#9a3412;font-family:inherit;opacity:0;transform:translateY(12px);transition:opacity .3s,transform .3s;';
+    box.innerHTML='<div style="font-weight:600;margin-bottom:4px;">📅 重要日期提醒</div>'+
+      d.reminders.map(function(r){
+        var t=r.daysUntil<=0?'今天是':(r.daysUntil===1?'明天是':'还有 '+r.daysUntil+' 天是');
+        return '<div>★ '+t+'「'+esc(r.title)+'」</div>';
+      }).join('')+
+      '<span style="position:absolute;right:12px;top:8px;cursor:pointer;opacity:.6;font-size:18px;">×</span>';
+    var close=function(){box.style.opacity='0';box.style.transform='translateY(12px)';setTimeout(function(){box.remove();},320);};
+    box.querySelector('span').onclick=close;
+    document.body.appendChild(box);
+    requestAnimationFrame(function(){box.style.opacity='1';box.style.transform='translateY(0)';});
+    var secs=Number(d.toastCloseSeconds||8);
+    if(secs>0){setTimeout(close, secs*1000);}
   }).catch(function(){});
 })();
 </script>
 ```
 
 - 提醒内容与配置和插件页完全一致（重要 + 前台可见 + 提前 N 天内；在插件设置里改天数/开关即同步生效）
-- 想关闭：插件设置里关闭「前台提醒」即可（接口返回空，横幅自动消失）
+- **自动关闭秒数**：插件设置「悬浮提示自动关闭秒数」可调（默认 8 秒；0 = 不自动关闭，手动点 ×）
+- 想改为顶部横幅式：把脚本里 `box` 样式换成 `top:0;left:0;right:0;` 并加 `text-align:center` 即可
+- 想关闭全站提醒：插件设置里关闭「前台提醒」（接口返回空，脚本不显示）
 - 说明：通过 Halo 官方「代码注入」机制生效（站点级配置，由你粘贴启用，非插件自动写入）；后台（控制台）整站暂无官方注入机制，保持「重要日期」插件页顶部提醒即可
 
 ## 主题模板（自定义展示，可选）
