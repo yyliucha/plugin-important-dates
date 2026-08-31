@@ -36,7 +36,7 @@ spec:
           name: toastEnabled
           label: 启用
           value: false
-          help: 开启后插件自动在站点「系统设置 → 代码注入 → 全局 head 标签」维护一段脚本（只增删自己的片段，不影响其他注入内容；与主题无关、任何主题都会生效）：访客访问任意页面时浮出重要日期提醒，点 × 后本次会话不再弹出；关闭后自动移除该脚本。
+          help: 开启后插件自动在站点「系统设置 → 代码注入 → 全局 head 标签」维护一段脚本（只增删自己的片段，不影响其他注入内容；与主题无关、任何主题都会生效）：访问任意页面时浮出重要日期提醒，点 × 只关闭当前弹窗，刷新/换页会重新打开；自动关闭（按秒数）同样只收起当前弹窗；关闭后自动移除该脚本。
         - $formkit: select
           name: toastPosition
           label: 弹窗位置
@@ -58,17 +58,17 @@ spec:
         - $formkit: text
           name: toastTitle
           label: 提醒标题
-          value: 重要日期提醒
+          value: 📅 重要日期提醒
           help: 弹窗标题文字
         - $formkit: textarea
           name: toastTemplate
           label: 提醒模板
-          value: 「{title}」还有 {daysUntil} 天（{dateText}）
-          help: 每条提醒的显示模板，可用占位符：{title} 名称、{daysUntil} 剩余天数、{dateText} 日期文本、{nextSolarDate} 下一次阳历日期
+          value: 「{title}」{whenText}（{dateText}）
+          help: 每条提醒的显示模板，可用占位符：{title} 名称、{whenText} 贴心措辞（今天/明天/还有 N 天自动生成）、{daysUntil} 剩余天数、{dateText} 日期文本、{nextSolarDate} 下一次阳历日期
         - $formkit: text
           name: toastEmptyText
           label: 无提醒时文案
-          value: 最近没有重要日期提醒
+          value: 最近没有重要日期，生活照常美好～
           help: 没有到期提醒时弹窗显示的文案；留空则无提醒时不弹出
     - group: basic
       label: 展示设置

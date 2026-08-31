@@ -4,8 +4,6 @@
  * 配置全部来自 GET /important-dates-reminders（公开接口）。
  */
 (function () {
-  var SESSION_KEY = "id-toast-closed-session";
-
   function esc(s) {
     return String(s == null ? "" : s)
       .replace(/&/g, "&amp;")
@@ -15,12 +13,21 @@
   }
 
   function applyTemplate(tpl, r) {
-    var text = tpl == null || String(tpl).trim() === "" ? "「{title}」还有 {daysUntil} 天" : String(tpl);
+    var text = tpl == null || String(tpl).trim() === "" ? "「{title}」{whenText}（{dateText}）" : String(tpl);
     return text
       .replace(/\{title\}/g, esc(r.title))
+      .replace(/\{whenText\}/g, whenText(r))
       .replace(/\{daysUntil\}/g, String(r.daysUntil))
       .replace(/\{dateText\}/g, esc(r.dateText || ""))
       .replace(/\{nextSolarDate\}/g, esc(r.nextSolarDate || ""));
+  }
+
+  /** 按剩余天数生成贴心措辞：今天 / 明天就到 / 还有 N 天就到。 */
+  function whenText(r) {
+    var d = Number(r.daysUntil);
+    if (d <= 0) return "就是今天呀 🎉";
+    if (d === 1) return "明天就到啦～";
+    return "还有 " + d + " 天就到啦～";
   }
 
   function positionStyle(pos) {
@@ -37,9 +44,6 @@
 
   function show(d) {
     if (!d || d.toastEnabled === false) return;
-    try {
-      if (window.sessionStorage && sessionStorage.getItem(SESSION_KEY)) return;
-    } catch (e) {}
     var items = d.reminders || [];
     var body;
     if (items.length) {
@@ -68,12 +72,10 @@
       'font-size:18px;line-height:1;" aria-label="关闭">×</span>';
     document.body.appendChild(box);
     var closed = false;
+    // 点 × 只关闭当前弹窗：不做任何记忆，刷新/换页后重新打开
     function close() {
       if (closed) return;
       closed = true;
-      try {
-        sessionStorage.setItem(SESSION_KEY, "1");
-      } catch (e) {}
       box.style.opacity = "0";
       setTimeout(function () {
         if (box.parentNode) box.parentNode.removeChild(box);

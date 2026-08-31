@@ -2,13 +2,13 @@ package com.yyliucha.importantdates.support;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.LinkedHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 import run.halo.app.extension.ConfigMap;
 import run.halo.app.extension.ReactiveExtensionClient;
-import run.halo.app.infra.SystemSetting;
 
 /**
  * 全站悬浮提醒的站点代码注入支持。
@@ -17,10 +17,15 @@ import run.halo.app.infra.SystemSetting;
  * {@code codeInjection.globalHead}（即「系统设置 → 代码注入 → 全局 head 标签」）
  * 追加插件脚本片段；关闭时仅移除该片段。
  *
- * <p>注入位置选择 {globalHead} 而非「页脚」：页脚注入（{@code footer}）只在主题
- * 模板包含 &lt;footer&gt; 元素时才会渲染，部分自定义主题不提供该元素导致注入即便
- * 写入也不会出现在页面里；而全局 head 注入对所有 Thymeleaf 渲染的页面（任何主题）
- * 都会生效，从而保证任意主题下悬浮提醒可见。
+ * <p>注入位置选择 globalHead 而非「页脚」：页脚注入只在主题模板包含
+ * &lt;footer&gt; 元素时渲染，部分自定义主题不提供该元素；而全局 head 注入
+ * 对所有 Thymeleaf 渲染的页面（任何主题）都会生效。
+ *
+ * <p>⚠️ 为避免 Halo 版本差异（2.20 与 2.26 的 API 不同），本类不依赖
+ * {@code run.halo.app.infra.SystemSetting} 等内部工具类，直接解析
+ * ConfigMap data 中的 {@code codeInjection} JSON 字符串（字段名
+ * {@code globalHead}/{@code contentHead}/{@code footer} 从 Halo 2.20 至
+ * 2.26 保持稳定），保证插件可跨版本运行。
  *
  * <p>片段以 {@code id-toast} 标记包裹，互不影响用户手动写入的其他注入内容；
  * 内容相同时不会重复写入（避免版本号膨胀与并发冲突）。历史版本曾写入「页脚」，
@@ -37,6 +42,9 @@ import run.halo.app.infra.SystemSetting;
 public class ToastCodeInjector {
 
     private static final String SYSTEM_CONFIG_NAME = "system";
+    private static final String CODE_INJECTION_KEY = "codeInjection";
+    private static final String GLOBAL_HEAD_KEY = "globalHead";
+    private static final String FOOTER_KEY = "footer";
 
     private static final String TOAST_START = "<!-- id-toast:start -->";
     private static final String TOAST_END = "<!-- id-toast:end -->";
@@ -64,11 +72,9 @@ public class ToastCodeInjector {
     public Mono<Void> sync(boolean enabled) {
         return client.fetch(ConfigMap.class, SYSTEM_CONFIG_NAME)
             .flatMap(cm -> {
-                SystemSetting.CodeInjection codeInjection = readCodeInjection(cm);
-                String currentHead = nullableText(codeInjection == null ? null
-                    : codeInjection.getGlobalHead());
-                String currentFooter = nullableText(codeInjection == null ? null
-                    : codeInjection.getFooter());
+                ObjectNode codeInjection = codeInjectionNode(cm);
+                String currentHead = textOf(codeInjection, GLOBAL_HEAD_KEY);
+                String currentFooter = textOf(codeInjection, FOOTER_KEY);
                 String desiredHead = enabled ? withSegment(currentHead)
                     : withoutSegment(currentHead);
                 boolean footerHasOldSegment = currentFooter.contains(TOAST_START)
@@ -77,12 +83,12 @@ public class ToastCodeInjector {
                     return Mono.empty();
                 }
                 try {
-                    String desiredFooter = withoutSegment(currentFooter);
-                    ObjectNode ci = parseCodeInjection(cm);
-                    ci.put("globalHead", desiredHead);
-                    ci.put("footer", desiredFooter);
-                    cm.getData().put(SystemSetting.CodeInjection.GROUP,
-                        objectMapper.writeValueAsString(ci));
+                    codeInjection.put(GLOBAL_HEAD_KEY, desiredHead);
+                    codeInjection.put(FOOTER_KEY, withoutSegment(currentFooter));
+                    if (cm.getData() == null) {
+                        cm.setData(new LinkedHashMap<>());
+                    }
+                    cm.getData().put(CODE_INJECTION_KEY, objectMapper.writeValueAsString(codeInjection));
                     return client.update(cm)
                         .doOnNext(saved -> log.info(
                             "[important-dates] code injection synced (enabled={})", enabled))
@@ -100,22 +106,12 @@ public class ToastCodeInjector {
             });
     }
 
-    private static SystemSetting.CodeInjection readCodeInjection(ConfigMap cm) {
-        try {
-            return SystemSetting.get(cm, SystemSetting.CodeInjection.GROUP,
-                SystemSetting.CodeInjection.class);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private static String nullableText(String s) {
-        return s == null ? "" : s;
-    }
-
-    private ObjectNode parseCodeInjection(ConfigMap cm) throws Exception {
-        String raw = cm.getData() == null ? null
-            : cm.getData().get(SystemSetting.CodeInjection.GROUP);
+    /**
+     * 读取 data.codeInjection 的 JSON 字符串并转为对象节点；缺失/非法时返回空节点。
+     * 不依赖任何 Halo 内部工具类，保证跨版本兼容。
+     */
+    private ObjectNode codeInjectionNode(ConfigMap cm) {
+        String raw = cm.getData() == null ? null : cm.getData().get(CODE_INJECTION_KEY);
         if (raw == null || raw.isBlank()) {
             return objectMapper.createObjectNode();
         }
@@ -124,6 +120,14 @@ public class ToastCodeInjector {
         } catch (Exception e) {
             return objectMapper.createObjectNode();
         }
+    }
+
+    private static String textOf(ObjectNode node, String field) {
+        if (node == null || !node.hasNonNull(field)) {
+            return "";
+        }
+        String value = node.get(field).asText("");
+        return value == null ? "" : value;
     }
 
     static String withSegment(String content) {

@@ -78,6 +78,8 @@ group 'com.yyliucha.importantdates'
 
 > 修复记录（v1.0.22）：操作日志弹窗 VModal 内容在打开动画期间切换节点，与弹窗滚动条初始化竞争导致 Vue `insertBefore` NotFoundError（首/奇数次打开报错）。已改为「先加载数据再打开弹窗 + 弹窗内单一 table 结构（分支收入 tbody）」，浏览器连续开关 3 次验证零错误。
 >
+> 修复记录（v1.0.25）：生产环境 Halo 2.26 上报 `NoSuchMethodError: run.halo.app.infra.SystemSetting.get(...)` —— 该内部工具类在 Halo 2.26 已不存在，2.20 编译的引用在 2.26 运行崩溃（LinkageError 还会破坏网络层，导致连接反复断开）。已移除对 `SystemSetting` 的全部依赖，改为直接解析 ConfigMap `codeInjection` JSON（`globalHead/contentHead/footer` 键名跨版本稳定，2.20/2.26 均实测一致）；并建立双版本回归：**Halo 2.20.20 与 2.26.0 各跑 37/37 全绿**（含全局 head 注入/移除、页面含脚本、主题模板生成/升级、卡片渲染）。
+>
 > 修复记录（v1.0.23）：全站悬浮提醒最初注入「代码注入 → 页脚」，但页脚注入仅在主题模板包含 `<footer>` 元素时渲染（实测自定义主题不含该元素 → 脚本写入但页面不出现）。已迁移为注入「全局 head 标签」（对所有 Thymeleaf 渲染页面生效，与主题无关），并自动清理旧页脚片段；实测生产域名首页/插件页均正确出现脚本。
 
 ## 四、人工测试清单（发布者执行；每项勾选后回填日期）
