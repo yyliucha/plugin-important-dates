@@ -56,41 +56,76 @@ public class ImportantDateRouter {
      */
     @Bean
     RouterFunction<ServerResponse> importantDatesRouter() {
-        return org.springframework.web.reactive.function.server.RouterFunctions.route(
-            org.springframework.web.reactive.function.server.RequestPredicates.GET("/important-dates"),
-            request -> reminderConfig()
-                .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
-                .zipWith(themeTemplateSupport.ensureThemeTemplate()
-                    .then(themeTemplateSupport.templateExists()))
-                .flatMap(zip -> {
-                    ReminderConfig cfg = zip.getT1();
-                    boolean themeTemplateReady = zip.getT2() && cfg.useThemeTemplate();
-                    return Mono.zip(
-                            importantDateFinder.listAll().collectList(),
-                            importantDateFinder.listAllPeople().collectList(),
-                            importantDateFinder.listUpcoming(cfg.remindDays()).collectList()
-                        )
-                        .flatMap(tuple -> {
-                            List<ImportantDateVo> dates = tuple.getT1();
-                            List<PersonVo> people = tuple.getT2();
-                            List<ImportantDateVo> reminders = tuple.getT3();
-                            if (themeTemplateReady) {
-                                Map<String, Object> model = new LinkedHashMap<>();
-                                model.put("title", "重要日期");
-                                model.put("dates", dates);
-                                model.put("people", people);
-                                model.put("reminders", reminders);
-                                model.put("showImportantTag", cfg.showImportantTag());
-                                return ServerResponse.ok().render(THEME_TEMPLATE, model);
+        return org.springframework.web.reactive.function.server.RouterFunctions
+            .route(
+                org.springframework.web.reactive.function.server.RequestPredicates.GET("/important-dates"),
+                request -> reminderConfig()
+                    .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
+                    .zipWith(themeTemplateSupport.ensureThemeTemplate()
+                        .then(themeTemplateSupport.templateExists()))
+                    .flatMap(zip -> {
+                        ReminderConfig cfg = zip.getT1();
+                        boolean themeTemplateReady = zip.getT2() && cfg.useThemeTemplate();
+                        return Mono.zip(
+                                importantDateFinder.listAll().collectList(),
+                                importantDateFinder.listAllPeople().collectList(),
+                                importantDateFinder.listUpcoming(cfg.remindDays()).collectList()
+                            )
+                            .flatMap(tuple -> {
+                                List<ImportantDateVo> dates = tuple.getT1();
+                                List<PersonVo> people = tuple.getT2();
+                                List<ImportantDateVo> reminders = tuple.getT3();
+                                if (themeTemplateReady) {
+                                    Map<String, Object> model = new LinkedHashMap<>();
+                                    model.put("title", "重要日期");
+                                    model.put("dates", dates);
+                                    model.put("people", people);
+                                    model.put("reminders", reminders);
+                                    model.put("showImportantTag", cfg.showImportantTag());
+                                    return ServerResponse.ok().render(THEME_TEMPLATE, model);
+                                }
+                                return ServerResponse.ok()
+                                    .contentType(MediaType.TEXT_HTML)
+                                    .bodyValue(HtmlRenderer.render(
+                                        "重要日期", dates, people, reminders,
+                                        cfg.showImportantTag()));
+                            });
+                    })
+            )
+            // 全站提醒数据（供"代码注入"脚本获取；匿名公开）
+            .andRoute(
+                org.springframework.web.reactive.function.server.RequestPredicates.GET(
+                    "/important-dates-reminders"),
+                request -> reminderConfig().flatMap(cfg -> {
+                    Map<String, Object> result = new LinkedHashMap<>();
+                    result.put("enabled", cfg.frontendReminder());
+                    result.put("remindDays", cfg.remindDays());
+                    if (!cfg.frontendReminder()) {
+                        result.put("reminders", java.util.Collections.emptyList());
+                        return ServerResponse.ok()
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .bodyValue(result);
+                    }
+                    return importantDateFinder.listUpcoming(cfg.remindDays())
+                        .collectList()
+                        .map(upcoming -> {
+                            List<Map<String, Object>> items = new java.util.ArrayList<>();
+                            for (ImportantDateVo r : upcoming) {
+                                Map<String, Object> item = new LinkedHashMap<>();
+                                item.put("title", r.getTitle());
+                                item.put("daysUntil", r.getDaysUntil());
+                                item.put("dateText", r.getDateText());
+                                item.put("nextSolarDate", r.getNextSolarDate());
+                                items.add(item);
                             }
-                            return ServerResponse.ok()
-                                .contentType(MediaType.TEXT_HTML)
-                                .bodyValue(HtmlRenderer.render(
-                                    "重要日期", dates, people, reminders,
-                                    cfg.showImportantTag()));
-                        });
+                            result.put("reminders", items);
+                            return result;
+                        })
+                        .flatMap(map -> ServerResponse.ok()
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .bodyValue(map));
                 })
-        );
+            );
     }
 
     private Map<String, Object> buildModel(

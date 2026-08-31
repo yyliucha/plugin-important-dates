@@ -68,6 +68,7 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
         return client.listAll(Person.class, ListOptions.builder().build(), Sort.unsorted())
             .map(p -> toPersonVo(p, today))
             .filter(vo -> vo.getDisplayName() != null && !vo.getDisplayName().isBlank())
+            .filter(PersonVo::isFrontendVisible)
             .sort(Comparator.comparing(PersonVo::getDaysUntil)
                 .thenComparing(PersonVo::getDisplayName));
     }
@@ -127,6 +128,7 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
         }
         vo.setNextSolarDate(next == null ? null : next.toString());
         vo.setDaysUntil(DateCalc.daysUntil(today, next));
+        vo.setFrontendVisible(!Boolean.FALSE.equals(spec.getVisible()));
         return vo;
     }
 }

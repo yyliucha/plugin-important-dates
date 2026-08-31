@@ -45,4 +45,9 @@ public class PersonVo {
      * 距下一次生日的天数（>= 0）。
      */
     private long daysUntil;
+
+    /**
+     * 前台是否可见（false = 仅后台，不出现在前台）。
+     */
+    private boolean frontendVisible;
 }

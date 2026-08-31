@@ -64,6 +64,35 @@
 - **导出 / 导入**：右上角按钮备份与恢复（导入会先校验，重复自动跳过）
 - **提醒配置**：后台「插件 → 重要日期 → 设置」：提前提醒天数（默认 3）、后台提醒、前台提醒、前台"重要"标记、主题模板渲染（一般保持默认开启）
 
+## 全站提醒（可选，横幅显示在博客所有页面）
+
+后台与 `/important-dates` 页的提醒横幅是插件内置的。想在**博客每个页面**（首页、文章、页面…）顶部显示提醒横幅，只需在 Halo 系统设置（`系统 → 代码注入 → 全局 head 或 footer`）粘贴一次下面的脚本——插件已提供公开数据接口 `GET /important-dates-reminders`（无提醒时自动隐藏，不显示任何内容）：
+
+```html
+<script>
+(function(){
+  fetch('/important-dates-reminders').then(function(r){return r.json();}).then(function(d){
+    if(!d.enabled || !d.reminders || !d.reminders.length) return;
+    function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+    var bar=document.createElement('div');
+    bar.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#fff7ed;border-bottom:1px solid #fdba74;box-shadow:0 2px 8px rgba(0,0,0,.15);padding:10px 48px;text-align:center;font-size:14px;color:#9a3412;font-family:inherit;';
+    var html=d.reminders.map(function(r){
+      var t=r.daysUntil<=0?'今天是':(r.daysUntil===1?'明天是':'还有 '+r.daysUntil+' 天是');
+      return '<div>★ '+t+'「'+esc(r.title)+'」</div>';
+    }).join('');
+    bar.innerHTML=html+'<span style="position:absolute;right:14px;top:6px;cursor:pointer;opacity:.6;font-size:18px;">×</span>';
+    bar.querySelector('span').onclick=function(){bar.remove();document.body.style.paddingTop='0';};
+    document.body.style.paddingTop=(document.body.style.paddingTop?parseInt(document.body.style.paddingTop)+36:36)+'px';
+    document.body.appendChild(bar);
+  }).catch(function(){});
+})();
+</script>
+```
+
+- 提醒内容与配置和插件页完全一致（重要 + 前台可见 + 提前 N 天内；在插件设置里改天数/开关即同步生效）
+- 想关闭：插件设置里关闭「前台提醒」即可（接口返回空，横幅自动消失）
+- 说明：通过 Halo 官方「代码注入」机制生效（站点级配置，由你粘贴启用，非插件自动写入）；后台（控制台）整站暂无官方注入机制，保持「重要日期」插件页顶部提醒即可
+
 ## 主题模板（自定义展示，可选）
 
 插件已自动生成主题模板，无需手动操作。想**完全自定义**展示时，编辑主题里的 `templates/important-dates.html`（或参考下列数据自行新建，注意删除旧文件后插件会重新生成）：
