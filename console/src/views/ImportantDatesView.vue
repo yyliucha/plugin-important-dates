@@ -174,9 +174,16 @@
             体重：{{ p.spec.weightKg != null ? p.spec.weightKg + " kg" : "—" }}
             <template v-if="p.spec.heightCm != null">｜身高：{{ p.spec.heightCm }} cm</template>
             <template v-if="p.spec.bloodType">｜血型：{{ p.spec.bloodType }} 型</template>
+            <span class="privacy-tag">仅后台</span>
           </div>
-          <div v-if="p.spec.hobbies" class="person-line">喜好：{{ p.spec.hobbies }}</div>
-          <div v-if="p.spec.note" class="person-line note">备注：{{ p.spec.note }}</div>
+          <div v-if="p.spec.hobbies" class="person-line">
+            喜好：{{ p.spec.hobbies }}
+            <span class="privacy-tag">仅后台</span>
+          </div>
+          <div v-if="p.spec.note" class="person-line note">
+            备注：{{ p.spec.note }}
+            <span class="privacy-tag" style="vertical-align: middle;">仅后台</span>
+          </div>
           <div class="person-line person-rel-count">
             关联日期：{{ linkedDateCount(p.metadata.name) }} 条
           </div>
@@ -1241,6 +1248,18 @@ function formatTime(iso?: string): string {
 .muted {
   color: #9ca3af;
   font-size: 13px;
+}
+
+.privacy-tag {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #9ca3af;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  padding: 0 7px;
+  vertical-align: middle;
 }
 
 .hidden-tag {
