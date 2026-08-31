@@ -17,7 +17,7 @@
 | ![后台重要日期页](docs/screenshots/screenshot-console-main.png) | **后台「重要日期」页**：提醒横幅 + 日期列表（重要/前台开关、关联人、最近一次日期） |
 | ![前台页面](docs/screenshots/screenshot-frontend-page.png) | **前台 `/important-dates`**：自动在主题内打开，卡片式便签设计 + 提醒横幅 |
 | ![新增日期](docs/screenshots/screenshot-date-form.png) | **自研日期选择器**：阳历日历网格（格内标注农历）/ 农历年月日（含闰月） |
-| ![人员管理](docs/screenshots/screenshot-people.png) | **人员管理**：姓名/昵称/关系/生日/血型/身高/体重/喜好，敏感字段标注「仅后台」 |
+| ![人员管理](docs/screenshots/screenshot-people-list.png) | **人员管理**：姓名/昵称/关系/生日/血型/身高/体重/喜好，敏感字段标注「仅后台」 |
 | ![操作日志](docs/screenshots/screenshot-log-modal.png) | **操作日志弹窗**：每一次新增/编辑/删除的时间、操作、目标与变更详情 |
 | ![插件设置](docs/screenshots/screenshot-settings.png) | **插件设置**：提醒天数、后台/前台提醒、全站悬浮提醒（位置/标题/模板/关闭行为）、隐私脱敏 |
 | ![全站悬浮提醒](docs/screenshots/screenshot-toast.png) | **全站悬浮提醒弹窗**：自选位置（含屏幕中间）、自动关闭倒计时、关闭方式菜单 |
@@ -118,3 +118,4 @@ cd plugin-important-dates
 ## License
 
 [MIT](LICENSE)
+
