@@ -587,6 +587,8 @@ function removePerson(p: Person) {
     onConfirm: async () => {
       try {
         await deletePerson(p.metadata.name);
+        // 立即从本地列表移除（Halo 软删除后索引清理存在微小延迟，避免依赖时序）
+        persons.value = persons.value.filter((x) => x.metadata.name !== p.metadata.name);
         Toast.success("已删除");
         await appendLog("DELETE", p.spec.displayName, p.metadata.name, "删除人员");
         await load();
@@ -877,6 +879,8 @@ function remove(item: ImportantDate) {
     onConfirm: async () => {
       try {
         await deleteImportantDate(item.metadata.name);
+        // 立即从本地列表移除（Halo 软删除后索引清理存在微小延迟，避免依赖时序）
+        dates.value = dates.value.filter((d) => d.metadata.name !== item.metadata.name);
         Toast.success("已删除");
         await appendLog("DELETE", item.spec.title, item.metadata.name, summaryOf(item.spec));
         await load();

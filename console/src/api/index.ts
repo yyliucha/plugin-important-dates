@@ -13,7 +13,8 @@ export async function listImportantDates(): Promise<ImportantDate[]> {
       sort: "metadata.creationTimestamp,desc",
     },
   });
-  return data.items || [];
+  // Halo 删除为软删除：索引清理前列表可能短暂携带 deletionTimestamp，一律过滤
+  return (data.items || []).filter((i) => !i.metadata?.deletionTimestamp);
 }
 
 export async function createImportantDate(item: ImportantDate): Promise<ImportantDate> {
@@ -65,7 +66,8 @@ export async function listPersons(): Promise<Person[]> {
       sort: "metadata.creationTimestamp,desc",
     },
   });
-  return data.items || [];
+  // 同 importantdates：过滤软删除中的对象
+  return (data.items || []).filter((i) => !i.metadata?.deletionTimestamp);
 }
 
 export async function createPerson(item: Person): Promise<Person> {
