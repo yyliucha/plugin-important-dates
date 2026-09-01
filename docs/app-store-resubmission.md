@@ -66,4 +66,5 @@
 ## 六、AI 参与说明
 
 - 开发与测试由 AI 辅助（生成代码、自动化测试、浏览器验证），本材料提供上述可核验的自动化回归与浏览器验证记录；
-- 所有代码公开可审查（github.com/yyliucha/plugin-important-dates），人工清单由发布者在真实环境勾选执行后随提交说明提供。
+- 所有代码公开可审查（github.com/yyliucha/plugin-important-dates）；**人工测试证据（真实环境截图 + 勾选清单）：docs/manual-test-evidence.md**，已由发布者在真实环境执行并截图核验，随提交一并提供。
+
