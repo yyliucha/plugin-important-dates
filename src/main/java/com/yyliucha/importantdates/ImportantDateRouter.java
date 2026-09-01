@@ -11,23 +11,23 @@ import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
 import run.halo.app.plugin.ReactiveSettingFetcher;
+import run.halo.app.theme.TemplateNameResolver;
+import run.halo.app.theme.router.ModelConst;
 import com.yyliucha.importantdates.finders.ImportantDateFinder;
-import com.yyliucha.importantdates.support.HtmlRenderer;
-import com.yyliucha.importantdates.support.ThemeTemplateSupport;
 import com.yyliucha.importantdates.vo.ImportantDateVo;
 import com.yyliucha.importantdates.vo.PersonVo;
 
 /**
  * 前台路由：/important-dates。
  *
- * <p>渲染策略：
+ * <p>渲染策略（符合 Halo 官方「与主题集成」指南）：
  * <ul>
- *   <li>默认：使用插件内部渲染器（{@link HtmlRenderer}）生成完整 HTML，
- *       不依赖主题、不依赖插件模板机制，兼容全部 Halo 2.x 版本；</li>
- *   <li>开启插件设置「使用主题模板渲染」后：渲染当前激活主题的
- *       {@code important-dates.html} 模板（模板需自行放入主题 templates/ 目录且语法正确，
- *       页面将获得主题布局）；model 中提供 {@code title}/{@code dates}/{@code people}/
- *       {@code reminders}/{@code showImportantTag}。</li>
+ *   <li>插件自带默认 Thymeleaf 模板（{@code resources/templates/important-dates.html}），
+ *       不依赖、不修改任何主题文件；</li>
+ *   <li>通过 {@link TemplateNameResolver} 解析模板名：主题如提供同名模板（主题作者/用户主动
+ *       放置 {@code templates/important-dates.html}）则使用主题模板，否则使用插件默认模板；</li>
+ *   <li>页面模型设置 {@code _templateId}（{@link ModelConst#TEMPLATE_ID}）为
+ *       {@code plugin:plugin-important-dates:important-dates}，供 Head 处理器、SEO 等扩展识别。</li>
  * </ul>
  *
  * @author yyliucha
@@ -37,19 +37,20 @@ import com.yyliucha.importantdates.vo.PersonVo;
 public class ImportantDateRouter {
 
     private static final String THEME_TEMPLATE = "important-dates";
+    private static final String TEMPLATE_ID = "plugin:plugin-important-dates:important-dates";
     private static final int DEFAULT_REMIND_DAYS = 3;
     private static final int DEFAULT_TOAST_CLOSE_SECONDS = 8;
 
     private final ImportantDateFinder importantDateFinder;
     private final ReactiveSettingFetcher settingFetcher;
-    private final ThemeTemplateSupport themeTemplateSupport;
+    private final TemplateNameResolver templateNameResolver;
 
     public ImportantDateRouter(ImportantDateFinder importantDateFinder,
         ReactiveSettingFetcher settingFetcher,
-        ThemeTemplateSupport themeTemplateSupport) {
+        TemplateNameResolver templateNameResolver) {
         this.importantDateFinder = importantDateFinder;
         this.settingFetcher = settingFetcher;
-        this.themeTemplateSupport = themeTemplateSupport;
+        this.templateNameResolver = templateNameResolver;
     }
 
     /**
@@ -61,39 +62,30 @@ public class ImportantDateRouter {
             .route(
                 org.springframework.web.reactive.function.server.RequestPredicates.GET("/important-dates"),
                 request -> reminderConfig()
-                    .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
-                    .zipWith(themeTemplateSupport.ensureThemeTemplate()
-                        .then(themeTemplateSupport.templateExists()))
+                    .zipWith(importantDateFinder.listAll().collectList()
+                        .zipWith(importantDateFinder.listAllPeople().collectList()))
                     .flatMap(zip -> {
                         ReminderConfig cfg = zip.getT1();
-                        boolean themeTemplateReady = zip.getT2() && cfg.useThemeTemplate();
-                        return Mono.zip(
-                                importantDateFinder.listAll().collectList(),
-                                importantDateFinder.listAllPeople().collectList(),
-                                importantDateFinder.listUpcoming(cfg.remindDays()).collectList()
-                            )
-                            .flatMap(tuple -> {
-                                List<ImportantDateVo> dates = tuple.getT1();
-                                List<PersonVo> people = tuple.getT2();
-                                List<ImportantDateVo> reminders = tuple.getT3();
-                                if (themeTemplateReady) {
-                                    Map<String, Object> model = new LinkedHashMap<>();
-                                    model.put("title", "重要日期");
-                                    model.put("dates", dates);
-                                    model.put("people", people);
-                                    model.put("reminders", reminders);
-                                    model.put("showImportantTag", cfg.showImportantTag());
-                                    return ServerResponse.ok().render(THEME_TEMPLATE, model);
-                                }
-                                return ServerResponse.ok()
-                                    .contentType(MediaType.TEXT_HTML)
-                                    .bodyValue(HtmlRenderer.render(
-                                        "重要日期", dates, people, reminders,
-                                        cfg.showImportantTag()));
+                        List<ImportantDateVo> dates = zip.getT2().getT1();
+                        List<PersonVo> people = zip.getT2().getT2();
+                        return importantDateFinder.listUpcoming(cfg.remindDays()).collectList()
+                            .flatMap(reminders -> {
+                                Map<String, Object> model = new LinkedHashMap<>();
+                                model.put("title", "重要日期");
+                                model.put("dates", dates);
+                                model.put("people", people);
+                                model.put("reminders", reminders);
+                                model.put("showImportantTag", cfg.showImportantTag());
+                                model.put(ModelConst.TEMPLATE_ID, TEMPLATE_ID);
+                                return templateNameResolver
+                                    .resolveTemplateNameOrDefault(request.exchange(), THEME_TEMPLATE)
+                                    .defaultIfEmpty(THEME_TEMPLATE)
+                                    .flatMap(templateName -> ServerResponse.ok()
+                                        .render(templateName, model));
                             });
                     })
             )
-            // 全站提醒数据（供"代码注入"脚本获取；匿名公开）
+            // 全站提醒数据（供 TemplateHeadProcessor 输出的脚本获取；匿名公开）
             .andRoute(
                 org.springframework.web.reactive.function.server.RequestPredicates.GET(
                     "/important-dates-reminders"),
@@ -138,20 +130,6 @@ public class ImportantDateRouter {
             );
     }
 
-    private Map<String, Object> buildModel(
-        reactor.util.function.Tuple3<java.util.List<com.yyliucha.importantdates.vo.ImportantDateVo>,
-            java.util.List<com.yyliucha.importantdates.vo.PersonVo>,
-            java.util.List<com.yyliucha.importantdates.vo.ImportantDateVo>> tuple,
-        ReminderConfig cfg) {
-        Map<String, Object> model = new LinkedHashMap<>();
-        model.put("title", "重要日期");
-        model.put("dates", tuple.getT1());
-        model.put("people", tuple.getT2());
-        model.put("reminders", tuple.getT3());
-        model.put("showImportantTag", cfg.showImportantTag());
-        return model;
-    }
-
     /**
      * 读取提醒与悬浮提示配置（默认：提前 3 天、前台提醒开启、显示重要标记、
      * 悬浮提醒关闭、右下角、标题"重要日期提醒"）。
@@ -171,16 +149,15 @@ public class ImportantDateRouter {
             boolean frontendReminder = boolValue(r, "frontendReminder", true);
             int toastCloseSeconds = intValue(r, "toastCloseSeconds", DEFAULT_TOAST_CLOSE_SECONDS);
             boolean showImportantTag = boolValue(b, "showImportantTag", true);
-            boolean useThemeTemplate = boolValue(b, "useThemeTemplate", true);
             boolean toastEnabled = boolValue(t, "toastEnabled", false);
             String toastPosition = textValue(t, "toastPosition", "bottom-right");
-            String toastTitle = textValue(t, "toastTitle", "重要日期提醒");
+            String toastTitle = textValue(t, "toastTitle", "📅 重要日期提醒");
             String toastTemplate = textValue(t, "toastTemplate",
-                "「{title}」还有 {daysUntil} 天（{dateText}）");
+                "「{title}」{whenText}（{dateText}）");
             String toastEmptyText = textValue(t, "toastEmptyText", "最近没有重要日期，生活照常美好～");
             String toastDefaultClose = textValue(t, "toastDefaultClose", "once");
             boolean toastCloseMenu = boolValue(t, "toastCloseMenu", true);
-            return new ReminderConfig(days, frontendReminder, showImportantTag, useThemeTemplate,
+            return new ReminderConfig(days, frontendReminder, showImportantTag,
                 toastCloseSeconds, toastEnabled, toastPosition, toastTitle, toastTemplate,
                 toastEmptyText, toastDefaultClose, toastCloseMenu);
         });
@@ -219,7 +196,7 @@ public class ImportantDateRouter {
     }
 
     record ReminderConfig(int remindDays, boolean frontendReminder, boolean showImportantTag,
-        boolean useThemeTemplate, int toastCloseSeconds,
+        int toastCloseSeconds,
         boolean toastEnabled, String toastPosition, String toastTitle,
         String toastTemplate, String toastEmptyText, String toastDefaultClose,
         boolean toastCloseMenu) {

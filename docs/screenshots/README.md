@@ -35,9 +35,9 @@
 | 问题反馈 | https://github.com/yyliucha/plugin-important-dates/issues |
 | 支持地址 | https://github.com/yyliucha/plugin-important-dates（或站点） |
 | 许可证 | MIT |
-| Halo 兼容范围 | `>=2.14.0`（与 plugin.yaml requires 一致） |
-| 版本号 | 1.1.0（正式版，格式 `1.1.0`，无空格） |
-| 版本说明 | 从 Release v1.1.0 复制（功能与回归摘要） |
+| Halo 兼容范围 | `>=2.20.0`（与 plugin.yaml requires 一致；基于 2.20 API 编译，2.20/2.26 实测通过） |
+| 版本号 | 1.1.2（正式版，格式 `1.1.2`，无空格） |
+| 版本说明 | 从 Release v1.1.2 复制（功能与回归摘要） |
 | Logo | 需要一枚自有 Logo（128×128 或方形 PNG，勿用 Halo 默认图标）；当前 plugin.yaml 的 logo 若仍是默认需替换 |
 
 ## 提交前自查（对照官方审核指南重点）
@@ -47,6 +47,7 @@
 3. `plugin.yaml`：`logo`（自有）、`homepage`、`issues`、`license`、`requires: ">=2.14.0"` 均已设置（本项目已配好，仅 Logo 需确认）；
 4. 明确：插件不含联网请求、不采集用户数据、无需外部授权/付费能力（README 已写明）；
 5. 命名空间合规：自有代码全部为 `com.yyliucha.importantdates`（审核材料见 `docs/app-store-resubmission.md`）。
+
 
 
 
