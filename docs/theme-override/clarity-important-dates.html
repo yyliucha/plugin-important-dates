@@ -1,0 +1,105 @@
+<!doctype html>
+<!--
+  重要日期 · theme-clarity 主题覆盖模板
+  放置位置：themes/主题名/templates/important-dates.html（主题目录，非插件目录）
+  作用：让 /important-dates 在 Clarity 主题布局内打开（导航/页脚/暗色模式）
+  此文件为「主题侧覆盖」，插件永不修改；删除该文件即回到插件默认模板（Halo fallback 布局）
+-->
+<html
+  xmlns:th="https://www.thymeleaf.org"
+  th:replace="~{modules/layout :: html(content = ~{::content}, showAside = false, pageTitle = ${title}, head = ~{::head})}"
+>
+  <th:block th:fragment="head">
+    <style>
+      .id-wrap{max-width:920px;margin:0 auto;padding:24px 16px 8px;}
+      .id-hero{padding:6px 0 2px;}
+      .id-hero-title{font-size:1.8rem;margin:0 0 4px;font-family:'Kaiti SC','KaiTi','STKaiti','STXihei','PingFang SC',sans-serif;}
+      .id-hero-sub{opacity:.62;margin:0 0 20px;}
+      .id-block-title{font-size:1.15rem;margin:26px 0 14px;display:flex;align-items:center;gap:8px;}
+      .id-count{opacity:.5;font-weight:400;font-size:.9em;}
+      .id-board{columns:3 230px;column-gap:14px;}
+      @media (max-width:860px){.id-board{columns:2 200px;}}
+      @media (max-width:560px){.id-board{columns:1 170px;}}
+      .id-memo{break-inside:avoid;-webkit-column-break-inside:avoid;margin:0 0 16px;position:relative;border-radius:4px 4px 4px 14px;padding:18px 16px 14px;box-shadow:0 3px 8px rgba(0,0,0,.16);background:var(--paper,#fff8c5);color:#3f3f46;transform:rotate(var(--tilt,-1deg));transition:transform .16s ease;}
+      .id-memo:hover{transform:rotate(0deg) scale(1.04);box-shadow:0 6px 16px rgba(0,0,0,.22);}
+      .id-memo::before{content:'';position:absolute;top:-9px;left:50%;transform:translateX(-50%) rotate(-2deg);width:66px;height:17px;background:rgba(255,255,255,.5);border:1px solid rgba(128,128,128,.18);box-shadow:0 1px 2px rgba(0,0,0,.12);}
+      .id-memo:nth-child(6n+1){--tilt:-1deg;--paper:#fff8c5;}
+      .id-memo:nth-child(6n+2){--tilt:1.1deg;--paper:#ffd9e1;}
+      .id-memo:nth-child(6n+3){--tilt:-.6deg;--paper:#d7f0ff;}
+      .id-memo:nth-child(6n+4){--tilt:.9deg;--paper:#dcf5d3;}
+      .id-memo:nth-child(6n+5){--tilt:-1.2deg;--paper:#ece2ff;}
+      .id-memo:nth-child(6n+6){--tilt:.6deg;--paper:#ffe9c7;}
+      .id-memo-title{font-weight:700;font-size:1.04rem;display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-family:'Kaiti SC','KaiTi','STKaiti','PingFang SC',sans-serif;padding-right:56px;}
+      .id-pin{flex:none;width:11px;height:11px;border-radius:50%;background:linear-gradient(135deg,#f43f5e,#be123c);box-shadow:0 2px 3px rgba(0,0,0,.3);}
+      .id-memo-date{font-size:.86rem;opacity:.78;margin-top:7px;}
+      .id-memo-sub{font-size:.8rem;opacity:.72;margin-top:6px;}
+      .id-memo-days{position:absolute;top:16px;right:12px;text-align:right;color:#b45309;font-weight:800;font-size:1.2rem;line-height:1.05;padding-top:4px;background:rgba(255,255,255,.28);border-radius:8px;padding-left:6px;padding-right:6px;}
+      .id-memo-days small{display:block;font-size:.62rem;font-weight:600;opacity:.72;text-transform:uppercase;letter-spacing:.04em;margin-top:1px;}
+      .id-memo-people{font-size:.8rem;opacity:.78;margin-top:8px;}
+      .id-memo-avatar{width:34px;height:34px;border-radius:8px;background:rgba(255,255,255,.55);color:#3f3f46;display:flex;align-items:center;justify-content:center;font-weight:700;margin-right:10px;flex:none;box-shadow:inset 0 0 0 1px rgba(128,128,128,.2);}
+      @media (prefers-color-scheme: dark){.id-memo{box-shadow:0 3px 10px rgba(0,0,0,.5);}}
+      .id-remind{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);border-radius:12px;padding:10px 16px;margin-bottom:14px;}
+      .id-remind-item{color:#d97706;line-height:1.9;}
+      @media (prefers-color-scheme: dark){.id-remind{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.4);}.id-remind-item{color:#fbbf24;}}
+    </style>
+  </th:block>
+  <th:block th:fragment="content">
+    <div class="id-wrap">
+      <div class="id-hero">
+        <h1 class="id-hero-title" th:text="${title}">重要日期</h1>
+        <p class="id-hero-sub">记录值得纪念的日子，以及身边重要的人。</p>
+      </div>
+
+      <div class="id-remind" th:if="${reminders != null && !reminders.isEmpty()}">
+        <div class="id-remind-item" th:each="r : ${reminders}">
+          <span th:if="${r.daysUntil <= 0}" th:text="|「${r.title}」就是今天呀 🎉|">「结婚纪念日」就是今天呀 🎉</span>
+          <span th:if="${r.daysUntil == 1}" th:text="|「${r.title}」明天就到啦～|">「结婚纪念日」明天就到啦～</span>
+          <span th:if="${r.daysUntil > 1}" th:text="|「${r.title}」还有 ${r.daysUntil} 天就到啦～|">「结婚纪念日」还有 3 天就到啦～</span>
+        </div>
+      </div>
+
+      <h2 class="id-block-title">重要日期 <span class="id-count" th:text="${#lists.size(dates)}">5</span></h2>
+      <p class="id-hero-sub" th:if="${#lists.isEmpty(dates)}">还没有记录。</p>
+      <div class="id-board" th:unless="${#lists.isEmpty(dates)}">
+        <div class="id-memo" th:each="d : ${dates}">
+          <div class="id-memo-days">
+            <span th:text="${d.daysUntil}">35</span>
+            <small th:if="${d.nextSolarDate != null}" th:text="|天后 · ${d.nextSolarDate}|">天后 · 2026-10-02</small>
+          </div>
+          <div class="id-memo-title">
+            <span class="id-pin" th:if="${showImportantTag != null and showImportantTag and d.important}"></span>
+            <span th:text="${d.title}">结婚纪念日</span>
+          </div>
+          <div class="id-memo-date">
+            <span th:text="${d.dateText}">2021-10-02</span>
+            <span th:if="${d.dateType == 'LUNAR'}" th:text="（农历）">（农历）</span>
+          </div>
+          <div class="id-memo-people" th:if="${d.personNames != null && !d.personNames.isEmpty()}"
+               th:text="|❤ ${#strings.listJoin(d.personNames, '、')}|">❤ 老婆</div>
+        </div>
+      </div>
+
+      <h2 class="id-block-title">重要的人 <span class="id-count" th:text="${#lists.size(people)}">1</span></h2>
+      <p class="id-hero-sub" th:if="${#lists.isEmpty(people)}">还没有添加。</p>
+      <div class="id-board" th:unless="${#lists.isEmpty(people)}">
+        <div class="id-memo" th:each="p : ${people}">
+          <div class="id-memo-days" th:if="${p.daysUntil >= 0}">
+            <span th:text="${p.daysUntil}">61</span>
+            <small>天后</small>
+          </div>
+          <div class="id-memo-title" style="padding-right:0;">
+            <span class="id-memo-avatar" th:text="${#strings.substring(p.displayName, 0, 1)}">老</span>
+            <span th:text="${p.displayName}">老婆</span>
+            <span th:if="${p.relation}" style="font-size:.8em;opacity:.75;" th:text="|（${p.relation}）|">（配偶）</span>
+          </div>
+          <div class="id-memo-sub" th:if="${p.nickname != null && !p.nickname.isBlank()}"
+               th:text="|昵称：${p.nickname}|">昵称：三哥</div>
+          <div class="id-memo-date">
+            生日 <span th:text="${p.birthdayText}">1999-10-**</span>
+            <span th:if="${p.nextSolarDate != null}" th:text="|（${p.nextSolarDate}）|">（2026-10-**）</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </th:block>
+</html>

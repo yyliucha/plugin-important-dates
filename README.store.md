@@ -51,6 +51,10 @@
 - **卡片式设计**：月日徽章、大数字"还有 X 天"、重要胶囊徽章、人员首字头像卡，明暗色自适应，移动端响应式
 - 提供 `importantDateFinder` Finder API（listAll / listAllPeople / listUpcoming），主题可完全自定义展示
 
+> **主题未适配「页面布局契约」时如何嵌套（兼容指引）**
+> 渲染顺序（官方 `TemplateNameResolver`）：① 主题有 `templates/important-dates.html` → 用主题模板（嵌套）；② 否则用插件默认模板——主题支持布局契约（2.26+ 有 `templates/layout.html`）→ 自动复用主题外壳；不支持 → Halo 使用内置 fallback 布局（独立内容页，功能完整）。
+> 若你的主题尚未支持契约、又希望嵌套在主题内：复制 `docs/theme-override/clarity-important-dates.html` 到 `themes/主题名/templates/important-dates.html`（主题侧文件，插件永不修改；删除即回退默认）；生成其他主题的覆盖模板请参考 `docs/theme-override/README.md`。插件严格遵守官方案例：不写入、不修改、不删除任何主题文件。
+
 **📊 操作日志**
 - 每次新增、编辑、删除（日期或人员）以及"重要/前台"状态切换都会记录时间、操作类型、目标与变更详情，可在「操作日志」弹窗查看
 
