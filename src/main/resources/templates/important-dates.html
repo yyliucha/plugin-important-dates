@@ -1,9 +1,9 @@
 <!doctype html>
-<html xmlns:th="https://www.thymeleaf.org" th:lang="${#locale.toLanguageTag}" lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2" />
+<html xmlns:th="https://www.thymeleaf.org"
+  th:replace="~{layout :: html(head = ~{::head}, content = ~{::content})}">
+  <th:block th:fragment="head">
     <title th:text="${title}">重要日期</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2" />
     <style>
       .id-wrap{max-width:920px;margin:0 auto;padding:24px 16px 8px;}
       .id-hero{padding:6px 0 2px;}
@@ -35,10 +35,9 @@
       .id-remind{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);border-radius:12px;padding:10px 16px;margin-bottom:14px;}
       .id-remind-item{color:#d97706;line-height:1.9;}
       @media (prefers-color-scheme: dark){.id-remind{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.4);}.id-remind-item{color:#fbbf24;}}
-      body{margin:0;background:transparent;color:inherit;}
     </style>
-  </head>
-  <body>
+  </th:block>
+  <th:block th:fragment="content">
     <div class="id-wrap">
       <div class="id-hero">
         <h1 class="id-hero-title" th:text="${title}">重要日期</h1>
@@ -96,5 +95,5 @@
         </div>
       </div>
     </div>
-  </body>
+  </th:block>
 </html>

@@ -47,7 +47,7 @@
 
 **🏠 前台页面（插件默认模板，主题可选覆盖）**
 - 插件自带默认 Thymeleaf 模板：前台 `/important-dates` 无需任何手动操作即可渲染（**不写入、不修改任何主题文件**，停用/卸载零残留）
-- 通过官方 **TemplateNameResolver** 解析模板名：主题作者/用户若主动提供 `themes/主题名/templates/important-dates.html` 则使用主题模板（可选增强），否则使用插件默认模板；页面模型带 `_templateId = plugin:plugin-important-dates:important-dates`（供 Head 处理器、SEO 等扩展识别）
+- 页面外壳走官方 **页面布局契约**：插件模板调用 `layout :: html(...)`——当前主题支持布局契约时**自动复用主题页头、页脚与整体外壳**，不支持时 Halo 使用内置 fallback 布局；全程零主题文件写入\n- 通过官方 **TemplateNameResolver** 解析模板名：主题作者/用户若主动提供 `themes/主题名/templates/important-dates.html` 则优先使用主题模板（可选增强）；页面模型带 `_templateId = plugin:plugin-important-dates:important-dates`（供 Head 处理器、SEO 等扩展识别）
 - **卡片式设计**：月日徽章、大数字"还有 X 天"、重要胶囊徽章、人员首字头像卡，明暗色自适应，移动端响应式
 - 提供 `importantDateFinder` Finder API（listAll / listAllPeople / listUpcoming），主题可完全自定义展示
 
@@ -64,7 +64,7 @@
 
 ## 兼容性
 
-- **Halo 2.20 及以上**（基于 2.20 平台 API 编译，Java 17 字节码；已在 Halo 2.20 / 2.26 上实测通过完整回归；2.14–2.19 未验证，故最低兼容版本以实测 2.20 为准）
+- **Halo 2.26 及以上**（基于 2.20 平台 API 编译，Java 17 字节码；页面外壳通过官方「页面布局契约」复用主题布局：主题支持契约时用主题外壳，否则 Halo 使用 fallback 布局；已在 Halo 2.26 实测完整回归）
 - 管理员安装后默认拥有全部权限，无需手动配置角色权限
 
 ## 安装
@@ -114,13 +114,16 @@ cd plugin-important-dates
 ./gradlew build
 ```
 
-构建结果位于 `build/libs/plugin-important-dates-1.1.2.jar`。
+构建结果位于 `build/libs/plugin-important-dates-1.1.3.jar`。
 
 > 版本说明：**开发版使用 1.0.x 序列**（1.0.0 → 1.0.1 → …），**正式版从 1.1.0 开始**（1.1.0 → 1.1.1 → …），应用市场首发为 1.1.0。
 
 ## License
 
 [MIT](LICENSE)
+
+
+
 
 
 
