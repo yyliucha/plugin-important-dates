@@ -40,9 +40,10 @@ tasks.register('buildFrontend', Exec) {
         workingDir file("console")
         commandLine npmCmd, 'run', 'build'
     } else {
-        // CI (Linux)：通过登录 shell 执行，确保 actions/setup-node 注入的 node/npm 在 PATH 中
+        // CI (Linux)：通过登录 shell 执行，确保 actions/setup-node 注入的 node/npm 在 PATH 中；
+        // 锁文件在 Windows 生成，npm 的可选平台依赖可能缺失，补装 linux-x64 原生 rollup（--no-save 不写锁文件）
         workingDir layout.projectDirectory.asFile
-        commandLine 'bash', '-lc', 'cd console && npm ci && npm run build'
+        commandLine 'bash', '-lc', 'cd console && npm ci && npm install @rollup/rollup-linux-x64-gnu --no-save && npm run build'
     }
     inputs.dir(layout.projectDirectory.dir('console/src'))
     inputs.files(fileTree(
