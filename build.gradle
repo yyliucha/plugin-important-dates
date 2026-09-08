@@ -34,7 +34,7 @@ tasks.register('buildFrontend', Exec) {
     group = 'build'
     description = 'Build the console UI with npm (vite build)'
     workingDir file("console")
-    def npmCmd = System.getenv("NPM_CMD") ?: "C:/Users/Administrator/AppData/Local/nvm/v22.20.0/npm.cmd"
+    def npmCmd = System.getenv("NPM_CMD") ?: "npm"
     commandLine npmCmd, 'run', 'build'
     inputs.dir(layout.projectDirectory.dir('console/src'))
     inputs.files(fileTree(
@@ -58,3 +58,4 @@ tasks.named('classes') {
 halo {
     version = '2.26.0'
 }
+
