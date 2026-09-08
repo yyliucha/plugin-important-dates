@@ -24,6 +24,8 @@ export interface ImportantDateSpec {
   important?: boolean;
   /** 前台是否展示，默认 true */
   visible?: boolean;
+  /** 拖拽排序权重（越小越靠前） */
+  sortOrder?: number;
 }
 
 export interface ImportantDate {
@@ -73,6 +75,10 @@ export interface PersonSpec {
   note?: string;
   /** 前台是否展示，默认 true */
   visible?: boolean;
+  /** 大头贴照片地址（单张；前台是否显示由设置控制） */
+  avatar?: string;
+  /** 拖拽排序权重（越小越靠前） */
+  sortOrder?: number;
 }
 
 export interface Person {
@@ -81,3 +87,4 @@ export interface Person {
   metadata: Metadata;
   spec: PersonSpec;
 }
+

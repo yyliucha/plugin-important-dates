@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <VPageHeader title="重要日期">
     <template #actions>
       <VButton :loading="logLoading" @click="openLogs">操作日志</VButton>
@@ -84,9 +84,20 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in filteredDates" :key="item.metadata.name">
+              <tr
+                v-for="(item, idx) in filteredDates"
+                :key="item.metadata.name"
+                draggable="true"
+                class="drag-row"
+                @dragstart="dragStartDate(item)"
+                @dragover.prevent
+                @drop="dropDate(idx)"
+              >
                 <td>
-                  <div class="title">{{ item.spec.title }}</div>
+                  <div class="title">
+                    <span class="drag-handle" title="拖拽排序">⠿</span>
+                    {{ item.spec.title }}
+                  </div>
                 </td>
                 <td>
                   <VTag :theme="item.spec.dateType === 'SOLAR' ? 'primary' : 'secondary'">
@@ -154,10 +165,20 @@
         </VEmpty>
       </div>
       <div v-else class="persons-grid">
-        <VCard v-for="p in persons" :key="p.metadata.name" class="person-card">
+        <VCard
+          v-for="(p, idx) in sortedPersons"
+          :key="p.metadata.name"
+          class="person-card drag-row"
+          draggable="true"
+          @dragstart="dragStartPerson(p)"
+          @dragover.prevent
+          @drop="dropPerson(idx)"
+        >
           <div class="person-head">
             <div class="person-name">
-              {{ p.spec.displayName }}
+              <img v-if="p.spec.avatar" class="person-avatar" :src="p.spec.avatar" alt=""
+               onerror="this.style.display='none';var s=document.createElement('span');s.className='person-avatar person-avatar-char';s.style.display='inline-flex';s.textContent=this.closest('.person-name')?.querySelector('span')?.textContent?.slice(0,1)||'?';this.parentNode.insertBefore(s,this);" />
+              <span>{{ p.spec.displayName }}</span>
               <VTag v-if="p.spec.visible === false" theme="danger" class="hidden-tag">已隐藏</VTag>
             </div>
             <VSpace>
@@ -347,6 +368,13 @@
           </template>
         </tbody>
       </table>
+      <div v-if="logsTotal > 0" class="log-pager">
+        <VSpace>
+          <VButton size="sm" :disabled="logsPage <= 1" @click="changeLogPage(logsPage - 1)">上一页</VButton>
+          <span class="muted">第 {{ logsPage }} / {{ logsTotalPages }} 页 · 共 {{ logsTotal }} 条</span>
+          <VButton size="sm" :disabled="logsPage >= logsTotalPages" @click="changeLogPage(logsPage + 1)">下一页</VButton>
+        </VSpace>
+      </div>
     </VModal>
 
     <!-- ================= 导入 ================= -->
@@ -540,9 +568,102 @@ function linkedDateCount(personName: string): number {
 }
 
 const filteredDates = computed(() => {
-  if (!personFilter.value) return dates.value;
-  return dates.value.filter((d) => d.spec.personNames?.includes(personFilter.value));
+  const sorted = sortedDates.value;
+  if (!personFilter.value) return sorted;
+  return sorted.filter((d) => d.spec.personNames?.includes(personFilter.value));
 });
+
+/** 排序：拖拽权重（sortOrder）升序，创建时间倒序（同级） */
+function sortByOrder<T extends { metadata: { creationTimestamp?: string }; spec: { sortOrder?: number } }>(
+  arr: T[]
+): T[] {
+  return [...arr].sort((a, b) => {
+    const oa = a.spec.sortOrder || 0;
+    const ob = b.spec.sortOrder || 0;
+    if (oa !== ob) return oa - ob;
+    return (b.metadata.creationTimestamp || "").localeCompare(a.metadata.creationTimestamp || "");
+  });
+}
+
+const sortedDates = computed(() => sortByOrder(dates.value));
+const sortedPersons = computed(() => sortByOrder(persons.value));
+
+// ---------- 拖拽排序（重要日期 / 人员） ----------
+let dragDateName: string | null = null;
+let dragPersonName: string | null = null;
+
+function dragStartDate(item: ImportantDate) {
+  dragDateName = item.metadata.name;
+}
+
+function dropDate(targetIndex: number) {
+  if (!dragDateName) return;
+  const arr = filteredDates.value;
+  const srcIdx = arr.findIndex((d) => d.metadata.name === dragDateName);
+  dragDateName = null;
+  if (srcIdx < 0 || srcIdx === targetIndex) return;
+  const reordered = [...arr];
+  const [moved] = reordered.splice(srcIdx, 1);
+  reordered.splice(targetIndex, 0, moved);
+  void persistOrder("date", reordered.map((d) => d.metadata.name));
+}
+
+function dragStartPerson(p: Person) {
+  dragPersonName = p.metadata.name;
+}
+
+function dropPerson(targetIndex: number) {
+  if (!dragPersonName) return;
+  const arr = sortedPersons.value;
+  const srcIdx = arr.findIndex((p) => p.metadata.name === dragPersonName);
+  dragPersonName = null;
+  if (srcIdx < 0 || srcIdx === targetIndex) return;
+  const reordered = [...arr];
+  const [moved] = reordered.splice(srcIdx, 1);
+  reordered.splice(targetIndex, 0, moved);
+  void persistOrder("person", reordered.map((p) => p.metadata.name));
+}
+
+/** 把顺序落库：已排序列（按新顺序）+ 其余（按当前顺序），统一写入 1..n */
+async function persistOrder(kind: "date" | "person", orderedNames: string[]) {
+  try {
+    if (kind === "date") {
+      const byName = new Map(dates.value.map((d) => [d.metadata.name, d]));
+      const ordered = orderedNames.map((n) => byName.get(n)!).filter(Boolean);
+      const rest = sortedDates.value.filter((d) => !orderedNames.includes(d.metadata.name));
+      const full = [...ordered, ...rest];
+      let order = 1;
+      const toUpdate: ImportantDate[] = [];
+      for (const d of full) {
+        const next = { ...d, spec: { ...d.spec, sortOrder: order++ } };
+        if ((d.spec.sortOrder || 0) !== next.spec.sortOrder) toUpdate.push(next);
+      }
+      if (toUpdate.length) {
+        await Promise.all(toUpdate.map((u) => updateImportantDate(u)));
+      }
+      Toast.success("已保存排序");
+    } else {
+      const byName = new Map(persons.value.map((p) => [p.metadata.name, p]));
+      const ordered = orderedNames.map((n) => byName.get(n)!).filter(Boolean);
+      const rest = sortedPersons.value.filter((p) => !orderedNames.includes(p.metadata.name));
+      const full = [...ordered, ...rest];
+      let order = 1;
+      const toUpdate: Person[] = [];
+      for (const p of full) {
+        const next = { ...p, spec: { ...p.spec, sortOrder: order++ } };
+        if ((p.spec.sortOrder || 0) !== next.spec.sortOrder) toUpdate.push(next);
+      }
+      if (toUpdate.length) {
+        await Promise.all(toUpdate.map((u) => updatePerson(u)));
+      }
+      Toast.success("已保存排序");
+    }
+    await load();
+  } catch (error) {
+    Toast.error(`保存排序失败：${(error as Error)?.message || "未知错误"}`);
+    await load();
+  }
+}
 
 function togglePerson(name: string) {
   const idx = form.personNames.indexOf(name);
@@ -1087,19 +1208,36 @@ function closeImportModal() {
   personImportItems.value = [];
 }
 
-// ---------- 日志弹窗 ----------
-async function openLogs() {
-  // 先加载数据再打开弹窗：内容在弹窗打开前定型，避免打开动画期间切换节点
+// ---------- 日志弹窗（分页） ----------
+const LOG_PAGE_SIZE = 20;
+const logsPage = ref(1);
+const logsTotal = ref(0);
+const logsTotalPages = computed(() => Math.max(1, Math.ceil(logsTotal.value / LOG_PAGE_SIZE)));
+
+async function loadLogs(page: number) {
   logLoading.value = true;
   logError.value = "";
   try {
-    logs.value = await listOperationLogs();
+    const result = await listOperationLogs(page, LOG_PAGE_SIZE);
+    logs.value = result.items;
+    logsTotal.value = result.total;
+    logsPage.value = page;
   } catch (error) {
     logError.value = `日志加载失败：${(error as Error)?.message || "请稍后重试"}`;
   } finally {
     logLoading.value = false;
   }
+}
+
+async function openLogs() {
+  // 先加载数据再打开弹窗：内容在弹窗打开前定型，避免打开动画期间切换节点
+  await loadLogs(1);
   logVisible.value = true;
+}
+
+function changeLogPage(page: number) {
+  if (page < 1 || page > logsTotalPages.value) return;
+  void loadLogs(page);
 }
 
 function logTheme(action: LogAction): "primary" | "secondary" | "danger" {
@@ -1408,4 +1546,50 @@ function formatTime(iso?: string): string {
 .import-row .hint {
   word-break: break-all;
 }
+
+.drag-row {
+  cursor: grab;
+}
+
+.drag-row:active {
+  cursor: grabbing;
+}
+
+.drag-handle {
+  display: inline-block;
+  margin-right: 6px;
+  color: #9ca3af;
+  user-select: none;
+  cursor: grab;
+}
+
+.person-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  object-fit: cover;
+  vertical-align: middle;
+  margin-right: 8px;
+  box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.2);
+}
+
+.log-pager {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
 </style>
+
+
+.person-avatar-char {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #eef2ff;
+  color: #4f7cff;
+  font-weight: 700;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  margin-right: 8px;
+}

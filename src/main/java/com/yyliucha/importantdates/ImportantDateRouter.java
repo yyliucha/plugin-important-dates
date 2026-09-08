@@ -76,6 +76,7 @@ public class ImportantDateRouter {
                                 model.put("people", people);
                                 model.put("reminders", reminders);
                                 model.put("showImportantTag", cfg.showImportantTag());
+                                model.put("showAvatar", cfg.showAvatar());
                                 model.put(ModelConst.TEMPLATE_ID, TEMPLATE_ID);
                                 return templateNameResolver
                                     .resolveTemplateNameOrDefault(request.exchange(), THEME_TEMPLATE)
@@ -141,10 +142,13 @@ public class ImportantDateRouter {
             .switchIfEmpty(Mono.just(emptyNode()));
         Mono<JsonNode> toast = settingFetcher.get("toast")
             .switchIfEmpty(Mono.just(emptyNode()));
-        return Mono.zip(reminder, basic, toast).map(tuple -> {
+        Mono<JsonNode> privacy = settingFetcher.get("privacy")
+            .switchIfEmpty(Mono.just(emptyNode()));
+        return Mono.zip(reminder, basic, toast, privacy).map(tuple -> {
             JsonNode r = tuple.getT1();
             JsonNode b = tuple.getT2();
             JsonNode t = tuple.getT3();
+            JsonNode p = tuple.getT4();
             int days = intValue(r, "remindDays", DEFAULT_REMIND_DAYS);
             boolean frontendReminder = boolValue(r, "frontendReminder", true);
             int toastCloseSeconds = intValue(r, "toastCloseSeconds", DEFAULT_TOAST_CLOSE_SECONDS);
@@ -157,9 +161,10 @@ public class ImportantDateRouter {
             String toastEmptyText = textValue(t, "toastEmptyText", "最近没有重要日期，生活照常美好～");
             String toastDefaultClose = textValue(t, "toastDefaultClose", "once");
             boolean toastCloseMenu = boolValue(t, "toastCloseMenu", true);
+            boolean showAvatar = boolValue(p, "showAvatar", false);
             return new ReminderConfig(days, frontendReminder, showImportantTag,
                 toastCloseSeconds, toastEnabled, toastPosition, toastTitle, toastTemplate,
-                toastEmptyText, toastDefaultClose, toastCloseMenu);
+                toastEmptyText, toastDefaultClose, toastCloseMenu, showAvatar);
         });
     }
 
@@ -199,6 +204,6 @@ public class ImportantDateRouter {
         int toastCloseSeconds,
         boolean toastEnabled, String toastPosition, String toastTitle,
         String toastTemplate, String toastEmptyText, String toastDefaultClose,
-        boolean toastCloseMenu) {
+        boolean toastCloseMenu, boolean showAvatar) {
     }
 }

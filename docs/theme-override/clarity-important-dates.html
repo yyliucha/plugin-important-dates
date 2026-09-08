@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <!--
   重要日期 · theme-clarity 主题覆盖模板
   放置位置：themes/主题名/templates/important-dates.html（主题目录，非插件目录）
@@ -88,7 +88,7 @@
             <small>天后</small>
           </div>
           <div class="id-memo-title" style="padding-right:0;">
-            <span class="id-memo-avatar" th:text="${#strings.substring(p.displayName, 0, 1)}">老</span>
+            <img th:if="${showAvatar != null and showAvatar and p.avatar != null and !p.avatar.isBlank()}" th:src="${p.avatar}" alt="" style="width:34px;height:34px;border-radius:8px;object-fit:cover;flex:none;margin-right:10px;box-shadow:inset 0 0 0 1px rgba(128,128,128,.2);"/><span class="id-memo-avatar" th:unless="${showAvatar != null and showAvatar and p.avatar != null and !p.avatar.isBlank()}" th:text="${#strings.substring(p.displayName, 0, 1)}">老</span>
             <span th:text="${p.displayName}">老婆</span>
             <span th:if="${p.relation}" style="font-size:.8em;opacity:.75;" th:text="|（${p.relation}）|">（配偶）</span>
           </div>
@@ -103,3 +103,4 @@
     </div>
   </th:block>
 </html>
+

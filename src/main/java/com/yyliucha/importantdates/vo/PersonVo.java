@@ -50,4 +50,19 @@ public class PersonVo {
      * 前台是否可见（false = 仅后台，不出现在前台）。
      */
     private boolean frontendVisible;
+
+    /**
+     * 大头贴照片地址（仅一张；前台由设置「前台展示大头贴」控制，后台始终显示）。
+     */
+    private String avatar;
+
+    /**
+     * 排序权重（拖拽排序；越小越靠前）。
+     */
+    private int sortOrder;
+
+    /**
+     * 创建时间（排序平级时的次级排序依据）。
+     */
+    private String createdAt;
 }

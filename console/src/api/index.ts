@@ -10,10 +10,10 @@ export async function listImportantDates(): Promise<ImportantDate[]> {
     params: {
       page: 1,
       size: 500,
-      sort: "metadata.creationTimestamp,desc",
     },
   });
   // Halo 删除为软删除：索引清理前列表可能短暂携带 deletionTimestamp，一律过滤
+  // 排序由界面按拖拽权重（sortOrder）处理
   return (data.items || []).filter((i) => !i.metadata?.deletionTimestamp);
 }
 
@@ -47,15 +47,18 @@ export async function writeOperationLog(
   });
 }
 
-export async function listOperationLogs(): Promise<OperationLog[]> {
+export async function listOperationLogs(
+  page = 1,
+  size = 20
+): Promise<{ items: OperationLog[]; total: number }> {
   const { data } = await axiosInstance.get<ListResult<OperationLog>>(LOG_BASE, {
     params: {
-      page: 1,
-      size: 200,
+      page,
+      size,
       sort: "metadata.creationTimestamp,desc",
     },
   });
-  return data.items || [];
+  return { items: (data.items || []).filter((i) => !i.metadata?.deletionTimestamp), total: data.total || 0 };
 }
 
 export async function listPersons(): Promise<Person[]> {
@@ -63,10 +66,9 @@ export async function listPersons(): Promise<Person[]> {
     params: {
       page: 1,
       size: 500,
-      sort: "metadata.creationTimestamp,desc",
     },
   });
-  // 同 importantdates：过滤软删除中的对象
+  // 同 importantdates：过滤软删除中的对象；排序由界面按拖拽权重（sortOrder）处理
   return (data.items || []).filter((i) => !i.metadata?.deletionTimestamp);
 }
 

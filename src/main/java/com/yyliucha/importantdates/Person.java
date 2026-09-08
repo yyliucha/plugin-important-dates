@@ -120,5 +120,19 @@ public class Person extends AbstractExtension {
          */
         @Schema(description = "是否在前台展示")
         private Boolean visible = true;
+
+        /**
+         * 大头贴照片地址（仅一张）。后台管理端始终显示；
+         * 前台是否显示由插件设置「隐私 → 前台展示大头贴」统一控制。
+         */
+        @Schema(description = "大头贴照片地址")
+        private String avatar;
+
+        /**
+         * 排序权重（越小越靠前）。控制台拖拽排序后写入 1..n；
+         * 未拖拽过的记录为 0，按创建时间倒序排列。
+         */
+        @Schema(description = "排序权重")
+        private Integer sortOrder = 0;
     }
 }

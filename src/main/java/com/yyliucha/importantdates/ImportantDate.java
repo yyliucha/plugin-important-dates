@@ -90,5 +90,12 @@ public class ImportantDate extends AbstractExtension {
          */
         @Schema(description = "是否在前台展示")
         private Boolean visible = true;
+
+        /**
+         * 排序权重（越小越靠前）。控制台拖拽排序后写入 1..n；
+         * 未拖拽过的记录为 0，按创建时间倒序排列。
+         */
+        @Schema(description = "排序权重")
+        private Integer sortOrder = 0;
     }
 }

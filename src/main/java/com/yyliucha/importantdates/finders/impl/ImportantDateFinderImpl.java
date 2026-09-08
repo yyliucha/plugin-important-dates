@@ -47,14 +47,32 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
 
     @Override
     public Flux<ImportantDateVo> listAll() {
-        return listDateVos(false);
+        return listDateVos(false)
+            .sort(boardComparator());
     }
 
     @Override
     public Flux<ImportantDateVo> listUpcoming(int days) {
         LocalDate today = LocalDate.now();
         return listDateVos(true)
-            .filter(vo -> vo.getDaysUntil() >= 0 && vo.getDaysUntil() <= days);
+            .filter(vo -> vo.getDaysUntil() >= 0 && vo.getDaysUntil() <= days)
+            .sort(Comparator.comparingLong(ImportantDateVo::getDaysUntil)
+                .thenComparing(ImportantDateVo::getTitle));
+    }
+
+    /**
+     * 面板排序：拖拽权重（sortOrder）升序，创建时间倒序（同级）。
+     */
+    private static Comparator<ImportantDateVo> boardComparator() {
+        return Comparator.comparingInt(ImportantDateVo::getSortOrder)
+            .thenComparing(Comparator.comparing(ImportantDateVo::getCreatedAt,
+                Comparator.nullsLast(Comparator.reverseOrder())));
+    }
+
+    private static Comparator<PersonVo> personBoardComparator() {
+        return Comparator.comparingInt(PersonVo::getSortOrder)
+            .thenComparing(Comparator.comparing(PersonVo::getCreatedAt,
+                Comparator.nullsLast(Comparator.reverseOrder())));
     }
 
     private Flux<ImportantDateVo> listDateVos(boolean importantOnly) {
@@ -68,9 +86,7 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
                     .map(d -> toDateVo(d, byName, today))
                     .filter(vo -> vo.getNextSolarDate() != null)
                     .filter(vo -> vo.isFrontendVisible())
-                    .filter(vo -> !importantOnly || vo.isImportant())
-                    .sort(Comparator.comparing(ImportantDateVo::getDaysUntil)
-                        .thenComparing(ImportantDateVo::getTitle));
+                    .filter(vo -> !importantOnly || vo.isImportant());
             });
     }
 
@@ -83,8 +99,7 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
                     .map(p -> toPersonVo(p, today, show))
                     .filter(vo -> vo.getDisplayName() != null && !vo.getDisplayName().isBlank())
                     .filter(PersonVo::isFrontendVisible)
-                    .sort(Comparator.comparing(PersonVo::getDaysUntil)
-                        .thenComparing(PersonVo::getDisplayName))
+                    .sort(personBoardComparator())
             );
     }
 
@@ -120,6 +135,8 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
             }
         }
         vo.setPersonNames(names);
+        vo.setSortOrder(spec.getSortOrder() == null ? 0 : spec.getSortOrder());
+        vo.setCreatedAt(date.getMetadata().getCreationTimestamp() == null ? null : date.getMetadata().getCreationTimestamp().toString());
         return vo;
     }
 
@@ -149,6 +166,9 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
             vo.setBirthdayText(maskBirthday(vo.getBirthdayText()));
             vo.setNextSolarDate(maskBirthday(vo.getNextSolarDate()));
         }
+        vo.setAvatar(spec.getAvatar());
+        vo.setSortOrder(spec.getSortOrder() == null ? 0 : spec.getSortOrder());
+        vo.setCreatedAt(person.getMetadata().getCreationTimestamp() == null ? null : person.getMetadata().getCreationTimestamp().toString());
         return vo;
     }
 
@@ -167,3 +187,4 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
         return masked.equals(text) ? text : masked;
     }
 }
+

@@ -111,4 +111,41 @@ spec:
           label: 前台展示生日
           value: false
           help: 默认关闭：前台（/important-dates 页面、主题模板、数据接口）中人员生日一律脱敏显示（如 1999-10-** / 腊月**）；开启后前台展示完整生日。后台管理端始终显示完整信息，不受影响。
+        - $formkit: checkbox
+          name: showAvatar
+          label: 前台展示大头贴
+          value: false
+          help: 默认关闭：人员照片（大头贴）仅后台管理端显示；开启后前台（/important-dates 页面、主题模板）展示人员照片。照片本身属于敏感信息，关闭时前台不输出任何图片地址。
+    - group: log
+      label: 日志设置
+      formSchema:
+        - $formkit: number
+          name: logRetainDays
+          label: 日志保留天数
+          value: 30
+          min: 0
+          help: 操作日志自动清理：只保留最近 N 天的日志（按日志创建时间，每 6 小时自动清理一次）。填入 0 表示不清理。默认 30 天。
+    - group: attachment
+      label: 附件设置
+      formSchema:
+        - $formkit: select
+          name: avatarGroupName
+          label: 大头贴分类（分组）
+          value: ""
+          options:
+            - label: 不限定
+              value: ""
+          help: 与官方附件库一致的「分类」下拉：选项实时取自站点附件库分组（系统分组变更即时更新）。大头贴「从附件库选择」默认只显示该分类，上传的大头贴图片也会存入该分类。
+        - $formkit: select
+          name: avatarPolicyName
+          label: 大头贴存储策略
+          value: ""
+          options:
+            - label: 默认策略
+              value: ""
+          help: 与官方一致的「存储策略」下拉：选项实时取自站点存储策略（系统策略变更即时更新）。大头贴上传将使用所选策略；留空使用默认策略。
+
+
+
+
 

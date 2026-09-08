@@ -118,13 +118,36 @@ cd plugin-important-dates
 ./gradlew build
 ```
 
-构建结果位于 `build/libs/plugin-important-dates-1.1.3.jar`。
+构建结果位于 `build/libs/plugin-important-dates-1.0.51.jar`。
 
-> 版本说明：**开发版使用 1.0.x 序列**（1.0.0 → 1.0.1 → …），**正式版从 1.1.0 开始**（1.1.0 → 1.1.1 → …），应用市场首发为 1.1.0。
+> 版本说明：**开发版使用 1.0.x 序列**（1.0.0 → 1.0.1 → … 当前 1.0.33）；**正式版版本号在发布时指定**（当前正式线 1.1.x，后续正式版号以发布为准）。
 
 ## License
 
 [MIT](LICENSE)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

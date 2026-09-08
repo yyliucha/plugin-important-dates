@@ -61,4 +61,14 @@ public class ImportantDateVo {
      * 剩余天数是否有效（nextSolarDate 非空即有效）。
      */
     private boolean daysValid;
+
+    /**
+     * 排序权重（拖拽排序；越小越靠前）。
+     */
+    private int sortOrder;
+
+    /**
+     * 创建时间（排序平级时的次级排序依据）。
+     */
+    private String createdAt;
 }
