@@ -15,7 +15,7 @@
 | --- | --- |
 | ![仪表盘提醒小组件](https://raw.githubusercontent.com/yyliucha/plugin-important-dates/main/docs/screenshots/screenshot-dashboard.png) | **控制台仪表盘小组件**：到期提醒常驻仪表盘、一眼可见、无关闭按钮、每分钟自动刷新 |
 | ![后台重要日期页](https://raw.githubusercontent.com/yyliucha/plugin-important-dates/main/docs/screenshots/screenshot-console-main.png) | **后台「重要日期」页**：提醒横幅 + 日期列表（重要/前台开关、关联人、最近一次日期） |
-| ![前台页面](https://raw.githubusercontent.com/yyliucha/plugin-important-dates/main/docs/screenshots/screenshot-frontend-page.png) | **前台 `/important-dates`**：自动在主题内打开，卡片式便签设计 + 提醒横幅 |
+| ![前台页面](https://raw.githubusercontent.com/yyliucha/plugin-important-dates/main/docs/screenshots/screenshot-frontend-page.png) | **前台 `/important-dates`**：插件默认模板（布局契约自动复用主题外壳/fallback），卡片式便签设计 + 提醒横幅 |
 | ![新增日期](https://raw.githubusercontent.com/yyliucha/plugin-important-dates/main/docs/screenshots/screenshot-date-form.png) | **自研日期选择器**：阳历日历网格（格内标注农历）/ 农历年月日（含闰月） |
 | ![人员管理](https://raw.githubusercontent.com/yyliucha/plugin-important-dates/main/docs/screenshots/screenshot-people-list.png) | **人员管理**：姓名/昵称/关系/生日/血型/身高/体重/喜好，敏感字段标注「仅后台」 |
 | ![操作日志](https://raw.githubusercontent.com/yyliucha/plugin-important-dates/main/docs/screenshots/screenshot-log-modal.png) | **操作日志弹窗**：每一次新增/编辑/删除的时间、操作、目标与变更详情 |
@@ -31,7 +31,7 @@
 - **重要/普通标识**：默认重要，重要日期参与到期提醒，可作为全站提示的条件
 
 **👤 人员管理**
-- 人员字段：姓名、昵称、关系（配偶/子女/父母/朋友…）、生日（阳历/农历）、性别、血型、身高、体重（最新值）、喜好、备注
+- 人员字段：姓名、昵称、关系（配偶/子女/父母/朋友…）、生日（阳历/农历）、性别、血型、身高、体重（最新值）、喜好、备注、**大头贴**（单张；官方附件库上传/选择，后台始终显示，前台由隐私设置控制，附件被删除自动回退首字符）
 - 重要日期可**关联多人**（如结婚纪念日关联夫妻两人），列表支持**按人员筛选**
 
 **🔔 到期提醒（三处，任你挑）**
@@ -55,8 +55,8 @@
 > 渲染顺序（官方 `TemplateNameResolver`）：① 主题有 `templates/important-dates.html` → 用主题模板（嵌套）；② 否则用插件默认模板——主题支持布局契约（2.26+ 有 `templates/layout.html`）→ 自动复用主题外壳；不支持 → Halo 使用内置 fallback 布局（独立内容页，功能完整）。
 > 若你的主题尚未支持契约、又希望嵌套在主题内：复制 `docs/theme-override/clarity-important-dates.html` 到 `themes/主题名/templates/important-dates.html`（主题侧文件，插件永不修改；删除即回退默认）；生成其他主题的覆盖模板请参考 `docs/theme-override/README.md`。插件严格遵守官方案例：不写入、不修改、不删除任何主题文件。
 
-**📊 操作日志**
-- 每次新增、编辑、删除（日期或人员）以及"重要/前台"状态切换都会记录时间、操作类型、目标与变更详情，可在「操作日志」弹窗查看
+**↕️ 拖拽排序**：重要日期与人员列表均支持拖拽调整顺序，先后台保存，前台/主题模板/仪表盘按该顺序显示\n\n**📊 操作日志**
+- 每次新增、编辑、删除（日期或人员）以及"重要/前台"状态切换都会记录时间、操作类型、目标与变更详情，可在「操作日志」弹窗查看（**分页浏览**，每页 20 条）\n- **自动清理**：设置「日志设置 → 日志保留天数」（默认 30 天，0=不清理），插件每 6 小时自动删除超期日志
 
 **💾 导出 / 导入**
 - 一键导出全部数据（含人员）为 `important-dates-YYYY-MM-DD.json`（备份/迁移）；导入按记录标识判重，**已存在自动跳过、不覆盖**，结果弹窗汇报（兼容旧版导出文件）
@@ -105,9 +105,9 @@
 
 ## 主题模板（自定义展示，可选）
 
-插件已自动生成主题模板，无需手动操作。想**完全自定义**展示时，编辑主题里的 `templates/important-dates.html`（或参考下列数据自行新建，注意删除旧文件后插件会重新生成）：
+插件**不会写入或修改任何主题文件**。想自定义展示时，在主题目录放置 `templates/important-dates.html`（TemplateNameResolver 会优先使用主题模板；删除即回退插件默认模板）。
 
-模板可直接消费的数据：`title`、`dates`（title/dateText/nextSolarDate/daysUntil/personNames/important）、`people`（displayName/nickname/relation/birthdayText/nextSolarDate/daysUntil）、`reminders`（即将到来的重要日期）、`showImportantTag`。也可以直接调用 `importantDateFinder` Finder API 获取数据。
+模板可直接消费的数据：`title`、`dates`（title/dateText/nextSolarDate/daysUntil/personNames/important）、`people`（displayName/nickname/relation/birthdayText/nextSolarDate/daysUntil/avatar）、`reminders`（即将到来的重要日期）、`showImportantTag`、`showAvatar`。也可以直接调用 `importantDateFinder` Finder API 获取数据。
 
 ## 重新构建（可选）
 
@@ -118,13 +118,33 @@ cd plugin-important-dates
 ./gradlew build
 ```
 
-构建结果位于 `build/libs/plugin-important-dates-1.0.33.jar`。
+构建结果位于 `build/libs/plugin-important-dates-1.2.0.jar`。
 
 > 版本说明：**开发版使用 1.0.x 序列**（1.0.0 → 1.0.1 → … 当前 1.0.33）；**正式版版本号在发布时指定**（当前正式线 1.1.x，后续正式版号以发布为准）。
 
 ## License
 
 [MIT](LICENSE)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
