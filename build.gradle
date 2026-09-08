@@ -32,10 +32,18 @@ tasks.withType(JavaCompile).configureEach {
 // 产物 console/build/dist/* + ui-plugin.json，由下方 processUiResources 复制进 jar 的 console/ 目录。
 tasks.register('buildFrontend', Exec) {
     group = 'build'
-    description = 'Build the console UI with npm (vite build)'
-    workingDir file("console")
-    def npmCmd = System.getenv("NPM_CMD") ?: "npm"
-    commandLine npmCmd, 'run', 'build'
+    description = 'Build the console UI (npm ci + vite build)'
+    def isWin = org.gradle.internal.os.OperatingSystem.current().isWindows()
+    if (isWin) {
+        // 本机：nvm 路径或系统 PATH 中的 npm
+        def npmCmd = System.getenv("NPM_CMD") ?: "npm"
+        workingDir file("console")
+        commandLine npmCmd, 'run', 'build'
+    } else {
+        // CI (Linux)：通过登录 shell 执行，确保 actions/setup-node 注入的 node/npm 在 PATH 中
+        workingDir layout.projectDirectory.asFile
+        commandLine 'bash', '-lc', 'cd console && npm ci && npm run build'
+    }
     inputs.dir(layout.projectDirectory.dir('console/src'))
     inputs.files(fileTree(
         dir: layout.projectDirectory.dir('console'),
