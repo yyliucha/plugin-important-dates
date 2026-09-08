@@ -3,7 +3,7 @@
 [![build](https://github.com/yyliucha/plugin-important-dates/actions/workflows/build.yaml/badge.svg)](https://github.com/yyliucha/plugin-important-dates/actions/workflows/build.yaml)
 [![plugin](https://img.shields.io/badge/Halo-2.x-1f6feb?logo=halo&color=1f6feb)](https://github.com/halo-dev/halo)
 
-一个 Halo 2.x 插件：在**后台**记录并管理自己的重要日期与家人朋友，例如结婚纪念日、孩子出生日期，支持阳历/农历、到期提醒（仪表盘常驻 + 前台页面 + 全站悬浮弹窗）、主题内自动展示。
+一个 Halo 2.x 插件：在**后台**记录并管理自己的重要日期与家人朋友（结婚纪念日、孩子出生日期等），支持阳历/农历（含闰月）、每年自动循环、**拖拽排序**、人员档案与**大头贴**、到期提醒（仪表盘常驻 + 前台页面 + 全站悬浮弹窗）、隐私脱敏、**操作日志（分页/自动清理）**与导出导入；完全按 Halo 2.26 官方文档与扩展点实现。
 
 [English README](README.en.md) ｜ [Releases](https://github.com/yyliucha/plugin-important-dates/releases) ｜ [问题反馈](https://github.com/yyliucha/plugin-important-dates/issues) ｜ 作者：[yyliucha](https://github.com/yyliucha)
 
@@ -125,6 +125,7 @@ cd plugin-important-dates
 ## License
 
 [MIT](LICENSE)
+
 
 
 
