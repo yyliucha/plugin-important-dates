@@ -296,11 +296,40 @@ function computePopupPos() {
 }
 
 function toggle() {
-  // 打开时与当前选择同步
-  viewYear.value = now.getFullYear();
-  viewMonth.value = now.getMonth() + 1;
-  viewLunarMonth.value = props.lunarMonth || 1;
-  viewLunarLeap.value = !!props.isLeapMonth;
+  // 打开时定位到已选择日期（编辑场景：面板直接显示用户已选时间）
+  if (props.dateType === "SOLAR" && props.solarDate) {
+    const parts = props.solarDate.split("-").map(Number);
+    if (parts.length === 3 && parts[0] >= 1900) {
+      viewYear.value = parts[0];
+      viewMonth.value = parts[1];
+    } else {
+      viewYear.value = now.getFullYear();
+      viewMonth.value = now.getMonth() + 1;
+    }
+  } else if (props.dateType === "LUNAR" && props.lunarMonth) {
+    // 农历模式：定位到该农历月/日最近对应的公历年份（保证闰月与日数正确）
+    let targetYear = now.getFullYear();
+    for (const year of [now.getFullYear(), now.getFullYear() + 1]) {
+      const m = findLunarMonth(year, props.lunarMonth || 1, !!props.isLeapMonth);
+      if (m) {
+        try {
+          const s = Solar.fromJulianDay(m.getFirstJulianDay());
+          targetYear = s.getYear();
+        } catch {
+          targetYear = year;
+        }
+        break;
+      }
+    }
+    viewYear.value = targetYear;
+    viewLunarMonth.value = props.lunarMonth || 1;
+    viewLunarLeap.value = !!props.isLeapMonth;
+  } else {
+    viewYear.value = now.getFullYear();
+    viewMonth.value = now.getMonth() + 1;
+    viewLunarMonth.value = props.lunarMonth || 1;
+    viewLunarLeap.value = !!props.isLeapMonth;
+  }
   if (!open.value) {
     computePopupPos();
   }

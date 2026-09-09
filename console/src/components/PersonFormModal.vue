@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <VModal
     :visible="visible"
     :title="person ? '编辑人员' : '新增人员'"
@@ -22,6 +22,7 @@
           <span class="label">关系</span>
           <select v-model="form.relation" class="input">
             <option value="">未填写</option>
+            <option value="本人">本人</option>
             <option value="配偶">配偶</option>
             <option value="子女">子女</option>
             <option value="父亲">父亲</option>
@@ -792,6 +793,7 @@ async function save() {
   color: #6b7280;
 }
 </style>
+
 
 
 
