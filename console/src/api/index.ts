@@ -63,6 +63,38 @@ export async function listOperationLogs(
   return { items: (data.items || []).filter((i) => !i.metadata?.deletionTimestamp), total: data.total || 0 };
 }
 
+/**
+ * 扩展更新通用处理：先用服务端最新 metadata.version 覆盖，再提交；
+ * 若仍返回 409（并发冲突，例如列表打开后记录被其他页面/操作更新过），
+ * 自动拉取最新版本重试一次，避免用户看到 "code 409" 这类难以理解的报错。
+ */
+async function putExtension<T extends { metadata: { name: string; version?: number } }>(
+  base: string,
+  item: T
+): Promise<T> {
+  const doPut = async (payload: T) => {
+    const { data } = await axiosInstance.put<T>(`${base}/${payload.metadata.name}`, payload);
+    return data;
+  };
+  let payload = item;
+  try {
+    const { data: latest } = await axiosInstance.get<T>(`${base}/${item.metadata.name}`);
+    payload = { ...item, metadata: { ...item.metadata, ...latest.metadata } };
+  } catch {
+    // 取不到最新版本时按原样提交，由下面的重试兜底
+  }
+  try {
+    return await doPut(payload);
+  } catch (error) {
+    const status = (error as { response?: { status?: number } })?.response?.status;
+    if (status !== 409) {
+      throw error;
+    }
+    const { data: latest } = await axiosInstance.get<T>(`${base}/${item.metadata.name}`);
+    const retried = { ...item, metadata: { ...item.metadata, ...latest.metadata } };
+    return await doPut(retried);
+  }
+}
 export async function listPersons(): Promise<Person[]> {
   const { data } = await axiosInstance.get<ListResult<Person>>(PERSON_BASE, {
     params: {
@@ -80,8 +112,7 @@ export async function createPerson(item: Person): Promise<Person> {
 }
 
 export async function updatePerson(item: Person): Promise<Person> {
-  const { data } = await axiosInstance.put<Person>(`${PERSON_BASE}/${item.metadata.name}`, item);
-  return data;
+  return putExtension<Person>(PERSON_BASE, item);
 }
 
 export async function deletePerson(name: string): Promise<void> {
@@ -106,8 +137,7 @@ export async function createCar(item: Car): Promise<Car> {
 }
 
 export async function updateCar(item: Car): Promise<Car> {
-  const { data } = await axiosInstance.put<Car>(`${CAR_BASE}/${item.metadata.name}`, item);
-  return data;
+  return putExtension<Car>(CAR_BASE, item);
 }
 
 export async function deleteCar(name: string): Promise<void> {
