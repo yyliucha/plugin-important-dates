@@ -60,7 +60,8 @@ tasks.register('buildFrontend', Exec) {
     outputs.dir(layout.projectDirectory.dir('console/build/dist'))
 }
 
-tasks.register('processUiResources', Copy) {
+// Sync（而非 Copy）：镜像式复制，自动删除上一次构建遗留的旧 hash 产物，避免 jar 内出现多份前端包
+tasks.register('processUiResources', Sync) {
     from layout.projectDirectory.dir('console/build/dist')
     into layout.buildDirectory.dir('resources/main/console')
     dependsOn tasks.named('buildFrontend')
@@ -74,6 +75,7 @@ tasks.named('classes') {
 halo {
     version = '2.26.0'
 }
+
 
 
 
