@@ -27,4 +27,4 @@
 | 备用封面 | `docs/store-assets/cover-legacy-important-dates.png` | 1600×900，名称「重要日期」 |
 | README | `README.store.md` | 应用市场 README 字段（图片绝对地址，可整段粘贴；该字段支持 Markdown） |
 | Logo | `docs/store-assets/logo.png` | 沿用现有日历图标 |
-| 版本说明 | `docs/release-notes-1.2.0-SNAPSHOT.md`（预发布）/ `docs/release-notes-1.2.0.md`（正式版） | |
+| 版本说明 | `docs/release-notes-1.2.0.md`（正式版 1.2.0；含"测试不完整、可能有毁灭性 Bug、请先备份并谨慎升级"提示） | |
