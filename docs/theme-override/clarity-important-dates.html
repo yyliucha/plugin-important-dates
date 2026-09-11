@@ -212,8 +212,15 @@
         </div>
       </div>
 
-      <!-- 重要的人：两种视图都显示 -->
-      <h2 class="id-block-title">重要的人 <span class="id-count" th:text="${#lists.size(people)}">1</span></h2>
+      <!-- 身边的人：两种视图都显示，标题与说明随视图变化 -->
+      <h2 class="id-block-title id-only-life">牵挂的人 <span class="id-count" th:text="${#lists.size(people)}">1</span></h2>
+      <p class="id-hero-sub id-only-life">他们的生日与纪念日，都替你记着。</p>
+      <h2 class="id-block-title id-only-car" th:if="${showCarSection != null and showCarSection}">
+        牵挂的人 <span class="id-count" th:text="${#lists.size(people)}">1</span>
+      </h2>
+      <p class="id-hero-sub id-only-car" th:if="${showCarSection != null and showCarSection}">
+        谁开着哪辆车，都记在这里：<b>车主</b>、<b>常用驾驶人</b> 会带徽章。
+      </p>
       <p class="id-hero-sub" th:if="${#lists.isEmpty(people)}">还没有添加。</p>
       <div class="id-board" th:unless="${#lists.isEmpty(people)}">
         <div class="id-memo id-person" th:each="p : ${people}"
