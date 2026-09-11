@@ -53,9 +53,10 @@
       .id-car-head{display:flex;gap:12px;align-items:center;}
       .id-car-cover{width:92px;height:70px;border-radius:12px;flex:none;overflow:hidden;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#eef2ff,#e0e7ff);cursor:zoom-in;border:0;padding:0;}
       .id-car-cover img{width:100%;height:100%;object-fit:cover;display:block;}
-      .id-car-cover span{font-size:32px;line-height:1;}
+      .id-car-cover{font-size:32px;}
+      .id-car-cover-icon{display:none;align-items:center;justify-content:center;width:100%;height:100%;font-size:32px;line-height:1;}
       .id-car-cover-more{position:absolute;right:6px;bottom:6px;background:rgba(15,23,42,.55);color:#fff;font-size:.7rem;border-radius:999px;padding:1px 7px;}
-      .id-car-name{font-weight:700;font-size:1.05rem;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+      .id-car-name{font-weight:700;font-size:1.05rem;display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0;word-break:keep-all;}
       .id-car-sub{font-size:.84rem;opacity:.78;line-height:1.55;}
       .id-car-events{display:flex;flex-wrap:wrap;gap:6px;}
       .id-car-event{font-size:.78rem;padding:2px 9px;border-radius:999px;background:rgba(79,124,255,.12);color:#3730a3;}
@@ -138,7 +139,8 @@
               <div class="id-car-head">
                 <button type="button" class="id-car-cover" th:if="${c.coverUrl != null and !c.coverUrl.isBlank()}"
                         th:attr="data-album-target=${c.name}" th:title="|查看相册（${c.photoCount} 张）|">
-                  <img th:src="${c.coverUrl}" alt="" />
+                  <img th:src="${c.coverUrl}" alt="" onerror="this.style.display='none';var i=this.parentNode.querySelector('.id-car-cover-icon');if(i){i.style.display='flex';}" />
+                  <span class="id-car-cover-icon" th:text="${c.vehicleTypeIcon}">🚗</span>
                   <span class="id-car-cover-more" th:if="${c.photoCount > 1}" th:text="|1/${c.photoCount}|">1/3</span>
                 </button>
                 <span class="id-car-cover" th:unless="${c.coverUrl != null and !c.coverUrl.isBlank()}" th:text="${c.vehicleTypeIcon}">🚗</span>
@@ -297,3 +299,4 @@
     </script>
   </th:block>
 </html>
+
