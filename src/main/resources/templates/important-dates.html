@@ -2,7 +2,7 @@
 <html xmlns:th="https://www.thymeleaf.org"
   th:replace="~{layout :: html(head = ~{::head}, content = ~{::content})}">
   <th:block th:fragment="head">
-    <title th:text="${title}">记得</title>
+    <title th:text="${title}">重要日期</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2" />
     <style>
       .id-wrap{max-width:920px;margin:0 auto;padding:24px 16px 8px;}
@@ -94,7 +94,7 @@
   <th:block th:fragment="content">
     <div class="id-wrap id-app" id="id-app" data-view="life" th:attr="data-skin-enabled=${carSkinEnabled}">
       <div class="id-hero">
-        <h1 class="id-hero-title" th:text="${title}">记得</h1>
+        <h1 class="id-hero-title" th:text="${title}">重要日期</h1>
         <p class="id-hero-sub">记录值得纪念的日子、身边重要的人，还有陪你跑的爱车。</p>
       </div>
 

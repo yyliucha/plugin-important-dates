@@ -2,7 +2,7 @@
   <WidgetCard :body-class="['!p-0']">
     <template #title>
       <div class="inline-flex items-center gap-2">
-        <div class="text-base font-medium flex-1">📅 记得 · 到期提醒</div>
+        <div class="text-base font-medium flex-1">📅 重要日期提醒</div>
       </div>
     </template>
     <div class="p-4">
@@ -23,12 +23,12 @@
           <span class="whitespace-nowrap text-sm font-bold text-red-600">{{ daysLabel(r.daysUntil) }}</span>
         </div>
         <div class="text-xs text-gray-500">
-          来自「记得」插件；提前天数与开关可在 插件 → 记得 → 设置 中调整
+          来自「重要日期」插件；提前天数与开关可在 插件 → 重要日期 → 设置 中调整
         </div>
       </div>
       <div v-else>
         <div class="text-gray-500">最近没有重要日期提醒</div>
-        <a class="text-sm text-blue-600 hover:text-blue-700" href="/console/important-dates">去管理记得 →</a>
+        <a class="text-sm text-blue-600 hover:text-blue-700" href="/console/important-dates">去管理重要日期 →</a>
       </div>
     </div>
   </WidgetCard>
