@@ -13,11 +13,11 @@ export default definePlugin({
         name: "ImportantDates",
         component: ImportantDatesView,
         meta: {
-          title: "重要日期",
+          title: "记得",
           searchable: true,
           permissions: ["plugin:important-dates:view"],
           menu: {
-            name: "重要日期",
+            name: "记得",
             group: "content",
             icon: markRaw(CalendarIcon),
             priority: 0,
@@ -33,7 +33,7 @@ export default definePlugin({
       {
         id: "important-dates-reminder",
         component: markRaw(ReminderWidget),
-        group: "重要日期",
+        group: "记得",
         defaultSize: { w: 6, h: 5, minW: 3, minH: 3, maxW: 12, maxH: 8 },
       },
     ],

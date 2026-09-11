@@ -13,8 +13,8 @@ spec:
   homepage: https://github.com/yyliucha/plugin-important-dates#readme
   repo: https://github.com/yyliucha/plugin-important-dates
   issues: https://github.com/yyliucha/plugin-important-dates/issues
-  displayName: "重要日期"
-  description: "在后台记录重要日期与家人朋友，也管好爱车：记录纪念日、生日（阳历/农历含闰月、每年自动循环）与家人朋友档案；管理座驾（汽车/电瓶车/自行车）的保险、年检、保养到期；支持人员大头贴与座驾相册、拖拽排序、三处到期提醒（仪表盘小组件/前台横幅/全站悬浮弹窗）、隐私脱敏、操作日志（分页/自动清理）与导出导入。完全按 Halo 2.26 官方文档与扩展点实现，零系统配置写入、零主题文件写入。"
+  displayName: "记得"
+  description: "记得 - 重要日期与爱车：记录纪念日、生日（阳历/农历含闰月、每年自动循环）与家人朋友档案；管理座驾（汽车/电瓶车/自行车）的保险、年检、保养到期；支持人员大头贴与座驾相册、拖拽排序、三处到期提醒（仪表盘小组件/前台横幅/全站悬浮弹窗）、隐私脱敏、操作日志（分页/自动清理）与导出导入。完全按 Halo 2.26 官方文档与扩展点实现，零系统配置写入、零主题文件写入。"
   settingName: plugin-important-dates-settings
   configMapName: plugin-important-dates-configmap
   license:

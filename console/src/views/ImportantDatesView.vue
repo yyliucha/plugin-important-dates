@@ -1,5 +1,5 @@
 <template>
-  <VPageHeader title="重要日期">
+  <VPageHeader title="记得">
     <template #actions>
       <VButton :loading="logLoading" @click="openLogs">操作日志</VButton>
       <VButton @click="exportData">导出</VButton>
