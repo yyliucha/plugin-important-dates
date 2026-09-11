@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html xmlns:th="https://www.thymeleaf.org"
   th:replace="~{layout :: html(head = ~{::head}, content = ~{::content})}">
   <th:block th:fragment="head">
@@ -10,8 +10,10 @@
       .id-hero-title{font-size:1.8rem;margin:0 0 4px;font-family:'Kaiti SC','KaiTi','STKaiti','STXihei','PingFang SC',sans-serif;}
       .id-hero-sub{opacity:.62;margin:0 0 20px;}
       .id-switch{display:inline-flex;gap:4px;padding:4px;border-radius:999px;background:rgba(128,128,128,.12);margin:0 0 18px;}
-      .id-switch button{border:0;background:transparent;cursor:pointer;font:inherit;font-size:.92rem;padding:6px 18px;border-radius:999px;color:inherit;opacity:.7;transition:all .18s ease;}
-      .id-switch button.on{background:rgba(255,255,255,.92);color:#1f2937;opacity:1;box-shadow:0 1px 4px rgba(0,0,0,.15);}
+      .id-switch button{border:0;background:transparent;cursor:pointer;font:inherit;font-size:.92rem;font-weight:500;line-height:1.2;padding:7px 20px;border-radius:999px;color:inherit;opacity:.72;transition:all .18s ease;}
+      /* 选中态：实心主题色 + 强制白字（避免被主题的 button 颜色规则覆盖导致看不清） */
+      .id-app .id-switch button.on{background:#2563eb !important;color:#ffffff !important;-webkit-text-fill-color:#ffffff !important;opacity:1;font-weight:600;text-shadow:none;box-shadow:0 2px 8px rgba(37,99,235,.35);}
+      .id-switch button:hover{opacity:.95;}
       .id-block-title{font-size:1.15rem;margin:26px 0 14px;display:flex;align-items:center;gap:8px;}
       .id-count{opacity:.5;font-weight:400;font-size:.9em;}
       .id-board{columns:3 230px;column-gap:14px;}
@@ -85,7 +87,7 @@
       .id-app[data-view="car"] .id-only-life{display:none !important;}
       @media (prefers-color-scheme: dark){
         .id-car{box-shadow:0 4px 14px rgba(0,0,0,.45);}
-        .id-switch button.on{background:rgba(255,255,255,.16);color:#f8fafc;}
+        .id-app .id-switch button.on{background:#2563eb !important;color:#ffffff !important;-webkit-text-fill-color:#ffffff !important;}
       }
     </style>
   </th:block>
