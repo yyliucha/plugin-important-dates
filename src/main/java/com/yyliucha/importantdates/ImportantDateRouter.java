@@ -73,8 +73,16 @@ public class ImportantDateRouter {
                         List<CarVo> cars = cfg.carFrontendSection()
                             ? zip.getT2().getT2()
                             : java.util.Collections.emptyList();
-                        return importantDateFinder.listUpcoming(cfg.remindDays()).collectList()
-                            .flatMap(reminders -> {
+                        Mono<List<ImportantDateVo>> dateEvents =
+                            importantDateFinder.listUpcoming(cfg.remindDays()).collectList();
+                        Mono<List<CarVo.CarEventVo>> carEvents =
+                            cfg.carFrontendSection() && cfg.carEventsEnabled()
+                                ? importantDateFinder.listUpcomingCarEvents(cfg.remindDays()).collectList()
+                                : Mono.just(java.util.Collections.<CarVo.CarEventVo>emptyList());
+                        return dateEvents.zipWith(carEvents)
+                            .flatMap(tuple -> {
+                                List<ImportantDateVo> reminders = tuple.getT1();
+                                List<CarVo.CarEventVo> events = tuple.getT2();
                                 Map<String, Object> model = new LinkedHashMap<>();
                                 model.put("title", cfg.carFrontendSection() ? "记得" : "重要日期");
                                 model.put("dates", dates);
@@ -84,9 +92,23 @@ public class ImportantDateRouter {
                                 model.put("showAvatar", cfg.showAvatar());
                                 // 座驾（1.2.0）：生活/爱车双视图数据
                                 model.put("cars", cars);
+                                model.put("carEvents", events);
                                 model.put("view", "life");
                                 model.put("showCarSection", cfg.carFrontendSection());
                                 model.put("carSkinEnabled", cfg.carSkinEnabled());
+                                List<String> carOwners = cars.stream()
+                                    .map(CarVo::getOwnerName)
+                                    .filter(n -> n != null && !n.isBlank())
+                                    .distinct()
+                                    .toList();
+                                List<String> carDrivers = cars.stream()
+                                    .flatMap(c -> c.getDriverNames() == null
+                                        ? java.util.stream.Stream.<String>empty()
+                                        : c.getDriverNames().stream())
+                                    .distinct()
+                                    .toList();
+                                model.put("carOwners", carOwners);
+                                model.put("carDrivers", carDrivers);
                                 model.put(ModelConst.TEMPLATE_ID, TEMPLATE_ID);
                                 return templateNameResolver
                                     .resolveTemplateNameOrDefault(request.exchange(), THEME_TEMPLATE)

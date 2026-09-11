@@ -1,8 +1,8 @@
 ﻿<!doctype html>
 <!--
-  重要日期 · theme-clarity 主题覆盖模板
+  记得 · theme-clarity 主题覆盖模板
   放置位置：themes/主题名/templates/important-dates.html（主题目录，非插件目录）
-  作用：让 /important-dates 在 Clarity 主题布局内打开（导航/页脚/暗色模式）
+  作用：让 /important-dates 在 Clarity 主题布局内打开（导航/页脚/暗色模式），并支持「生活 / 爱车」切换与相册查看
   此文件为「主题侧覆盖」，插件永不修改；删除该文件即回到插件默认模板（Halo fallback 布局）
 -->
 <html
@@ -10,11 +10,16 @@
   th:replace="~{modules/layout :: html(content = ~{::content}, showAside = false, pageTitle = ${title}, head = ~{::head})}"
 >
   <th:block th:fragment="head">
+    <title th:text="${title}">记得</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2" />
     <style>
       .id-wrap{max-width:920px;margin:0 auto;padding:24px 16px 8px;}
       .id-hero{padding:6px 0 2px;}
       .id-hero-title{font-size:1.8rem;margin:0 0 4px;font-family:'Kaiti SC','KaiTi','STKaiti','STXihei','PingFang SC',sans-serif;}
       .id-hero-sub{opacity:.62;margin:0 0 20px;}
+      .id-switch{display:inline-flex;gap:4px;padding:4px;border-radius:999px;background:rgba(128,128,128,.12);margin:0 0 18px;}
+      .id-switch button{border:0;background:transparent;cursor:pointer;font:inherit;font-size:.92rem;padding:6px 18px;border-radius:999px;color:inherit;opacity:.7;transition:all .18s ease;}
+      .id-switch button.on{background:rgba(255,255,255,.92);color:#1f2937;opacity:1;box-shadow:0 1px 4px rgba(0,0,0,.15);}
       .id-block-title{font-size:1.15rem;margin:26px 0 14px;display:flex;align-items:center;gap:8px;}
       .id-count{opacity:.5;font-weight:400;font-size:.9em;}
       .id-board{columns:3 230px;column-gap:14px;}
@@ -41,16 +46,70 @@
       .id-remind{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);border-radius:12px;padding:10px 16px;margin-bottom:14px;}
       .id-remind-item{color:#d97706;line-height:1.9;}
       @media (prefers-color-scheme: dark){.id-remind{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.4);}.id-remind-item{color:#fbbf24;}}
+
+      /* ===== 爱车（座驾） ===== */
+      .id-cars{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;}
+      .id-car{position:relative;border-radius:16px;padding:16px;background:#f8fafc;box-shadow:0 3px 10px rgba(0,0,0,.12);border:1px solid rgba(128,128,128,.16);display:flex;flex-direction:column;gap:10px;color:#334155;}
+      .id-car-head{display:flex;gap:12px;align-items:center;}
+      .id-car-cover{width:92px;height:70px;border-radius:12px;flex:none;overflow:hidden;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#eef2ff,#e0e7ff);cursor:zoom-in;border:0;padding:0;}
+      .id-car-cover img{width:100%;height:100%;object-fit:cover;display:block;}
+      .id-car-cover span{font-size:32px;line-height:1;}
+      .id-car-cover-more{position:absolute;right:6px;bottom:6px;background:rgba(15,23,42,.55);color:#fff;font-size:.7rem;border-radius:999px;padding:1px 7px;}
+      .id-car-name{font-weight:700;font-size:1.05rem;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+      .id-car-sub{font-size:.84rem;opacity:.78;line-height:1.55;}
+      .id-car-events{display:flex;flex-wrap:wrap;gap:6px;}
+      .id-car-event{font-size:.78rem;padding:2px 9px;border-radius:999px;background:rgba(79,124,255,.12);color:#3730a3;}
+      .id-car-event.soon{background:rgba(249,115,22,.14);color:#c2410c;}
+      .id-car-event.overdue{background:rgba(239,68,68,.14);color:#b91c1c;}
+      .id-badge{font-size:.74rem;padding:1px 8px;border-radius:999px;border:1px solid currentColor;opacity:.85;}
+      .id-car-badge{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px;}
+
+      /* 性别统一徽章：车与人同款（男=酷 / 女=可爱 / 未关联=中性） */
+      .id-car-skin-cool,.id-person-skin-cool{background:linear-gradient(150deg,#111827,#0f172a 55%,#1e3a8a);color:#e5e7eb;border-color:rgba(148,163,184,.4);}
+      .id-car-skin-cool .id-car-event{background:rgba(96,165,250,.18);color:#bfdbfe;}
+      .id-car-skin-cool .id-car-event.soon{background:rgba(251,191,36,.18);color:#fde68a;}
+      .id-car-skin-cool .id-car-event.overdue{background:rgba(248,113,113,.2);color:#fecaca;}
+      .id-car-skin-cool .id-car-cover{box-shadow:inset 0 0 0 1px rgba(148,163,184,.5);}
+      .id-car-skin-cool .id-badge{border-color:rgba(147,197,253,.7);color:#bfdbfe;}
+      .id-car-skin-cute,.id-person-skin-cute{background:linear-gradient(150deg,#fff1f7,#ffe4ef 55%,#fdf2f8);color:#831843;border-color:rgba(244,114,182,.4);}
+      .id-car-skin-cute .id-car-event{background:rgba(236,72,153,.12);color:#9d174d;}
+      .id-car-skin-cute .id-car-event.soon{background:rgba(249,115,22,.16);color:#c2410c;}
+      .id-car-skin-cute .id-car-event.overdue{background:rgba(239,68,68,.16);color:#b91c1c;}
+      .id-car-skin-cute .id-badge{border-color:rgba(236,72,153,.6);color:#9d174d;}
+      .id-car-skin-neutral{background:#f8fafc;}
+
+      /* 相册浮层（点击封面查看，只读） */
+      .id-album{position:fixed;inset:0;z-index:9998;background:rgba(15,23,42,.86);display:none;flex-direction:column;align-items:center;padding:22px 14px;}
+      .id-album.open{display:flex;}
+      .id-album-body{max-width:860px;width:100%;overflow:auto;display:flex;flex-direction:column;gap:12px;padding-bottom:20px;}
+      .id-album-body img{width:100%;border-radius:12px;display:block;box-shadow:0 10px 30px rgba(0,0,0,.4);}
+      .id-album-bar{width:100%;max-width:860px;display:flex;align-items:center;justify-content:space-between;color:#e5e7eb;margin-bottom:12px;font-size:.95rem;}
+      .id-album-close{border:0;background:rgba(255,255,255,.14);color:#fff;border-radius:999px;width:32px;height:32px;font-size:16px;cursor:pointer;}
+      body.id-album-open{overflow:hidden;}
+
+      /* 视图切换：由 id-app 上的 data-view 控制 */
+      .id-app[data-view="life"] .id-only-car{display:none !important;}
+      .id-app[data-view="car"] .id-only-life{display:none !important;}
+      @media (prefers-color-scheme: dark){
+        .id-car{box-shadow:0 4px 14px rgba(0,0,0,.45);}
+        .id-switch button.on{background:rgba(255,255,255,.16);color:#f8fafc;}
+      }
     </style>
   </th:block>
   <th:block th:fragment="content">
-    <div class="id-wrap">
+    <div class="id-wrap id-app" id="id-app" data-view="life" th:attr="data-skin-enabled=${carSkinEnabled}">
       <div class="id-hero">
-        <h1 class="id-hero-title" th:text="${title}">重要日期</h1>
-        <p class="id-hero-sub">记录值得纪念的日子，以及身边重要的人。</p>
+        <h1 class="id-hero-title" th:text="${title}">记得</h1>
+        <p class="id-hero-sub">记录值得纪念的日子、身边重要的人，还有陪你跑的爱车。</p>
       </div>
 
-      <div class="id-remind" th:if="${reminders != null && !reminders.isEmpty()}">
+      <div class="id-switch" th:if="${showCarSection != null and showCarSection}" role="tablist">
+        <button type="button" class="on" data-view-btn="life" role="tab">生活</button>
+        <button type="button" data-view-btn="car" role="tab">爱车</button>
+      </div>
+
+      <!-- 生活视图：即将到来的重要日期 -->
+      <div class="id-remind id-only-life" th:if="${reminders != null && !reminders.isEmpty()}">
         <div class="id-remind-item" th:each="r : ${reminders}">
           <span th:if="${r.daysUntil <= 0}" th:text="|「${r.title}」就是今天呀 🎉|">「结婚纪念日」就是今天呀 🎉</span>
           <span th:if="${r.daysUntil == 1}" th:text="|「${r.title}」明天就到啦～|">「结婚纪念日」明天就到啦～</span>
@@ -58,31 +117,105 @@
         </div>
       </div>
 
-      <h2 class="id-block-title">重要日期 <span class="id-count" th:text="${#lists.size(dates)}">5</span></h2>
-      <p class="id-hero-sub" th:if="${#lists.isEmpty(dates)}">还没有记录。</p>
-      <div class="id-board" th:unless="${#lists.isEmpty(dates)}">
-        <div class="id-memo" th:each="d : ${dates}">
-          <div class="id-memo-days">
-            <span th:text="${d.daysUntil}">35</span>
-            <small th:if="${d.nextSolarDate != null}" th:text="|天后 · ${d.nextSolarDate}|">天后 · 2026-10-02</small>
-          </div>
-          <div class="id-memo-title">
-            <span class="id-pin" th:if="${showImportantTag != null and showImportantTag and d.important}"></span>
-            <span th:text="${d.title}">结婚纪念日</span>
-          </div>
-          <div class="id-memo-date">
-            <span th:text="${d.dateText}">2021-10-02</span>
-            <span th:if="${d.dateType == 'LUNAR'}" th:text="（农历）">（农历）</span>
-          </div>
-          <div class="id-memo-people" th:if="${d.personNames != null && !d.personNames.isEmpty()}"
-               th:text="|❤ ${#strings.listJoin(d.personNames, '、')}|">❤ 老婆</div>
+      <!-- 爱车视图：即将到来的座驾到期事项 -->
+      <div class="id-remind id-only-car" th:if="${carEvents != null && !carEvents.isEmpty()}">
+        <div class="id-remind-item" th:each="e : ${carEvents}">
+          <span th:if="${e.daysUntil < 0}" th:text="|「${e.carName}」的${e.label}已过期 ${-e.daysUntil} 天，记得安排一下呀～|">「小白」的交强险已过期 5 天</span>
+          <span th:if="${e.daysUntil == 0}" th:text="|「${e.carName}」的${e.label}就是今天到期呀 🎉|">今天到期</span>
+          <span th:if="${e.daysUntil == 1}" th:text="|「${e.carName}」的${e.label}明天到期～|">明天到期</span>
+          <span th:if="${e.daysUntil > 1}" th:text="|「${e.carName}」的${e.label}还有 ${e.daysUntil} 天到期，记得安排一下呀～|">还有 7 天</span>
         </div>
       </div>
 
+      <!-- 爱车视图：座驾卡片 -->
+      <th:block th:if="${showCarSection != null and showCarSection}">
+        <div class="id-only-car">
+          <h2 class="id-block-title">我的爱车 <span class="id-count" th:text="${#lists.size(cars)}">2</span></h2>
+          <p class="id-hero-sub" th:if="${#lists.isEmpty(cars)}">还没添加爱车，先记一辆吧～</p>
+          <div class="id-cars" th:unless="${#lists.isEmpty(cars)}">
+            <div class="id-car" th:each="c : ${cars}"
+                 th:classappend="${carSkinEnabled != null and carSkinEnabled} ? 'id-car-skin-' + ${c.skin} : 'id-car-skin-neutral'">
+              <div class="id-car-head">
+                <button type="button" class="id-car-cover" th:if="${c.coverUrl != null and !c.coverUrl.isBlank()}"
+                        th:attr="data-album-target=${c.name}" th:title="|查看相册（${c.photoCount} 张）|">
+                  <img th:src="${c.coverUrl}" alt="" />
+                  <span class="id-car-cover-more" th:if="${c.photoCount > 1}" th:text="|1/${c.photoCount}|">1/3</span>
+                </button>
+                <span class="id-car-cover" th:unless="${c.coverUrl != null and !c.coverUrl.isBlank()}" th:text="${c.vehicleTypeIcon}">🚗</span>
+                <div>
+                  <div class="id-car-name">
+                    <span th:text="${c.vehicleTypeIcon}">🚗</span>
+                    <span th:text="${c.displayName}">小白</span>
+                  </div>
+                  <div class="id-car-sub">
+                    <span th:text="${c.vehicleTypeLabel}">SUV</span>
+                    <th:block th:if="${c.brand != null and !c.brand.isBlank()}"> · <span th:text="${c.brand}">比亚迪</span></th:block>
+                    <th:block th:if="${c.model != null and !c.model.isBlank()}"> <span th:text="${c.model}">汉 EV</span></th:block>
+                  </div>
+                  <div class="id-car-sub" th:if="${c.plateMasked != null and !c.plateMasked.isBlank()}">
+                    车牌 <span th:text="${c.plateMasked}">粤B·****5</span>
+                  </div>
+                </div>
+              </div>
+              <div class="id-car-events" th:if="${c.events != null && !c.events.isEmpty()}">
+                <span class="id-car-event"
+                      th:each="e, it : ${c.events}" th:if="${it.index < 3}"
+                      th:classappend="${e.overdue} ? 'overdue' : (${e.daysUntil <= 15} ? 'soon' : '')">
+                  <span th:text="${e.label}">交强险</span>
+                  <th:block th:if="${e.overdue}" th:text="| · 已过期 ${-e.daysUntil} 天|"> · 已过期 5 天</th:block>
+                  <th:block th:unless="${e.overdue}" th:text="| · ${e.daysUntil == 0 ? '今天到期' : e.daysUntil + ' 天后'}|"> · 7 天后</th:block>
+                </span>
+              </div>
+              <div class="id-car-badge" th:if="${c.ownerName != null and !c.ownerName.isBlank()}">
+                <span class="id-badge" th:text="|车主 ${c.ownerName}|">车主 孙铭</span>
+                <span class="id-badge" th:each="d : ${c.driverNames}" th:if="${d != c.ownerName}" th:text="|驾驶人 ${d}|">驾驶人 宁琪儿</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 相册浮层：只读查看（后台勾选「展示」的照片） -->
+        <div class="id-album" th:each="c : ${cars}" th:id="|album-${c.name}|" th:attr="data-album=${c.name}">
+          <div class="id-album-bar">
+            <span th:text="|${c.displayName} · 相册（${c.photoCount} 张）|">小白 · 相册</span>
+            <button type="button" class="id-album-close" data-album-close="1" aria-label="关闭">✕</button>
+          </div>
+          <div class="id-album-body">
+            <img th:each="photo : ${c.photos}" th:src="${photo.url}" th:alt="${c.displayName}" loading="lazy" />
+          </div>
+        </div>
+      </th:block>
+
+      <!-- 生活视图：重要日期 -->
+      <div class="id-only-life">
+        <h2 class="id-block-title">重要日期 <span class="id-count" th:text="${#lists.size(dates)}">5</span></h2>
+        <p class="id-hero-sub" th:if="${#lists.isEmpty(dates)}">还没有记录。</p>
+        <div class="id-board" th:unless="${#lists.isEmpty(dates)}">
+          <div class="id-memo" th:each="d : ${dates}">
+            <div class="id-memo-days">
+              <span th:text="${d.daysUntil}">35</span>
+              <small th:if="${d.nextSolarDate != null}" th:text="|天后 · ${d.nextSolarDate}|">天后 · 2026-10-02</small>
+            </div>
+            <div class="id-memo-title">
+              <span class="id-pin" th:if="${showImportantTag != null and showImportantTag and d.important}"></span>
+              <span th:text="${d.title}">结婚纪念日</span>
+            </div>
+            <div class="id-memo-date">
+              <span th:text="${d.dateText}">2021-10-02</span>
+              <span th:if="${d.dateType == 'LUNAR'}" th:text="（农历）">（农历）</span>
+            </div>
+            <div class="id-memo-people" th:if="${d.personNames != null && !d.personNames.isEmpty()}"
+                 th:text="|❤ ${#strings.listJoin(d.personNames, '、')}|">❤ 老婆</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 重要的人：两种视图都显示 -->
       <h2 class="id-block-title">重要的人 <span class="id-count" th:text="${#lists.size(people)}">1</span></h2>
       <p class="id-hero-sub" th:if="${#lists.isEmpty(people)}">还没有添加。</p>
       <div class="id-board" th:unless="${#lists.isEmpty(people)}">
-        <div class="id-memo" th:each="p : ${people}">
+        <div class="id-memo id-person" th:each="p : ${people}"
+             th:classappend="${carSkinEnabled != null and carSkinEnabled and (carOwners != null and carOwners.contains(p.displayName) or carDrivers != null and carDrivers.contains(p.displayName))} ? ((p.gender == '男') ? 'id-person-skin-cool' : ((p.gender == '女') ? 'id-person-skin-cute' : '')) : ''">
           <div class="id-memo-days" th:if="${p.daysUntil >= 0}">
             <span th:text="${p.daysUntil}">61</span>
             <small>天后</small>
@@ -91,6 +224,10 @@
             <img th:if="${showAvatar != null and showAvatar and p.avatar != null and !p.avatar.isBlank()}" th:src="${p.avatar}" alt="" style="width:34px;height:34px;border-radius:8px;object-fit:cover;flex:none;margin-right:10px;box-shadow:inset 0 0 0 1px rgba(128,128,128,.2);"/><span class="id-memo-avatar" th:unless="${showAvatar != null and showAvatar and p.avatar != null and !p.avatar.isBlank()}" th:text="${#strings.substring(p.displayName, 0, 1)}">老</span>
             <span th:text="${p.displayName}">老婆</span>
             <span th:if="${p.relation}" style="font-size:.8em;opacity:.75;" th:text="|（${p.relation}）|">（配偶）</span>
+          </div>
+          <div class="id-car-badge" th:if="${carOwners != null and carOwners.contains(p.displayName) or carDrivers != null and carDrivers.contains(p.displayName)}">
+            <span class="id-badge" th:if="${carOwners != null and carOwners.contains(p.displayName)}">车主</span>
+            <span class="id-badge" th:if="${carDrivers != null and carDrivers.contains(p.displayName)}">驾驶人</span>
           </div>
           <div class="id-memo-sub" th:if="${p.nickname != null && !p.nickname.isBlank()}"
                th:text="|昵称：${p.nickname}|">昵称：三哥</div>
@@ -101,6 +238,62 @@
         </div>
       </div>
     </div>
+
+    <script th:if="${showCarSection != null and showCarSection}">
+      (function () {
+        var app = document.getElementById('id-app');
+        if (!app) return;
+        var buttons = app.querySelectorAll('[data-view-btn]');
+        function apply(view, push) {
+          app.setAttribute('data-view', view);
+          for (var i = 0; i < buttons.length; i++) {
+            buttons[i].classList.toggle('on', buttons[i].getAttribute('data-view-btn') === view);
+          }
+          try {
+            var url = new URL(window.location.href);
+            if (view === 'car') { url.searchParams.set('view', 'car'); } else { url.searchParams.delete('view'); }
+            if (push) { history.replaceState(null, '', url.toString()); }
+          } catch (e) { /* 忽略 */ }
+        }
+        for (var i = 0; i < buttons.length; i++) {
+          buttons[i].addEventListener('click', function () {
+            apply(this.getAttribute('data-view-btn'), true);
+          });
+        }
+        var initial = 'life';
+        try {
+          if (new URL(window.location.href).searchParams.get('view') === 'car') { initial = 'car'; }
+        } catch (e) { /* 忽略 */ }
+        apply(initial, false);
+
+        // 相册浮层
+        function closeAlbums() {
+          var open = document.querySelectorAll('.id-album.open');
+          for (var k = 0; k < open.length; k++) { open[k].classList.remove('open'); }
+          document.body.classList.remove('id-album-open');
+        }
+        var covers = app.querySelectorAll('[data-album-target]');
+        for (var j = 0; j < covers.length; j++) {
+          covers[j].addEventListener('click', function () {
+            var target = document.getElementById('album-' + this.getAttribute('data-album-target'));
+            if (!target) return;
+            closeAlbums();
+            target.classList.add('open');
+            document.body.classList.add('id-album-open');
+          });
+        }
+        document.addEventListener('click', function (ev) {
+          var el = ev.target;
+          while (el && el !== document.body) {
+            if (el.getAttribute && el.getAttribute('data-album-close')) { closeAlbums(); return; }
+            if (el.classList && el.classList.contains('id-album')) { closeAlbums(); return; }
+            el = el.parentNode;
+          }
+        });
+        document.addEventListener('keydown', function (ev) {
+          if (ev.key === 'Escape') { closeAlbums(); }
+        });
+      })();
+    </script>
   </th:block>
 </html>
-
