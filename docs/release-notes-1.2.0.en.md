@@ -1,4 +1,4 @@
-## v1.2.0 · Remember — Important Dates & My Vehicles
+## v1.2.0
 
 ### Important notice (read first)
 
