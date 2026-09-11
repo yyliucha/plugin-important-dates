@@ -1,9 +1,10 @@
 import { axiosInstance } from "@halo-dev/api-client";
-import type { ImportantDate, ListResult, LogAction, OperationLog, Person } from "@/types";
+import type { Car, ImportantDate, ListResult, LogAction, LogTargetType, OperationLog, Person } from "@/types";
 
 const BASE = "/apis/importantdates.halo.run/v1alpha1/importantdates";
 const LOG_BASE = "/apis/importantdates.halo.run/v1alpha1/operationlogs";
 const PERSON_BASE = "/apis/importantdates.halo.run/v1alpha1/persons";
+const CAR_BASE = "/apis/importantdates.halo.run/v1alpha1/cars";
 
 export async function listImportantDates(): Promise<ImportantDate[]> {
   const { data } = await axiosInstance.get<ListResult<ImportantDate>>(BASE, {
@@ -35,7 +36,8 @@ export async function writeOperationLog(
   action: LogAction,
   targetTitle: string,
   targetName: string,
-  detail: string
+  detail: string,
+  targetType: LogTargetType = "DATE"
 ): Promise<void> {
   await axiosInstance.post<OperationLog>(LOG_BASE, {
     apiVersion: "importantdates.halo.run/v1alpha1",
@@ -43,7 +45,7 @@ export async function writeOperationLog(
     metadata: {
       name: `operation-log-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     },
-    spec: { action, targetTitle, targetName, detail },
+    spec: { action, targetTitle, targetName, targetType, detail },
   });
 }
 
@@ -86,6 +88,32 @@ export async function deletePerson(name: string): Promise<void> {
   await axiosInstance.delete(`${PERSON_BASE}/${name}`);
 }
 
+// ---------- 座驾（1.2.0） ----------
+
+export async function listCars(): Promise<Car[]> {
+  const { data } = await axiosInstance.get<ListResult<Car>>(CAR_BASE, {
+    params: {
+      page: 1,
+      size: 500,
+    },
+  });
+  return (data.items || []).filter((i) => !i.metadata?.deletionTimestamp);
+}
+
+export async function createCar(item: Car): Promise<Car> {
+  const { data } = await axiosInstance.post<Car>(CAR_BASE, item);
+  return data;
+}
+
+export async function updateCar(item: Car): Promise<Car> {
+  const { data } = await axiosInstance.put<Car>(`${CAR_BASE}/${item.metadata.name}`, item);
+  return data;
+}
+
+export async function deleteCar(name: string): Promise<void> {
+  await axiosInstance.delete(`${CAR_BASE}/${name}`);
+}
+
 /**
  * 读取插件配置（json-config 接口），返回配置数据对象。
  */
@@ -98,3 +126,4 @@ export async function fetchPluginJsonConfig(
   const config = data?.data ?? data ?? {};
   return config as Record<string, string>;
 }
+

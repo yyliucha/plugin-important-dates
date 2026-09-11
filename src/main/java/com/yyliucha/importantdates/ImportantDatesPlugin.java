@@ -66,6 +66,7 @@ public class ImportantDatesPlugin extends BasePlugin {
         schemeManager.register(ImportantDate.class);
         schemeManager.register(OperationLog.class);
         schemeManager.register(Person.class);
+        schemeManager.register(Car.class);
         // 悬浮提醒旧默认文案一次性迁移（仅写插件自身配置）
         migrateToastDefaults();
         // 操作日志自动清理（按设置保留天数）
@@ -81,6 +82,7 @@ public class ImportantDatesPlugin extends BasePlugin {
         schemeManager.unregister(Scheme.buildFromType(ImportantDate.class));
         schemeManager.unregister(Scheme.buildFromType(OperationLog.class));
         schemeManager.unregister(Scheme.buildFromType(Person.class));
+        schemeManager.unregister(Scheme.buildFromType(Car.class));
     }
 
     // ---------- 附件设置下拉动态化（实时同步） ----------
@@ -367,3 +369,4 @@ public class ImportantDatesPlugin extends BasePlugin {
         return labels != null && "true".equalsIgnoreCase(labels.get(run.halo.app.core.extension.attachment.Group.HIDDEN_LABEL));
     }
 }
+

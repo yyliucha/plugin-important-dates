@@ -1,11 +1,11 @@
-﻿<template>
+<template>
   <VPageHeader title="重要日期">
     <template #actions>
       <VButton :loading="logLoading" @click="openLogs">操作日志</VButton>
       <VButton @click="exportData">导出</VButton>
       <VButton @click="triggerImport">导入</VButton>
-      <VButton type="secondary" @click="activeTab === 'dates' ? openCreate() : openPersonCreate()">
-        <span style="margin-right: 4px">＋</span>{{ activeTab === "dates" ? "新增日期" : "新增人员" }}
+      <VButton type="secondary" @click="onPrimaryAction">
+        <span style="margin-right: 4px">＋</span>{{ primaryActionLabel }}
       </VButton>
     </template>
   </VPageHeader>
@@ -37,6 +37,14 @@
         @click="activeTab = 'persons'"
       >
         人员（{{ persons.length }}）
+      </button>
+      <button
+        type="button"
+        class="tab-btn"
+        :class="{ active: activeTab === 'cars' }"
+        @click="activeTab = 'cars'"
+      >
+        座驾（{{ cars.length }}）
       </button>
     </div>
 
@@ -225,6 +233,89 @@
       </div>
     </template>
 
+    <!-- ================= 座驾 ================= -->
+    <template v-if="activeTab === 'cars' && !loading">
+      <div v-if="!cars.length" style="padding: 60px 0">
+        <VEmpty
+          title="还没添加座驾"
+          message="把爱车、电瓶车或自行车记下来吧：保险、年检、保养到期会自动提醒你。"
+        >
+          <template #actions>
+            <VButton type="secondary" @click="openCarCreate">先记一辆</VButton>
+          </template>
+        </VEmpty>
+      </div>
+      <div v-else class="cars-grid">
+        <VCard
+          v-for="(c, idx) in sortedCars"
+          :key="c.metadata.name"
+          class="car-card drag-row"
+          draggable="true"
+          @dragstart="dragStartCar(c)"
+          @dragover.prevent
+          @drop="dropCar(idx)"
+        >
+          <div class="car-head">
+            <div class="car-cover" :class="`car-cover-${skinOf(c)}`">
+              <img v-if="carCover(c)" :src="carCover(c) || ''" alt="" />
+              <span v-else class="car-cover-icon">{{ carIcon(c) }}</span>
+            </div>
+            <div class="car-title">
+              <div class="car-name">
+                {{ c.spec.displayName }}
+                <VTag v-if="c.spec.status === 'SOLD'" theme="secondary">已出售</VTag>
+                <VTag v-else-if="c.spec.status === 'SCRAPPED'" theme="danger">已报废</VTag>
+                <VTag v-if="c.spec.visible !== true" theme="danger" class="hidden-tag">未展示</VTag>
+              </div>
+              <div class="car-sub">
+                {{ carTypeLabel(c) }}<template v-if="c.spec.brand || c.spec.model"> · {{ [c.spec.brand, c.spec.model].filter(Boolean).join(" ") }}</template>
+                <template v-if="c.spec.energyType"> · {{ energyLabel(c.spec.energyType) }}</template>
+              </div>
+              <div class="car-sub">
+                车牌：{{ c.spec.plateNo || "—" }}
+                <span v-if="c.spec.mileageKm != null">｜里程：{{ c.spec.mileageKm }} km</span>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="carEventsOf(c).length" class="car-events">
+            <span
+              v-for="e in carEventsOf(c).slice(0, 3)"
+              :key="e.label + e.date"
+              class="car-event"
+              :class="{ overdue: e.daysUntil < 0, soon: e.daysUntil >= 0 && e.daysUntil <= 15 }"
+            >
+              {{ e.label }} · {{ e.daysUntil < 0 ? `已过期 ${-e.daysUntil} 天` : e.daysUntil === 0 ? "今天到期" : `${e.daysUntil} 天后` }}
+            </span>
+            <span v-if="carEventsOf(c).length > 3" class="car-event more">+{{ carEventsOf(c).length - 3 }}</span>
+          </div>
+          <div v-else class="car-sub muted">暂无启用的到期项</div>
+
+          <div class="car-sub">
+            车主：{{ personTitleBy(c.spec.ownerName) || "未关联" }}
+            <template v-if="c.spec.driverNames?.length">
+              ｜驾驶人：{{ c.spec.driverNames.map((n) => personTitleBy(n)).filter(Boolean).join("、") }}
+            </template>
+          </div>
+          <div v-if="c.spec.note" class="car-sub note">备注：{{ c.spec.note }}</div>
+
+          <div class="car-actions">
+            <VSpace>
+              <VButton size="sm" @click="openCarEdit(c)">编辑</VButton>
+              <label class="visible-toggle">
+                <VSwitch
+                  :model-value="c.spec.visible === true"
+                  @change="(v: boolean) => toggleCarVisible(c, v)"
+                />
+                <span class="muted">前台展示</span>
+              </label>
+              <VButton size="sm" type="danger" @click="removeCar(c)">删除</VButton>
+            </VSpace>
+          </div>
+        </VCard>
+      </div>
+    </template>
+
     <div class="storage-note">
       数据存储于 Halo 扩展存储（与站点数据库一致：H2 / MySQL / PostgreSQL）；操作日志会记录每一次新增、编辑与删除。
     </div>
@@ -326,6 +417,13 @@
       @saved="onPersonSaved"
     />
 
+    <CarFormModal
+      :visible="carModalVisible"
+      :car="editingCar"
+      @update:visible="(v: boolean) => (carModalVisible = v)"
+      @saved="onCarSaved"
+    />
+
     <!-- ================= 操作日志 ================= -->
     <VModal :visible="logVisible" title="操作日志" width="760" @close="logVisible = false">
       <!-- 保持单一 table 结构：内容分支只发生在 tbody 内，避免弹窗过渡/滚动条初始化期间
@@ -388,7 +486,8 @@
           <span class="label">校验结果</span>
           <span class="hint">
             重要日期：可导入 <b>{{ importValidCount }}</b> 条，跳过 <b>{{ importDuplicateCount }}</b> 条，无效 <b>{{ importInvalidCount }}</b> 条；
-            人员：可导入 <b>{{ personImportValidCount }}</b> 条，跳过 <b>{{ personImportDuplicateCount }}</b> 条，无效 <b>{{ personImportInvalidCount }}</b> 条。
+            人员：可导入 <b>{{ personImportValidCount }}</b> 条，跳过 <b>{{ personImportDuplicateCount }}</b> 条，无效 <b>{{ personImportInvalidCount }}</b> 条；
+            座驾：可导入 <b>{{ carImportValidCount }}</b> 辆，跳过 <b>{{ carImportDuplicateCount }}</b> 辆，无效 <b>{{ carImportInvalidCount }}</b> 辆。
           </span>
         </div>
         <div class="hint">导入不会覆盖已有数据（按记录标识判重，已存在的自动跳过）。</div>
@@ -398,7 +497,8 @@
           <span class="label">导入结果</span>
           <span class="hint">
             人员：新增 <b>{{ importResult.personsImported }}</b>，跳过 <b>{{ importResult.personsSkipped }}</b>，失败 <b>{{ importResult.personsFailed }}</b>；
-            重要日期：新增 <b>{{ importResult.imported }}</b>，跳过 <b>{{ importResult.skipped }}</b>，失败 <b>{{ importResult.failed }}</b>。
+            重要日期：新增 <b>{{ importResult.imported }}</b>，跳过 <b>{{ importResult.skipped }}</b>，失败 <b>{{ importResult.failed }}</b>；
+            座驾：新增 <b>{{ importResult.carsImported }}</b>，跳过 <b>{{ importResult.carsSkipped }}</b>，失败 <b>{{ importResult.carsFailed }}</b>。
           </span>
         </div>
       </div>
@@ -409,7 +509,7 @@
             v-if="!importResult"
             type="secondary"
             :loading="importing"
-            :disabled="!importValidCount && !personImportValidCount"
+            :disabled="!importValidCount && !personImportValidCount && !carImportValidCount"
             @click="doImport"
           >
             开始导入
@@ -437,34 +537,44 @@ import {
   VTag,
 } from "@halo-dev/components";
 import {
+  createCar,
   createImportantDate,
   createPerson,
+  deleteCar,
   deleteImportantDate,
   deletePerson,
   fetchPluginJsonConfig,
+  listCars,
   listImportantDates,
   listOperationLogs,
   listPersons,
+  updateCar,
   updateImportantDate,
   updatePerson,
   writeOperationLog,
 } from "@/api";
+import CarFormModal from "@/components/CarFormModal.vue";
 import PersonFormModal from "@/components/PersonFormModal.vue";
 import SunLunarPicker from "@/components/SunLunarPicker.vue";
-import type { DateType, ImportantDate, LogAction, OperationLog, Person } from "@/types";
+import type { Car, CarReminder, DateType, ImportantDate, LogAction, LogTargetType, OperationLog, Person } from "@/types";
+import { VEHICLE_TYPES } from "@/types";
 import { lunarMonthDayText, nextSolarDate } from "@/utils/lunar";
 
 const loading = ref(true);
 const saving = ref(false);
 const dates = ref<ImportantDate[]>([]);
 const persons = ref<Person[]>([]);
-const activeTab = ref<"dates" | "persons">("dates");
+const cars = ref<Car[]>([]);
+const activeTab = ref<"dates" | "persons" | "cars">("dates");
 
 const modalVisible = ref(false);
 const editingName = ref<string | null>(null);
 
 const personModalVisible = ref(false);
 const editingPerson = ref<Person | null>(null);
+
+const carModalVisible = ref(false);
+const editingCar = ref<Car | null>(null);
 
 const personFilter = ref("");
 
@@ -482,10 +592,17 @@ const importDuplicateCount = ref(0);
 const importInvalidCount = ref(0);
 const importItems = ref<Array<{ name: string; spec: ImportantDate["spec"] }>>([]);
 const personImportValidCount = ref(0);
+const carImportItems = ref<Array<{ name: string; spec: Car["spec"] }>>([]);
+const carImportValidCount = ref(0);
+const carImportDuplicateCount = ref(0);
+const carImportInvalidCount = ref(0);
 const personImportDuplicateCount = ref(0);
 const personImportInvalidCount = ref(0);
 const personImportItems = ref<Array<{ name: string; spec: Person["spec"] }>>([]);
 const importResult = ref<{
+  carsImported: number;
+  carsSkipped: number;
+  carsFailed: number;
   imported: number;
   skipped: number;
   failed: number;
@@ -525,13 +642,24 @@ const form = reactive<DateForm>(emptyForm());
 async function load() {
   loading.value = true;
   try {
-    const [dateList, personList] = await Promise.all([listImportantDates(), listPersons()]);
+    const [dateList, personList, carList] = await Promise.all([
+      listImportantDates(),
+      listPersons(),
+      listCars(),
+    ]);
     dates.value = dateList;
     persons.value = personList;
+    cars.value = carList;
     await loadRemindConfig();
   } finally {
     loading.value = false;
   }
+}
+
+function personTitleBy(name?: string): string {
+  if (!name) return "";
+  const p = personBy(name);
+  return p ? personTitle(p) : name;
 }
 
 onMounted(load);
@@ -543,11 +671,6 @@ function personTitle(p: Person): string {
 
 function personBy(name: string): Person | undefined {
   return persons.value.find((p) => p.metadata.name === name);
-}
-
-function personTitleBy(name: string): string {
-  const p = personBy(name);
-  return p ? personTitle(p) : name;
 }
 
 function personBirthdayText(p: Person): string {
@@ -587,10 +710,125 @@ function sortByOrder<T extends { metadata: { creationTimestamp?: string }; spec:
 
 const sortedDates = computed(() => sortByOrder(dates.value));
 const sortedPersons = computed(() => sortByOrder(persons.value));
+const sortedCars = computed(() => sortByOrder(cars.value));
 
-// ---------- 拖拽排序（重要日期 / 人员） ----------
+/** 主按钮文案：随页签变化 */
+const primaryActionLabel = computed(() => {
+  if (activeTab.value === "cars") return "新增座驾";
+  if (activeTab.value === "persons") return "新增人员";
+  return "新增日期";
+});
+
+function onPrimaryAction() {
+  if (activeTab.value === "cars") {
+    openCarCreate();
+  } else if (activeTab.value === "persons") {
+    openPersonCreate();
+  } else {
+    openCreate();
+  }
+}
+
+// ---------- 座驾展示辅助 ----------
+function carTypeInfo(type?: string) {
+  return VEHICLE_TYPES.find((t) => t.value === type) || VEHICLE_TYPES[0];
+}
+
+function carTypeLabel(c: Car): string {
+  return carTypeInfo(c.spec.vehicleType).label;
+}
+
+function carIcon(c: Car): string {
+  return carTypeInfo(c.spec.vehicleType).icon;
+}
+
+function energyLabel(type?: string): string {
+  const map: Record<string, string> = {
+    FUEL: "燃油",
+    EV: "纯电",
+    PHEV: "插电混动",
+    HEV: "油电混动",
+    HUMAN: "人力",
+  };
+  return map[type || ""] || "燃油";
+}
+
+function carCover(c: Car): string | undefined {
+  const photos = c.spec.photos || [];
+  if (!photos.length) return undefined;
+  const cover = photos.find((p) => p.isCover);
+  return (cover || photos[0]).url;
+}
+
+/** 统一徽章：车主性别决定卡片风格（男=酷 / 女=可爱 / 其他=中性） */
+function skinOf(c: Car): "cool" | "cute" | "neutral" {
+  const owner = (persons.value || []).find((p) => p.metadata.name === c.spec.ownerName);
+  const gender = owner?.spec?.gender || "";
+  if (gender === "男") return "cool";
+  if (gender === "女") return "cute";
+  return "neutral";
+}
+
+const YEARLY_REMINDER_KEYS = ["INSURANCE_COMPULSORY", "INSURANCE_COMMERCIAL", "INSPECTION", "TAX", "LICENSE"];
+
+function reminderLabelOf(r: CarReminder): string {
+  if (r.label && r.label.trim()) return r.label.trim();
+  const map: Record<string, string> = {
+    INSURANCE_COMPULSORY: "交强险",
+    INSURANCE_COMMERCIAL: "商业险",
+    INSPECTION: "年检",
+    MAINTENANCE: "保养",
+    TAX: "车船税",
+    LICENSE: "驾照换证",
+    CUSTOM: "自定义",
+  };
+  return map[r.key || ""] || "到期事项";
+}
+
+function daysUntil(dateText: string): number | null {
+  if (!dateText) return null;
+  const due = new Date(`${dateText}T00:00:00`);
+  if (Number.isNaN(due.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((due.getTime() - today.getTime()) / 86400000);
+}
+
+/** 后台列表用：计算启用的到期项（含按年滚动与保养推算），按剩余天数升序 */
+function carEventsOf(c: Car): { label: string; date: string; daysUntil: number }[] {
+  const list: { label: string; date: string; daysUntil: number }[] = [];
+  for (const r of c.spec.reminders || []) {
+    if (r.enabled === false) continue;
+    let dueText = r.date || "";
+    if (!dueText && r.key === "MAINTENANCE" && r.lastServiceDate && r.intervalMonths) {
+      const last = new Date(`${r.lastServiceDate}T00:00:00`);
+      if (!Number.isNaN(last.getTime())) {
+        last.setMonth(last.getMonth() + Number(r.intervalMonths));
+        dueText = last.toISOString().slice(0, 10);
+      }
+    }
+    if (!dueText) continue;
+    let due = new Date(`${dueText}T00:00:00`);
+    if (Number.isNaN(due.getTime())) continue;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (YEARLY_REMINDER_KEYS.includes(r.key || "")) {
+      let guard = 0;
+      while (due.getTime() < today.getTime() && guard++ < 3) {
+        due = new Date(due.setFullYear(due.getFullYear() + 1));
+      }
+    }
+    const days = daysUntil(due.toISOString().slice(0, 10));
+    if (days === null) continue;
+    list.push({ label: reminderLabelOf(r), date: due.toISOString().slice(0, 10), daysUntil: days });
+  }
+  return list.sort((a, b) => a.daysUntil - b.daysUntil);
+}
+
+// ---------- 拖拽排序（重要日期 / 人员 / 座驾） ----------
 let dragDateName: string | null = null;
 let dragPersonName: string | null = null;
+let dragCarName: string | null = null;
 
 function dragStartDate(item: ImportantDate) {
   dragDateName = item.metadata.name;
@@ -624,8 +862,24 @@ function dropPerson(targetIndex: number) {
   void persistOrder("person", reordered.map((p) => p.metadata.name));
 }
 
+function dragStartCar(c: Car) {
+  dragCarName = c.metadata.name;
+}
+
+function dropCar(targetIndex: number) {
+  if (!dragCarName) return;
+  const arr = sortedCars.value;
+  const srcIdx = arr.findIndex((c) => c.metadata.name === dragCarName);
+  dragCarName = null;
+  if (srcIdx < 0 || srcIdx === targetIndex) return;
+  const reordered = [...arr];
+  const [moved] = reordered.splice(srcIdx, 1);
+  reordered.splice(targetIndex, 0, moved);
+  void persistOrder("car", reordered.map((c) => c.metadata.name));
+}
+
 /** 把顺序落库：已排序列（按新顺序）+ 其余（按当前顺序），统一写入 1..n */
-async function persistOrder(kind: "date" | "person", orderedNames: string[]) {
+async function persistOrder(kind: "date" | "person" | "car", orderedNames: string[]) {
   try {
     if (kind === "date") {
       const byName = new Map(dates.value.map((d) => [d.metadata.name, d]));
@@ -643,18 +897,25 @@ async function persistOrder(kind: "date" | "person", orderedNames: string[]) {
       }
       Toast.success("已保存排序");
     } else {
-      const byName = new Map(persons.value.map((p) => [p.metadata.name, p]));
+      const isCar = kind === "car";
+      const source: { metadata: { name: string }; spec: { sortOrder?: number } }[] = isCar
+        ? cars.value
+        : persons.value;
+      const sortedList = isCar ? sortedCars.value : sortedPersons.value;
+      const byName = new Map(source.map((p) => [p.metadata.name, p]));
       const ordered = orderedNames.map((n) => byName.get(n)!).filter(Boolean);
-      const rest = sortedPersons.value.filter((p) => !orderedNames.includes(p.metadata.name));
+      const rest = sortedList.filter((p) => !orderedNames.includes(p.metadata.name));
       const full = [...ordered, ...rest];
       let order = 1;
-      const toUpdate: Person[] = [];
+      const toUpdate: { item: Person | Car; next: Person | Car }[] = [];
       for (const p of full) {
-        const next = { ...p, spec: { ...p.spec, sortOrder: order++ } };
-        if ((p.spec.sortOrder || 0) !== next.spec.sortOrder) toUpdate.push(next);
+        const next = { ...p, spec: { ...p.spec, sortOrder: order++ } } as Person | Car;
+        if ((p.spec.sortOrder || 0) !== next.spec.sortOrder) toUpdate.push({ item: p as Person | Car, next });
       }
       if (toUpdate.length) {
-        await Promise.all(toUpdate.map((u) => updatePerson(u)));
+        await Promise.all(
+          toUpdate.map(({ next }) => (isCar ? updateCar(next as Car) : updatePerson(next as Person)))
+        );
       }
       Toast.success("已保存排序");
     }
@@ -671,6 +932,68 @@ function togglePerson(name: string) {
     form.personNames.splice(idx, 1);
   } else {
     form.personNames.push(name);
+  }
+}
+
+// ---------- 座驾操作 ----------
+function openCarCreate() {
+  editingCar.value = null;
+  carModalVisible.value = true;
+}
+
+function openCarEdit(c: Car) {
+  editingCar.value = c;
+  carModalVisible.value = true;
+}
+
+async function onCarSaved() {
+  const c = editingCar.value;
+  await appendLog(
+    c ? "UPDATE" : "CREATE",
+    c?.spec.displayName || "座驾",
+    c?.metadata.name || "",
+    c ? "编辑座驾信息" : "新增座驾",
+    "CAR"
+  );
+  await load();
+}
+
+function removeCar(c: Car) {
+  Dialog.warning({
+    title: "删除确认",
+    description: `确定要删除「${c.spec.displayName}」吗？相册与到期项会一并删除，删除后不可恢复。`,
+    confirmText: "删除",
+    cancelText: "取消",
+    onConfirm: async () => {
+      try {
+        await deleteCar(c.metadata.name);
+        cars.value = cars.value.filter((x) => x.metadata.name !== c.metadata.name);
+        Toast.success("已删除");
+        await appendLog("DELETE", c.spec.displayName, c.metadata.name, "删除座驾", "CAR");
+        await load();
+      } catch (error) {
+        Toast.error(`删除失败：${(error as Error)?.message || "未知错误"}`);
+      }
+    },
+  });
+}
+
+async function toggleCarVisible(c: Car, visibleValue: boolean) {
+  try {
+    const next: Car = { ...c, spec: { ...c.spec, visible: visibleValue } };
+    await updateCar(next);
+    c.spec.visible = visibleValue;
+    Toast.success(visibleValue ? "已在前台展示（车牌自动脱敏）" : "已取消前台展示");
+    await appendLog(
+      "UPDATE",
+      c.spec.displayName,
+      c.metadata.name,
+      visibleValue ? "开启前台展示" : "关闭前台展示",
+      "CAR"
+    );
+  } catch (error) {
+    Toast.error(`操作失败：${(error as Error)?.message || "未知错误"}`);
+    await load();
   }
 }
 
@@ -691,7 +1014,8 @@ async function onPersonSaved() {
     p ? "UPDATE" : "CREATE",
     personTitleBy(p?.metadata.name || ""),
     p?.metadata.name || "",
-    p ? `编辑人员信息` : "新增人员"
+    p ? `编辑人员信息` : "新增人员",
+    "PERSON"
   );
   await load();
 }
@@ -711,7 +1035,7 @@ function removePerson(p: Person) {
         // 立即从本地列表移除（Halo 软删除后索引清理存在微小延迟，避免依赖时序）
         persons.value = persons.value.filter((x) => x.metadata.name !== p.metadata.name);
         Toast.success("已删除");
-        await appendLog("DELETE", p.spec.displayName, p.metadata.name, "删除人员");
+        await appendLog("DELETE", p.spec.displayName, p.metadata.name, "删除人员", "PERSON");
         await load();
       } catch (error) {
         Toast.error(`删除失败：${(error as Error)?.message || "未知错误"}`);
@@ -885,9 +1209,15 @@ async function togglePersonVisible(p: Person, visibleValue: boolean) {
 }
 
 // ---------- 操作日志 ----------
-async function appendLog(action: LogAction, targetTitle: string, targetName: string, detail: string) {
+async function appendLog(
+  action: LogAction,
+  targetTitle: string,
+  targetName: string,
+  detail: string,
+  targetType: LogTargetType = "DATE"
+) {
   try {
-    await writeOperationLog(action, targetTitle, targetName, detail);
+    await writeOperationLog(action, targetTitle, targetName, detail, targetType);
   } catch {
     // 日志写入失败不影响主流程
   }
@@ -1016,11 +1346,13 @@ function remove(item: ImportantDate) {
 function exportData() {
   const items = dates.value.map((d) => ({ name: d.metadata.name, spec: d.spec }));
   const people = persons.value.map((p) => ({ name: p.metadata.name, spec: p.spec }));
+  const vehicles = cars.value.map((c) => ({ name: c.metadata.name, spec: c.spec }));
   const payload = {
     app: "plugin-important-dates",
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     persons: people,
+    cars: vehicles,
     items,
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -1032,7 +1364,9 @@ function exportData() {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  Toast.success(`已导出 ${items.length} 条日期、${people.length} 位人员`);
+  Toast.success(
+    `已导出 ${items.length} 条日期、${people.length} 位人员、${vehicles.length} 辆座驾`
+  );
 }
 
 function triggerImport() {
@@ -1052,6 +1386,11 @@ function validatePersonSpec(spec: unknown): spec is Person["spec"] {
     return Number.isInteger(m) && m >= 1 && m <= 12 && Number.isInteger(d) && d >= 1 && d <= 30;
   }
   return false;
+}
+
+function validateCarSpec(spec: unknown): spec is Car["spec"] {
+  const s = spec as Car["spec"];
+  return !!s && typeof s.displayName === "string" && !!s.displayName.trim();
 }
 
 function validateDateSpec(spec: unknown): spec is ImportantDate["spec"] {
@@ -1130,6 +1469,36 @@ async function onImportFile(e: Event) {
       valid++;
     }
 
+    // 座驾（v3 导出文件；旧文件无 cars 字段则跳过）
+    const rawCars = parsed?.cars;
+    const existingCars = new Set(cars.value.map((x) => x.metadata.name));
+    let cValid = 0;
+    let cDup = 0;
+    let cInvalid = 0;
+    const cList: Array<{ name: string; spec: Car["spec"] }> = [];
+    const cSeen = new Set<string>();
+    if (Array.isArray(rawCars)) {
+      for (const it of rawCars) {
+        const spec = it?.spec;
+        if (!validateCarSpec(spec)) {
+          cInvalid++;
+          continue;
+        }
+        const name = typeof it.name === "string" && it.name ? it.name : `car-import-${Date.now()}-${cValid}`;
+        if (existingCars.has(name) || cSeen.has(name)) {
+          cDup++;
+          continue;
+        }
+        cSeen.add(name);
+        cList.push({ name, spec: { ...spec } });
+        cValid++;
+      }
+    }
+    carImportItems.value = cList;
+    carImportValidCount.value = cValid;
+    carImportDuplicateCount.value = cDup;
+    carImportInvalidCount.value = cInvalid;
+
     importItems.value = list;
     importValidCount.value = valid;
     importDuplicateCount.value = dup;
@@ -1139,7 +1508,7 @@ async function onImportFile(e: Event) {
     personImportDuplicateCount.value = pDup;
     personImportInvalidCount.value = pInvalid;
     importModalVisible.value = true;
-    if (!valid && !pValid) {
+    if (!valid && !pValid && !cValid) {
       Toast.warning("文件中没有可导入的记录");
     }
   } catch {
@@ -1155,7 +1524,23 @@ async function doImport() {
   let failed = 0;
   let personsImported = 0;
   let personsFailed = 0;
+  let carsImported = 0;
+  let carsFailed = 0;
   try {
+    for (const item of carImportItems.value) {
+      try {
+        const created = await createCar({
+          apiVersion: "importantdates.halo.run/v1alpha1",
+          kind: "Car",
+          metadata: { name: item.name },
+          spec: item.spec,
+        });
+        carsImported++;
+        await appendLog("CREATE", created.spec.displayName, created.metadata.name, "导入：新增座驾", "CAR");
+      } catch {
+        carsFailed++;
+      }
+    }
     for (const item of personImportItems.value) {
       try {
         const created = await createPerson({
@@ -1193,11 +1578,14 @@ async function doImport() {
       personsImported,
       personsSkipped: personImportDuplicateCount.value,
       personsFailed,
+      carsImported,
+      carsSkipped: carImportDuplicateCount.value,
+      carsFailed,
     };
-    if (imported > 0 || personsImported > 0) {
+    if (imported > 0 || personsImported > 0 || carsImported > 0) {
       await load();
     }
-    Toast.success(`导入完成：新增 ${personsImported} 位人员、${imported} 条日期`);
+    Toast.success(`导入完成：新增 ${personsImported} 位人员、${imported} 条日期、${carsImported} 辆座驾`);
   }
 }
 
@@ -1206,6 +1594,7 @@ function closeImportModal() {
   importResult.value = null;
   importItems.value = [];
   personImportItems.value = [];
+  carImportItems.value = [];
 }
 
 // ---------- 日志弹窗（分页） ----------
@@ -1593,3 +1982,133 @@ function formatTime(iso?: string): string {
   vertical-align: middle;
   margin-right: 8px;
 }
+
+/* ===== 座驾（1.2.0） ===== */
+.cars-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 14px;
+}
+
+.car-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.car-head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.car-cover {
+  width: 84px;
+  height: 62px;
+  border-radius: 10px;
+  flex: none;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #eef2ff, #e0e7ff);
+}
+
+.car-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.car-cover-icon {
+  font-size: 30px;
+}
+
+/* 性别统一徽章：男=酷（冷色硬朗）/ 女=可爱（粉彩圆润）/ 未关联=中性 */
+.car-cover-cool {
+  background: linear-gradient(135deg, #1f2937, #0f172a 60%, #1e3a8a);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.45);
+}
+
+.car-cover-cool .car-cover-icon {
+  filter: drop-shadow(0 0 6px rgba(96, 165, 250, 0.65));
+}
+
+.car-cover-cute {
+  background: linear-gradient(135deg, #ffe4ef, #ffd1e6 55%, #fff1f7);
+  box-shadow: inset 0 0 0 1px rgba(244, 114, 182, 0.35);
+}
+
+.car-cover-neutral {
+  background: linear-gradient(135deg, #eef2ff, #e0e7ff);
+}
+
+.car-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.car-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.car-sub {
+  font-size: 12.5px;
+  color: #4b5563;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.car-sub.note {
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.car-sub.muted {
+  color: #9ca3af;
+}
+
+.car-events {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.car-event {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+}
+
+.car-event.soon {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.car-event.overdue {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.car-event.more {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.car-actions {
+  margin-top: 4px;
+}
+

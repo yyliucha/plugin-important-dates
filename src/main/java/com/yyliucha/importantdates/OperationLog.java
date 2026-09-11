@@ -50,9 +50,16 @@ public class OperationLog extends AbstractExtension {
         private String targetName;
 
         /**
+         * 目标类型：DATE（重要日期）/ PERSON（人员）/ CAR（座驾）。旧数据为空时按 DATE 处理。
+         */
+        @Schema(description = "目标类型")
+        private String targetType = "DATE";
+
+        /**
          * 操作详情（如编辑前后的字段差异）。
          */
         @Schema(description = "操作详情")
         private String detail;
     }
 }
+

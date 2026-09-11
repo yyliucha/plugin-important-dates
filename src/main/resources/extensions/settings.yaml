@@ -90,6 +90,13 @@ spec:
             - label: 永久关闭
               value: forever
           help: 访客点 × 后的默认关闭行为；开启「关闭方式菜单」时，点 × 会先弹出选择菜单，5 秒未选择则按此默认执行（本次关闭仅收起当前弹窗，不记任何状态）
+        - $formkit: number
+          name: toastMaxPerType
+          label: 每类最多显示条数
+          value: 2
+          min: 1
+          max: 5
+          help: 悬浮弹窗中「重要日期」与「座驾到期」各自最多显示几条，超出的合并为一句提示（如：另有 2 项 7 天内到期）。
         - $formkit: checkbox
           name: toastCloseMenu
           label: 关闭方式菜单
@@ -144,8 +151,28 @@ spec:
             - label: 默认策略
               value: ""
           help: 与官方一致的「存储策略」下拉：选项实时取自站点存储策略（系统策略变更即时更新）。大头贴上传将使用所选策略；留空使用默认策略。
-
-
-
-
+    - group: car
+      label: 座驾设置
+      formSchema:
+        - $formkit: checkbox
+          name: carEventsEnabled
+          label: 座驾到期参与提醒
+          value: true
+          help: 开启后，车辆的保险、年检、保养、车船税等到期事项会与重要日期一起出现在仪表盘小组件、横幅与悬浮弹窗中。
+        - $formkit: number
+          name: carDefaultRemindDays
+          label: 座驾默认提前提醒天数
+          value: 15
+          min: 0
+          help: 车辆到期项的默认提前提醒天数（每个项目可单独覆盖）。
+        - $formkit: checkbox
+          name: carFrontendSection
+          label: 前台显示「爱车」视图
+          value: true
+          help: 开启后，前台页面顶部会出现「生活 / 爱车」切换；关闭则只显示生活视图。
+        - $formkit: checkbox
+          name: carSkinEnabled
+          label: 性别统一徽章风格
+          value: true
+          help: 座驾卡片与其车主/驾驶人使用统一徽章：男生「酷」、女生「可爱」、未关联则中性。
 

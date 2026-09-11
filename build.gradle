@@ -30,6 +30,12 @@ tasks.withType(JavaCompile).configureEach {
 // 构建后台管理界面（前端），依赖 Node.js/npm 环境。
 // 官方 2.26 UI 构建流：@halo-dev/ui-plugin-bundler-kit 2.26（format=auto → ESM provider），
 // 产物 console/build/dist/* + ui-plugin.json，由下方 processUiResources 复制进 jar 的 console/ 目录。
+tasks.register('cleanFrontendDist', Delete) {
+    group = 'build'
+    description = 'Remove stale console UI build output (避免旧产物被打进 jar)'
+    delete layout.projectDirectory.dir('console/build/dist')
+}
+
 tasks.register('buildFrontend', Exec) {
     group = 'build'
     description = 'Build the console UI (npm ci + vite build)'
@@ -45,6 +51,7 @@ tasks.register('buildFrontend', Exec) {
         workingDir layout.projectDirectory.asFile
         commandLine 'bash', '-lc', 'cd console && npm ci && npm install @rollup/rollup-linux-x64-gnu --no-save && npm run build'
     }
+    dependsOn tasks.named('cleanFrontendDist')
     inputs.dir(layout.projectDirectory.dir('console/src'))
     inputs.files(fileTree(
         dir: layout.projectDirectory.dir('console'),
@@ -67,6 +74,7 @@ tasks.named('classes') {
 halo {
     version = '2.26.0'
 }
+
 
 
 

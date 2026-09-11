@@ -14,6 +14,7 @@ import run.halo.app.plugin.ReactiveSettingFetcher;
 import run.halo.app.theme.TemplateNameResolver;
 import run.halo.app.theme.router.ModelConst;
 import com.yyliucha.importantdates.finders.ImportantDateFinder;
+import com.yyliucha.importantdates.vo.CarVo;
 import com.yyliucha.importantdates.vo.ImportantDateVo;
 import com.yyliucha.importantdates.vo.PersonVo;
 
@@ -63,20 +64,29 @@ public class ImportantDateRouter {
                 org.springframework.web.reactive.function.server.RequestPredicates.GET("/important-dates"),
                 request -> reminderConfig()
                     .zipWith(importantDateFinder.listAll().collectList()
-                        .zipWith(importantDateFinder.listAllPeople().collectList()))
+                        .zipWith(importantDateFinder.listAllPeople().collectList())
+                        .zipWith(importantDateFinder.listAllCars().collectList()))
                     .flatMap(zip -> {
                         ReminderConfig cfg = zip.getT1();
-                        List<ImportantDateVo> dates = zip.getT2().getT1();
-                        List<PersonVo> people = zip.getT2().getT2();
+                        List<ImportantDateVo> dates = zip.getT2().getT1().getT1();
+                        List<PersonVo> people = zip.getT2().getT1().getT2();
+                        List<CarVo> cars = cfg.carFrontendSection()
+                            ? zip.getT2().getT2()
+                            : java.util.Collections.emptyList();
                         return importantDateFinder.listUpcoming(cfg.remindDays()).collectList()
                             .flatMap(reminders -> {
                                 Map<String, Object> model = new LinkedHashMap<>();
-                                model.put("title", "重要日期");
+                                model.put("title", cfg.carFrontendSection() ? "记得" : "重要日期");
                                 model.put("dates", dates);
                                 model.put("people", people);
                                 model.put("reminders", reminders);
                                 model.put("showImportantTag", cfg.showImportantTag());
                                 model.put("showAvatar", cfg.showAvatar());
+                                // 座驾（1.2.0）：生活/爱车双视图数据
+                                model.put("cars", cars);
+                                model.put("view", "life");
+                                model.put("showCarSection", cfg.carFrontendSection());
+                                model.put("carSkinEnabled", cfg.carSkinEnabled());
                                 model.put(ModelConst.TEMPLATE_ID, TEMPLATE_ID);
                                 return templateNameResolver
                                     .resolveTemplateNameOrDefault(request.exchange(), THEME_TEMPLATE)
@@ -102,6 +112,7 @@ public class ImportantDateRouter {
                     result.put("toastEmptyText", cfg.toastEmptyText());
                     result.put("toastDefaultClose", cfg.toastDefaultClose());
                     result.put("toastCloseMenu", cfg.toastCloseMenu());
+                    result.put("toastMaxPerType", cfg.toastMaxPerType());
                     // 页面横幅由 frontendReminder 控制；全站悬浮提醒由 toastEnabled 控制
                     if (!cfg.frontendReminder() && !cfg.toastEnabled()) {
                         result.put("reminders", java.util.Collections.emptyList());
@@ -109,21 +120,62 @@ public class ImportantDateRouter {
                             .contentType(MediaType.APPLICATION_JSON)
                             .bodyValue(result);
                     }
-                    return importantDateFinder.listUpcoming(cfg.remindDays())
-                        .collectList()
-                        .map(upcoming -> {
-                            List<Map<String, Object>> items = new java.util.ArrayList<>();
-                            for (ImportantDateVo r : upcoming) {
-                                Map<String, Object> item = new LinkedHashMap<>();
-                                item.put("title", r.getTitle());
-                                item.put("daysUntil", r.getDaysUntil());
-                                item.put("dateText", r.getDateText());
-                                item.put("nextSolarDate", r.getNextSolarDate());
-                                items.add(item);
+                    Mono<List<ImportantDateVo>> dateEvents =
+                        importantDateFinder.listUpcoming(cfg.remindDays()).collectList();
+                    Mono<List<CarVo.CarEventVo>> carEvents = cfg.carEventsEnabled()
+                        ? importantDateFinder.listUpcomingCarEvents(cfg.remindDays()).collectList()
+                        : Mono.just(java.util.Collections.emptyList());
+                    return dateEvents.zipWith(carEvents).map(tuple -> {
+                        List<Map<String, Object>> merged = new java.util.ArrayList<>();
+                        for (ImportantDateVo r : tuple.getT1()) {
+                            Map<String, Object> item = new LinkedHashMap<>();
+                            item.put("type", "date");
+                            item.put("title", r.getTitle());
+                            item.put("daysUntil", r.getDaysUntil());
+                            item.put("dateText", r.getDateText());
+                            item.put("nextSolarDate", r.getNextSolarDate());
+                            merged.add(item);
+                        }
+                        for (CarVo.CarEventVo e : tuple.getT2()) {
+                            Map<String, Object> item = new LinkedHashMap<>();
+                            item.put("type", "car");
+                            item.put("carName", e.getCarName());
+                            item.put("carIcon", e.getCarIcon());
+                            item.put("title", e.getCarName() == null || e.getCarName().isBlank()
+                                ? e.getLabel() : e.getCarName() + " · " + e.getLabel());
+                            item.put("label", e.getLabel());
+                            item.put("daysUntil", e.getDaysUntil());
+                            item.put("dateText", e.getDateText());
+                            item.put("overdue", e.isOverdue());
+                            merged.add(item);
+                        }
+                        // 谁近谁靠前（同级时日期事件优先）
+                        merged.sort(java.util.Comparator
+                            .comparingLong((Map<String, Object> m) -> ((Number) m.get("daysUntil")).longValue())
+                            .thenComparing(m -> "date".equals(m.get("type")) ? 0 : 1));
+                        // 降噪：每类型最多 N 条，其余合并计数
+                        int max = Math.max(1, cfg.toastMaxPerType());
+                        List<Map<String, Object>> limited = new java.util.ArrayList<>();
+                        int dateShown = 0;
+                        int carShown = 0;
+                        int overflow = 0;
+                        for (Map<String, Object> item : merged) {
+                            boolean isDate = "date".equals(item.get("type"));
+                            if (isDate ? dateShown < max : carShown < max) {
+                                limited.add(item);
+                                if (isDate) {
+                                    dateShown++;
+                                } else {
+                                    carShown++;
+                                }
+                            } else {
+                                overflow++;
                             }
-                            result.put("reminders", items);
-                            return result;
-                        })
+                        }
+                        result.put("reminders", limited);
+                        result.put("overflowCount", overflow);
+                        return result;
+                    })
                         .flatMap(map -> ServerResponse.ok()
                             .contentType(MediaType.APPLICATION_JSON)
                             .bodyValue(map));
@@ -144,11 +196,14 @@ public class ImportantDateRouter {
             .switchIfEmpty(Mono.just(emptyNode()));
         Mono<JsonNode> privacy = settingFetcher.get("privacy")
             .switchIfEmpty(Mono.just(emptyNode()));
-        return Mono.zip(reminder, basic, toast, privacy).map(tuple -> {
+        Mono<JsonNode> car = settingFetcher.get("car")
+            .switchIfEmpty(Mono.just(emptyNode()));
+        return Mono.zip(reminder, basic, toast, privacy, car).map(tuple -> {
             JsonNode r = tuple.getT1();
             JsonNode b = tuple.getT2();
             JsonNode t = tuple.getT3();
             JsonNode p = tuple.getT4();
+            JsonNode c = tuple.getT5();
             int days = intValue(r, "remindDays", DEFAULT_REMIND_DAYS);
             boolean frontendReminder = boolValue(r, "frontendReminder", true);
             int toastCloseSeconds = intValue(r, "toastCloseSeconds", DEFAULT_TOAST_CLOSE_SECONDS);
@@ -162,9 +217,14 @@ public class ImportantDateRouter {
             String toastDefaultClose = textValue(t, "toastDefaultClose", "once");
             boolean toastCloseMenu = boolValue(t, "toastCloseMenu", true);
             boolean showAvatar = boolValue(p, "showAvatar", false);
+            boolean carEventsEnabled = boolValue(c, "carEventsEnabled", true);
+            boolean carFrontendSection = boolValue(c, "carFrontendSection", true);
+            boolean carSkinEnabled = boolValue(c, "carSkinEnabled", true);
+            int toastMaxPerType = intValue(t, "toastMaxPerType", 2);
             return new ReminderConfig(days, frontendReminder, showImportantTag,
                 toastCloseSeconds, toastEnabled, toastPosition, toastTitle, toastTemplate,
-                toastEmptyText, toastDefaultClose, toastCloseMenu, showAvatar);
+                toastEmptyText, toastDefaultClose, toastCloseMenu, showAvatar,
+                carEventsEnabled, carFrontendSection, carSkinEnabled, toastMaxPerType);
         });
     }
 
@@ -204,6 +264,9 @@ public class ImportantDateRouter {
         int toastCloseSeconds,
         boolean toastEnabled, String toastPosition, String toastTitle,
         String toastTemplate, String toastEmptyText, String toastDefaultClose,
-        boolean toastCloseMenu, boolean showAvatar) {
+        boolean toastCloseMenu, boolean showAvatar,
+        boolean carEventsEnabled, boolean carFrontendSection, boolean carSkinEnabled,
+        int toastMaxPerType) {
     }
 }
+

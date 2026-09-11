@@ -201,7 +201,6 @@ const emit = defineEmits<{
 
 const saving = ref(false);
 const avatarBroken = ref(false);
-watch(() => form.avatar, () => { avatarBroken.value = false; });
 
 // ---------- 大头贴：官方附件上传 / 附件库选择 ----------
 const fileInput = ref<HTMLInputElement>();
@@ -398,6 +397,9 @@ const empty = (): PersonForm => ({
 });
 
 const form = reactive<PersonForm>(empty());
+
+// 放在 form 声明之后：watch 的 getter 在 setup 阶段会立即求值，过早引用 form 会触发 TDZ
+watch(() => form.avatar, () => { avatarBroken.value = false; });
 
 /** 名称 → 显示名 映射(用于把配置里的原始名翻译成界面可读名) */
 const groupLabelMap = ref<Record<string, string>>({});
@@ -793,6 +795,7 @@ async function save() {
   color: #6b7280;
 }
 </style>
+
 
 
 
