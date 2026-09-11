@@ -137,20 +137,36 @@ spec:
       formSchema:
         - $formkit: select
           name: avatarGroupName
-          label: 照片分类（分组）
+          label: 人员大头贴 · 分类（分组）
           value: ""
           options:
             - label: 不限定
               value: ""
-          help: 与官方附件库一致的「分类」下拉：选项实时取自站点附件库分组（系统分组变更即时更新）。人员大头贴与座驾相册的「从附件库选择」默认只显示该分类，上传的照片也会存入该分类。
+          help: 人员大头贴专用的「分类」：选项实时取自站点附件库分组（系统分组变更即时更新）。「从附件库选择」默认只显示该分类，上传的大头贴也会存入该分类。
         - $formkit: select
           name: avatarPolicyName
-          label: 照片存储策略
+          label: 人员大头贴 · 存储策略
           value: ""
           options:
             - label: 默认策略
               value: ""
-          help: 与官方一致的「存储策略」下拉：选项实时取自站点存储策略（系统策略变更即时更新）。大头贴与座驾相册上传将使用所选策略；留空使用默认策略。
+          help: 人员大头贴专用的「存储策略」：选项实时取自站点存储策略。留空使用默认策略。
+        - $formkit: select
+          name: carGroupName
+          label: 座驾相册 · 分类（分组）
+          value: ""
+          options:
+            - label: 不限定
+              value: ""
+          help: 座驾相册专用的「分类」：与人员大头贴相互独立，可分别设置。座驾相册「从附件库选择」默认只显示该分类，上传的车辆照片也会存入该分类。
+        - $formkit: select
+          name: carPolicyName
+          label: 座驾相册 · 存储策略
+          value: ""
+          options:
+            - label: 默认策略
+              value: ""
+          help: 座驾相册专用的「存储策略」：与人员大头贴相互独立。留空使用默认策略。
     - group: car
       label: 座驾设置
       formSchema:

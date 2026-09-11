@@ -217,45 +217,34 @@ public class ImportantDatesPlugin extends BasePlugin {
                             }
                             for (JsonNode field : schema) {
                                 String name = field.path("name").asText();
-                                if ("avatarGroupName".equals(name)) {
-                                    ArrayNode newOpts = groupOptions(groups);
-                                    String newHelp = "实时同步 ✓ 分组 " + groups.size() + " 个（已过滤隐藏项）。点击可查看：不限定 / 未分组 / 全部可见分组。";
-                                    boolean optionChanged = !field.path("options").toString().equals(newOpts.toString())
-                                        || !newHelp.equals(field.path("help").asText(""));
-                                    // 首次安装默认选中第一个真实分组（未配置时），避免用户不选导致无可选项
-                                    if (optionChanged || field.path("value").asText("").isEmpty()) {
-                                        ((ObjectNode) field).set("options", newOpts);
-                                        ((ObjectNode) field).put("help", newHelp);
-                                        if (field.path("value").asText("").isEmpty()) {
-                                            for (JsonNode opt : newOpts) {
-                                                String v = opt.path("value").asText();
-                                                if (!v.isEmpty()) {
-                                                    ((ObjectNode) field).put("value", v);
-                                                    break;
-                                                }
+                                boolean isGroupField = "avatarGroupName".equals(name) || "carGroupName".equals(name);
+                                boolean isPolicyField = "avatarPolicyName".equals(name) || "carPolicyName".equals(name);
+                                if (!isGroupField && !isPolicyField) {
+                                    continue;
+                                }
+                                // 人员大头贴与座驾相册分别注入（各自的分类 / 策略），互不影响
+                                String target = "carGroupName".equals(name) || "carPolicyName".equals(name)
+                                    ? "座驾相册" : "人员大头贴";
+                                ArrayNode newOpts = isGroupField ? groupOptions(groups) : policyOptions(policies);
+                                String newHelp = isGroupField
+                                    ? "实时同步 ✓ " + target + "可选分组 " + groups.size() + " 个（已过滤隐藏项）。点击可查看：不限定 / 未分组 / 全部可见分组。"
+                                    : "实时同步 ✓ " + target + "可选策略 " + policies.size() + " 个（已过滤隐藏项）。点击可查看：默认策略 / 全部可见策略。";
+                                boolean optionChanged = !field.path("options").toString().equals(newOpts.toString())
+                                    || !newHelp.equals(field.path("help").asText(""));
+                                // 首次安装默认选中第一个真实项（未配置时），避免用户不选导致无可选项
+                                if (optionChanged || field.path("value").asText("").isEmpty()) {
+                                    ((ObjectNode) field).set("options", newOpts);
+                                    ((ObjectNode) field).put("help", newHelp);
+                                    if (field.path("value").asText("").isEmpty()) {
+                                        for (JsonNode opt : newOpts) {
+                                            String v = opt.path("value").asText();
+                                            if (!v.isEmpty()) {
+                                                ((ObjectNode) field).put("value", v);
+                                                break;
                                             }
                                         }
-                                        changed = true;
                                     }
-                                } else if ("avatarPolicyName".equals(name)) {
-                                    ArrayNode newOpts = policyOptions(policies);
-                                    String newHelp = "实时同步 ✓ 策略 " + policies.size() + " 个（已过滤隐藏项）。点击可查看：默认策略 / 全部可见策略。";
-                                    boolean optionChanged = !field.path("options").toString().equals(newOpts.toString())
-                                        || !newHelp.equals(field.path("help").asText(""));
-                                    if (optionChanged || field.path("value").asText("").isEmpty()) {
-                                        ((ObjectNode) field).set("options", newOpts);
-                                        ((ObjectNode) field).put("help", newHelp);
-                                        if (field.path("value").asText("").isEmpty()) {
-                                            for (JsonNode opt : newOpts) {
-                                                String v = opt.path("value").asText();
-                                                if (!v.isEmpty()) {
-                                                    ((ObjectNode) field).put("value", v);
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                        changed = true;
-                                    }
+                                    changed = true;
                                 }
                             }
                         }

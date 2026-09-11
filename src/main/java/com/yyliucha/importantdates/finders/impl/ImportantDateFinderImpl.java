@@ -197,24 +197,36 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
         vo.setPhotoCount(photos.size());
 
         // 车主 / 驾驶人（仅前台可见人员才输出姓名）
+        // 卡片风格规则：① 有车主 → 按车主性别；② 无车主但有驾驶人 → 驾驶人性别一致时按该性别，男女混合则中性；③ 都没有 → 中性
         Person owner = spec.getOwnerName() == null ? null : people.get(spec.getOwnerName());
-        if (owner != null && owner.getSpec() != null && !Boolean.FALSE.equals(owner.getSpec().getVisible())) {
-            vo.setOwnerName(owner.getSpec().getDisplayName());
-            vo.setOwnerGender(owner.getSpec().getGender());
-            vo.setSkin(VehicleSupport.skinOf(owner.getSpec().getGender()));
-        } else {
-            vo.setSkin("neutral");
-        }
         List<String> drivers = new ArrayList<>();
+        java.util.Set<String> driverSkins = new java.util.LinkedHashSet<>();
         if (spec.getDriverNames() != null) {
             for (String name : spec.getDriverNames()) {
                 Person p = people.get(name);
                 if (p != null && p.getSpec() != null && !Boolean.FALSE.equals(p.getSpec().getVisible())) {
                     drivers.add(p.getSpec().getDisplayName());
+                    String driverSkin = VehicleSupport.skinOf(p.getSpec().getGender());
+                    if (!"neutral".equals(driverSkin)) {
+                        driverSkins.add(driverSkin);
+                    }
                 }
             }
         }
+        if (owner != null && owner.getSpec() != null && !Boolean.FALSE.equals(owner.getSpec().getVisible())) {
+            vo.setOwnerName(owner.getSpec().getDisplayName());
+            vo.setOwnerGender(owner.getSpec().getGender());
+            vo.setSkin(VehicleSupport.skinOf(owner.getSpec().getGender()));
+        } else if (driverSkins.size() == 1) {
+            // 共同使用且性别一致（如两位男生 / 两位女生）→ 采用该风格
+            vo.setSkin(driverSkins.iterator().next());
+        } else {
+            // 无车主且驾驶人性别混合（或都未填）→ 中性，避免偏向任何一方
+            vo.setSkin("neutral");
+        }
         vo.setDriverNames(drivers);
+        // 共同持有标记（车主 + 驾驶人 ≥ 2 人时，前台可提示"共同使用"）
+        vo.setSharedPeople(drivers.size() + (vo.getOwnerName() == null ? 0 : 1));
 
         // 到期事项
         List<CarVo.CarEventVo> events = new ArrayList<>();

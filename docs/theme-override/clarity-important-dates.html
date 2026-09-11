@@ -58,6 +58,10 @@
       .id-car-cover{font-size:32px;}
       .id-car-cover-icon{display:none;align-items:center;justify-content:center;width:100%;height:100%;font-size:32px;line-height:1;}
       .id-car-cover-more{position:absolute;right:6px;bottom:6px;background:rgba(15,23,42,.55);color:#fff;font-size:.7rem;border-radius:999px;padding:1px 7px;}
+      .id-car-cover-empty{cursor:help;flex-direction:column;gap:2px;border:1px dashed rgba(128,128,128,.45);}
+      .id-car-cover-hint{font-size:.62rem;opacity:.7;letter-spacing:.02em;}
+      .id-tip{position:fixed;left:50%;bottom:32px;transform:translateX(-50%) translateY(8px);background:rgba(17,24,39,.94);color:#f8fafc;padding:11px 20px;border-radius:12px;font-size:.9rem;box-shadow:0 10px 30px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .2s ease,transform .2s ease;z-index:9999;max-width:min(90vw,520px);text-align:center;}
+      .id-tip.show{opacity:1;transform:translateX(-50%) translateY(0);}
       .id-car-name{font-weight:700;font-size:1.05rem;display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0;word-break:keep-all;}
       .id-car-sub{font-size:.84rem;opacity:.78;line-height:1.55;}
       .id-car-events{display:flex;flex-wrap:wrap;gap:6px;}
@@ -145,7 +149,11 @@
                   <span class="id-car-cover-icon" th:text="${c.vehicleTypeIcon}">🚗</span>
                   <span class="id-car-cover-more" th:if="${c.photoCount > 1}" th:text="|1/${c.photoCount}|">1/3</span>
                 </button>
-                <span class="id-car-cover" th:unless="${c.coverUrl != null and !c.coverUrl.isBlank()}" th:text="${c.vehicleTypeIcon}">🚗</span>
+                <button type="button" class="id-car-cover id-car-cover-empty" th:unless="${c.coverUrl != null and !c.coverUrl.isBlank()}"
+                        data-no-photo="1" th:attr="data-car-name=${c.displayName}" th:title="|${c.displayName} 还没有相册照片|">
+                  <span class="id-car-cover-icon" th:text="${c.vehicleTypeIcon}">🚗</span>
+                  <span class="id-car-cover-hint">暂无照片</span>
+                </button>
                 <div>
                   <div class="id-car-name">
                     <span th:text="${c.vehicleTypeIcon}">🚗</span>
@@ -170,7 +178,8 @@
                   <th:block th:unless="${e.overdue}" th:text="| · ${e.daysUntil == 0 ? '今天到期' : e.daysUntil + ' 天后'}|"> · 7 天后</th:block>
                 </span>
               </div>
-              <div class="id-car-badge" th:if="${c.ownerName != null and !c.ownerName.isBlank()}">
+              <div class="id-car-badge" th:if="${(c.ownerName != null and !c.ownerName.isBlank()) or c.sharedPeople > 1}">
+                <span class="id-badge" th:if="${c.sharedPeople > 1}">共同使用</span>
                 <span class="id-badge" th:text="|车主 ${c.ownerName}|">车主 孙铭</span>
                 <span class="id-badge" th:each="d : ${c.driverNames}" th:if="${d != c.ownerName}" th:text="|驾驶人 ${d}|">驾驶人 宁琪儿</span>
               </div>
@@ -310,6 +319,29 @@
         apply(initial, false);
 
         // 相册浮层
+        // 座驾暂无相册：点击给友好提示
+        var tipEl = null;
+        var tipTimer = null;
+        function showTip(text) {
+          if (!tipEl) {
+            tipEl = document.createElement('div');
+            tipEl.className = 'id-tip';
+            document.body.appendChild(tipEl);
+          }
+          tipEl.textContent = text;
+          tipEl.classList.add('show');
+          if (tipTimer) { clearTimeout(tipTimer); }
+          tipTimer = setTimeout(function () { tipEl.classList.remove('show'); }, 2600);
+        }
+        var emptyCovers = app.querySelectorAll('[data-no-photo]');
+        for (var q = 0; q < emptyCovers.length; q++) {
+          emptyCovers[q].addEventListener('click', function (ev) {
+            ev.stopPropagation();
+            var carName = this.getAttribute('data-car-name') || '这辆车';
+            showTip('「' + carName + '」还没有相册照片，可以在后台「座驾」里上传或从附件库选择～');
+          });
+        }
+
         function closeAlbums() {
           var open = document.querySelectorAll('.id-album.open');
           for (var k = 0; k < open.length; k++) { open[k].classList.remove('open'); }

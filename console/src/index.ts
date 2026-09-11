@@ -1,6 +1,6 @@
 import { definePlugin } from "@halo-dev/console-shared";
 import { markRaw } from "vue";
-import CalendarIcon from "./components/CalendarIcon.vue";
+import { IconCalendar } from "@halo-dev/components";
 import ReminderWidget from "./components/ReminderWidget.vue";
 import ImportantDatesView from "./views/ImportantDatesView.vue";
 
@@ -19,7 +19,7 @@ export default definePlugin({
           menu: {
             name: "记得",
             group: "content",
-            icon: markRaw(CalendarIcon),
+            icon: markRaw(IconCalendar),
             priority: 0,
           },
         },

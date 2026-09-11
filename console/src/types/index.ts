@@ -126,7 +126,7 @@ export const VEHICLE_TYPES: { value: VehicleType; label: string; icon: string }[
   { value: "MPV", label: "MPV", icon: "🚐" },
   { value: "SPORTS", label: "跑车", icon: "🏎️" },
   { value: "ORV", label: "越野车", icon: "🚙" },
-  { value: "PICKUP", label: "皮卡", icon: "🛻" },
+  { value: "PICKUP", label: "皮卡", icon: "🚛" },
   { value: "WAGON", label: "旅行车", icon: "🚗" },
   { value: "HATCHBACK", label: "两厢车", icon: "🚗" },
   { value: "CROSSOVER", label: "跨界车", icon: "🚙" },

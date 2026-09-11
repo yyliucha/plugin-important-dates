@@ -70,6 +70,9 @@ public class CarVo {
     /** 卡片皮肤：cool / cute / neutral。 */
     private String skin = "neutral";
 
+    /** 关联人数（车主 + 驾驶人），> 1 表示共同持有/共同使用。 */
+    private int sharedPeople;
+
     /** 前台是否可见。 */
     private boolean frontendVisible;
 

@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <VModal
     :visible="visible"
     :title="car ? '编辑座驾' : '新增座驾'"
@@ -253,14 +253,29 @@
           <span class="lib-group-hint">{{ libGroupHint }}</span>
           <button type="button" class="lib-close" aria-label="Close" @click="closeLib">✕</button>
         </div>
+        <div class="lib-scope-bar">
+          <label class="check">
+            <input type="checkbox" :checked="showAllLib" @change="toggleShowAll" />
+            <span>显示全部图片（忽略分类 / 策略）</span>
+          </label>
+          <span class="hint">
+            当前范围 <b>{{ libScopeCount }}</b> 张 · 附件库共 <b>{{ libTotalCount }}</b> 张图片
+          </span>
+        </div>
         <div class="lib-body">
-          <div v-if="libLoading" class="hint" style="padding: 20px 4px">加载中…</div>
+          <div v-if="libLoading" class="lib-loading">正在读取附件库…</div>
           <div v-else-if="libError" class="lib-error">
             {{ libError }}
             <VButton size="sm" @click="fetchLibrary">重试</VButton>
           </div>
-          <div v-else-if="!libItems.length" class="hint" style="padding: 20px 4px">
-            附件库暂无可用图片，请先「上传图片」，或到「附件」页面添加。
+          <div v-else-if="!libItems.length" class="lib-empty">
+            <template v-if="libTotalCount === 0">
+              附件库里还没有图片：点上方「上传图片」，或到后台「附件」页面添加后再回来。
+            </template>
+            <template v-else>
+              当前范围（{{ libGroupHint }}）下没有图片，但附件库共有 <b>{{ libTotalCount }}</b> 张图片。
+              <VButton size="sm" @click="toggleShowAll">显示全部图片</VButton>
+            </template>
           </div>
           <div v-else class="lib-grid">
             <div
@@ -388,6 +403,9 @@ const libLoading = ref(false);
 const libError = ref("");
 const libItems = ref<{ name: string; displayName: string; permalink: string }[]>([]);
 const libSelected = ref<string[]>([]);
+const showAllLib = ref(false);
+const libTotalCount = ref(0);
+const libScopeCount = ref(0);
 const avatarGroupName = ref("");
 const avatarPolicyName = ref("");
 
@@ -451,8 +469,9 @@ async function loadSettings() {
     } else if (raw && typeof raw === "object") {
       obj = raw as { avatarGroupName?: string; avatarPolicyName?: string };
     }
-    avatarGroupName.value = obj.avatarGroupName?.trim() || "";
-    avatarPolicyName.value = obj.avatarPolicyName?.trim() || "";
+    // 座驾相册使用独立设置（car* 优先；旧版本未拆分时回退到 avatar*）
+    avatarGroupName.value = (obj as { carGroupName?: string }).carGroupName?.trim() || obj.avatarGroupName?.trim() || "";
+    avatarPolicyName.value = (obj as { carPolicyName?: string }).carPolicyName?.trim() || obj.avatarPolicyName?.trim() || "";
   } catch {
     avatarGroupName.value = "";
     avatarPolicyName.value = "";
@@ -526,28 +545,30 @@ async function fetchLibrary() {
     const { data } = await axiosInstance.get<{
       items?: {
         metadata?: { name?: string };
-        spec?: { displayName?: string; mediaType?: string; groupName?: string };
+        spec?: { displayName?: string; mediaType?: string; groupName?: string; policyName?: string };
         status?: { permalink?: string };
       }[];
     }>("/apis/storage.halo.run/v1alpha1/attachments", {
-      params: { page: 1, size: 100, sort: "metadata.creationTimestamp,desc" },
+      params: { page: 1, size: 200, sort: "metadata.creationTimestamp,desc" },
     });
-    libItems.value = (data?.items || [])
-      .filter((a) => {
-        const url = a.status?.permalink || "";
-        const mt = (a.spec?.mediaType || "").toLowerCase();
-        const groupOk = !avatarGroupName.value || (a.spec?.groupName || "") === avatarGroupName.value;
-        return (
-          url &&
-          groupOk &&
-          (mt.startsWith("image/") || /\.(png|jpe?g|jpeg|gif|webp|svg|avif|bmp)$/i.test(url))
-        );
-      })
-      .map((a) => ({
-        name: a.metadata?.name || "",
-        displayName: a.spec?.displayName || a.metadata?.name || "",
-        permalink: a.status?.permalink || "",
-      }));
+    const all = (data?.items || []).filter((a) => {
+      const url = a.status?.permalink || "";
+      const mt = (a.spec?.mediaType || "").toLowerCase();
+      return url && (mt.startsWith("image/") || /\.(png|jpe?g|jpeg|gif|webp|svg|avif|bmp)$/i.test(url));
+    });
+    libTotalCount.value = all.length;
+    const scoped = all.filter((a) => {
+      const groupOk = !avatarGroupName.value || (a.spec?.groupName || "") === avatarGroupName.value;
+      const policyOk = !avatarPolicyName.value || (a.spec?.policyName || "") === avatarPolicyName.value;
+      return groupOk && policyOk;
+    });
+    libScopeCount.value = scoped.length;
+    const chosen = showAllLib.value ? all : scoped;
+    libItems.value = chosen.map((a) => ({
+      name: a.metadata?.name || "",
+      displayName: a.spec?.displayName || a.metadata?.name || "",
+      permalink: a.status?.permalink || "",
+    }));
   } catch (error) {
     libError.value = `加载附件库失败：${(error as Error)?.message || "请稍后重试"}`;
     libItems.value = [];
@@ -556,6 +577,11 @@ async function fetchLibrary() {
   }
 }
 
+function toggleShowAll() {
+  showAllLib.value = !showAllLib.value;
+  libSelected.value = [];
+  void fetchLibrary();
+}
 function openLibrary() {
   libVisible.value = true;
   libSelected.value = [];
@@ -922,6 +948,52 @@ watch(
   cursor: pointer;
   padding: 4px 8px;
   border-radius: 6px;
+}
+
+.lib-scope-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 18px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fafafa;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+
+.lib-empty {
+  padding: 22px 4px;
+  color: #6b7280;
+  font-size: 13px;
+  line-height: 1.9;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.lib-loading {
+  padding: 22px 4px;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.lib-loading::after {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-left: 8px;
+  border: 2px solid #c7d2fe;
+  border-top-color: #4f7cff;
+  border-radius: 50%;
+  animation: lib-spin .8s linear infinite;
+  vertical-align: middle;
+}
+
+@keyframes lib-spin {
+  to { transform: rotate(360deg); }
 }
 
 .lib-body {

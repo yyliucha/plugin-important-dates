@@ -44,7 +44,7 @@ public final class VehicleSupport {
         Map.entry("MPV", "🚐"),
         Map.entry("SPORTS", "🏎️"),
         Map.entry("ORV", "🚙"),
-        Map.entry("PICKUP", "🛻"),
+        Map.entry("PICKUP", "🚛"),
         Map.entry("WAGON", "🚗"),
         Map.entry("HATCHBACK", "🚗"),
         Map.entry("CROSSOVER", "🚙"),
