@@ -1,4 +1,4 @@
-# 截图清单（应用市场上架 / 仓库展示）
+﻿# 截图清单（应用市场上架 / 仓库展示）
 
 提交 Halo 应用市场前，把下面 8 张实际截图放到本目录（`F:\dsh\plugin-important-dates\docs\screenshots\`），**文件名与 README 中的引用保持一致**（按下表命名即可，README 会自动显示）。
 
@@ -48,11 +48,11 @@
 4. 明确：插件不含联网请求、不采集用户数据、无需外部授权/付费能力（README 已写明）；
 5. 命名空间合规：自有代码全部为 `com.yyliucha.importantdates`（审核材料见 `docs/app-store-resubmission.md`）。
 
+## 座驾模块（1.2.0 新增）
 
-
-
-
-
-
-
-
+| 文件 | 说明 |
+| --- | --- |
+| screenshot-console-car.png | 后台「座驾」页签：车辆卡片（分类图标、车牌、到期徽章、车主/驾驶人、前台开关、拖拽排序） |
+| screenshot-console-car-form.png | 座驾表单：分类/能源/证照/里程/关联人员/多图相册（含「展示」勾选）/到期项 |
+| screenshot-frontend-car.png | 前台「爱车」视图：车辆卡片 + 性别统一徽章（男=酷 / 女=可爱）+ 车主/驾驶人徽章 |
+| screenshot-frontend-album.png | 前台相册浮层：点击封面全屏查看（只读；仅显示勾选「展示」的照片） |

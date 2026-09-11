@@ -1,9 +1,9 @@
-# 重要日期（plugin-important-dates）
+﻿# 记得 · 重要日期与爱车（plugin-important-dates）
 
 [![build](https://github.com/yyliucha/plugin-important-dates/actions/workflows/build.yaml/badge.svg)](https://github.com/yyliucha/plugin-important-dates/actions/workflows/build.yaml)
 [![plugin](https://img.shields.io/badge/Halo-2.x-1f6feb?logo=halo&color=1f6feb)](https://github.com/halo-dev/halo)
 
-一个 Halo 2.x 插件：在**后台**记录并管理自己的重要日期与家人朋友（结婚纪念日、孩子出生日期等），支持阳历/农历（含闰月）、每年自动循环、**拖拽排序**、人员档案与**大头贴**、到期提醒（仪表盘常驻 + 前台页面 + 全站悬浮弹窗）、隐私脱敏、**操作日志（分页/自动清理）**与导出导入；完全按 Halo 2.26 官方文档与扩展点实现。
+一个 Halo 2.x 插件：在**后台**记录重要日期与家人朋友（结婚纪念日、孩子出生日期等），也记录你的**座驾**（汽车 / 电瓶车 / 自行车）的保险、年检、保养到期。支持阳历/农历（含闰月）、每年自动循环、**拖拽排序**、人员档案与**大头贴**、**多图相册与前台「生活 / 爱车」双视图**、到期提醒（仪表盘常驻 + 前台横幅 + 全站悬浮弹窗）、隐私脱敏、**操作日志（分页/自动清理）**与导出导入；完全按 Halo 2.26 官方文档与扩展点实现。
 
 [English README](README.en.md) ｜ [Releases](https://github.com/yyliucha/plugin-important-dates/releases) ｜ [问题反馈](https://github.com/yyliucha/plugin-important-dates/issues) ｜ 作者：[yyliucha](https://github.com/yyliucha)
 
@@ -19,7 +19,11 @@
 | ![新增日期](https://raw.githubusercontent.com/yyliucha/plugin-important-dates/main/docs/screenshots/screenshot-date-form.png) | **自研日期选择器**：阳历日历网格（格内标注农历）/ 农历年月日（含闰月） |
 | ![人员管理](https://raw.githubusercontent.com/yyliucha/plugin-important-dates/main/docs/screenshots/screenshot-people-list.png) | **人员管理**：姓名/昵称/关系/生日/血型/身高/体重/喜好，敏感字段标注「仅后台」 |
 | ![操作日志](https://raw.githubusercontent.com/yyliucha/plugin-important-dates/main/docs/screenshots/screenshot-log-modal.png) | **操作日志弹窗**：每一次新增/编辑/删除的时间、操作、目标与变更详情 |
-| ![插件设置](https://raw.githubusercontent.com/yyliucha/plugin-important-dates/main/docs/screenshots/screenshot-settings.png) | **插件设置**：提醒天数、后台/前台提醒、全站悬浮提醒（位置/标题/模板/关闭行为）、隐私脱敏 |
+| ![座驾列表](https://raw.githubusercontent.com/yyliucha/plugin-important-dates/main/docs/screenshots/screenshot-console-car.png) | **后台「座驾」页签**：分类图标、脱敏/完整车牌、到期徽章（已过期/临近）、车主与驾驶人、拖拽排序、前台开关 |
+| ![座驾表单](https://raw.githubusercontent.com/yyliucha/plugin-important-dates/main/docs/screenshots/screenshot-console-car-form.png) | **座驾表单**：分类（轿车/SUV/MPV/跑车/…/电瓶车/自行车）、能源类型、证照与里程、多图相册（可勾选是否前台展示）、到期项（保险/年检/保养/车船税/自定义） |
+| ![前台爱车视图](https://raw.githubusercontent.com/yyliucha/plugin-important-dates/main/docs/screenshots/screenshot-frontend-car.png) | **前台「爱车」视图**：车辆卡片（分类图标、脱敏车牌、到期徽章）、**性别统一徽章**（男=酷 / 女=可爱，车与人同款）、车主/驾驶人徽章 |
+| ![前台相册](https://raw.githubusercontent.com/yyliucha/plugin-important-dates/main/docs/screenshots/screenshot-frontend-album.png) | **前台相册浮层**：点击封面全屏查看相册（只读、可滚动、Esc 关闭；仅显示后台勾选「展示」的照片） |
+| ![插件设置](https://raw.githubusercontent.com/yyliucha/plugin-important-dates/main/docs/screenshots/screenshot-settings.png) | **插件设置**：提醒天数、座驾设置、后台/前台提醒、全站悬浮提醒（位置/标题/模板/关闭行为）、隐私脱敏 |
 | ![全站悬浮提醒](https://raw.githubusercontent.com/yyliucha/plugin-important-dates/main/docs/screenshots/screenshot-toast.png) | **全站悬浮提醒弹窗**：自选位置（含屏幕中间）、自动关闭倒计时、关闭方式菜单 |
 
 ## 功能
@@ -30,6 +34,13 @@
 - **自研日期选择器**：阳历模式为日历网格（格子内标注农历）；农历模式可选年份、月份（含闰月）、日期并实时显示对应阳历；均支持**年/月下拉快选**；**编辑时日历面板自动定位到已选日期**
 - **重要/普通标识**：默认重要，重要日期参与到期提醒，可作为全站提示的条件
 
+**🚗 座驾（汽车 / 电瓶车 / 自行车）**
+- **车辆档案**：名称/昵称、品牌、车系型号、**17 类分类**（轿车/SUV/MPV/跑车/越野车/皮卡/旅行车/两厢车/跨界车/微面/房车/货车/客车/摩托车/**电瓶车/自行车**/其他）、能源类型（燃油/纯电/插混/油电混动/人力）、颜色、车牌号、VIN、发动机号、注册/购买日期、里程、状态（在用车/已出售/已报废）
+- **多图相册**：上传或从官方附件库多选、拖拽排序、设封面；**每张可单独勾选「展示」**（未勾选仅后台可见，适合行驶证/保单等证件照）；前台点击封面即可全屏查看（只读）
+- **到期提醒**：交强险、商业险、年检、保养（支持日期与间隔月数推算）、车船税、驾照换证、自定义项；每项可单独设置提前天数与启用开关；**按年循环项到期后自动滚动到下一次**；已出售/已报废车辆不再提醒
+- **关联人员**：车主（单选）与常用驾驶人（多选），可选；关联后车辆卡片与人员卡片使用**统一徽章风格**（男生「酷」/ 女生「可爱」/ 未关联中性）
+- **隐私**：**车牌号前台永远脱敏**（`粤B·****5`）；VIN、发动机号、保单号、购买价格**永不输出到前台**；车辆「前台展示」默认关闭
+- **排序**：车辆列表支持拖拽排序，前后台顺序一致；导出/导入（JSON v3）包含车辆与相册
 **👤 人员管理**
 - 人员字段：姓名、昵称、关系（本人/配偶/子女/父母/朋友…）、生日（阳历/农历）、性别、血型、身高、体重（最新值）、喜好、备注、**大头贴**（单张；官方附件库上传/选择，后台始终显示，前台由隐私设置控制，附件被删除自动回退首字符）
 - 重要日期可**关联多人**（如结婚纪念日关联夫妻两人），列表支持**按人员筛选**
@@ -83,6 +94,7 @@
 
 - **新增日期**：右上角「+ 新增日期」→ 名称、日期类型、日期（日历面板：阳历点选 / 农历选年月日）、关联人员（可多选）、备注；可勾选「重要」参与提醒、「前台展示」控制是否公开
 - **人员页签**：管理人员信息；人员卡片上可直接切换「前台展示」
+- **座驾页签**：管理车辆档案与相册（上传/附件库多选、拖拽排序、设封面、逐张勾选「是否前台展示」），设置交强险/商业险/年检/保养/车船税等到期项与提前天数；卡片上可直接切换「前台展示」与状态
 - **列表**：显示类型、日期、最近一次、关联人、重要标记、前台开关；顶部可按人员筛选
 - **操作日志**：右上角按钮查看全部变更明细
 - **导出 / 导入**：右上角按钮备份与恢复（导入会先校验，重复自动跳过）
@@ -107,7 +119,11 @@
 
 插件**不会写入或修改任何主题文件**。想自定义展示时，在主题目录放置 `templates/important-dates.html`（TemplateNameResolver 会优先使用主题模板；删除即回退插件默认模板）。
 
-模板可直接消费的数据：`title`、`dates`（title/dateText/nextSolarDate/daysUntil/personNames/important）、`people`（displayName/nickname/relation/birthdayText/nextSolarDate/daysUntil/avatar）、`reminders`（即将到来的重要日期）、`showImportantTag`、`showAvatar`。也可以直接调用 `importantDateFinder` Finder API 获取数据。
+模板可直接消费的数据：
+- 生活视图：`title`、`dates`（title/dateText/nextSolarDate/daysUntil/personNames/important）、`people`（displayName/nickname/relation/birthdayText/nextSolarDate/daysUntil/avatar/gender）、`reminders`（即将到来的重要日期）、`showImportantTag`、`showAvatar`
+- 爱车视图：`cars`（displayName/brand/model/vehicleTypeLabel/vehicleTypeIcon/energyTypeLabel/**plateMasked**（脱敏车牌）/coverUrl/photos/photoCount/ownerName/driverNames/**skin**（cool|cute|neutral）/events）、`carEvents`（carName/label/date/daysUntil/overdue）、`carOwners`、`carDrivers`、`showCarSection`、`carSkinEnabled`、`view`（life|car）
+
+也可以直接调用 `importantDateFinder` Finder API：`listAll()` / `listAllPeople()` / `listAllCars()` / `listUpcoming(days)` / `listUpcomingCarEvents(days)`。
 
 ## 重新构建（可选）
 
@@ -118,13 +134,17 @@ cd plugin-important-dates
 ./gradlew build
 ```
 
-构建结果位于 `build/libs/plugin-important-dates-1.1.5.jar`。
+构建结果位于 `build/libs/plugin-important-dates-1.2.0-SNAPSHOT.jar`。
 
 > 版本说明：**开发版使用 1.0.x 序列**（1.0.0 → 1.0.1 → … 当前 1.0.33）；**正式版版本号在发布时指定**（当前正式线 1.1.x，后续正式版号以发布为准）。
 
 ## License
 
 [MIT](LICENSE)
+
+
+
+
 
 
 

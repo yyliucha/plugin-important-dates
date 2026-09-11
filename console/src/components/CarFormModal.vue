@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <VModal
     :visible="visible"
     :title="car ? '编辑座驾' : '新增座驾'"
@@ -244,7 +244,8 @@
       </div>
     </div>
 
-    <!-- 附件库多选浮层 -->
+    <!-- 附件库多选浮层（Teleport 到 body：避免 VModal 插槽内的 DOM 插入冲突） -->
+    <Teleport to="body">
     <div v-if="libVisible" class="lib-overlay" @click.self="closeLib">
       <div class="lib-panel">
         <div class="lib-header">
@@ -284,6 +285,7 @@
         </div>
       </div>
     </div>
+    </Teleport>
 
     <template #footer>
       <VSpace>
@@ -979,3 +981,4 @@ watch(
   border-top: 1px solid #e5e7eb;
 }
 </style>
+
