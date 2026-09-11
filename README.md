@@ -1,4 +1,4 @@
-# 记得 · 重要日期与爱车（plugin-important-dates）
+﻿# 记得 · 重要日期与爱车（plugin-important-dates）
 
 [![build](https://github.com/yyliucha/plugin-important-dates/actions/workflows/build.yaml/badge.svg)](https://github.com/yyliucha/plugin-important-dates/actions/workflows/build.yaml)
 [![plugin](https://img.shields.io/badge/Halo-2.x-1f6feb?logo=halo&color=1f6feb)](https://github.com/halo-dev/halo)

@@ -109,6 +109,39 @@ public class ImportantDateRouter {
                                     .toList();
                                 model.put("carOwners", carOwners);
                                 model.put("carDrivers", carDrivers);
+                                // 人员 → 爱车关系（用于「车主与驾驶人」区块的关系徽章，例如「车主 · 小白」）
+                                java.util.Map<String, java.util.List<java.util.Map<String, String>>> personCars =
+                                    new LinkedHashMap<>();
+                                for (CarVo car : cars) {
+                                    if (car.getOwnerName() != null && !car.getOwnerName().isBlank()) {
+                                        personCars.computeIfAbsent(car.getOwnerName(), k -> new java.util.ArrayList<>())
+                                            .add(java.util.Map.of(
+                                                "role", "车主",
+                                                "carName", car.getDisplayName() == null ? "" : car.getDisplayName(),
+                                                "carIcon", car.getVehicleTypeIcon() == null ? "🚗" : car.getVehicleTypeIcon()));
+                                    }
+                                    if (car.getDriverNames() != null) {
+                                        for (String driver : car.getDriverNames()) {
+                                            if (driver == null || driver.isBlank() || driver.equals(car.getOwnerName())) {
+                                                continue;
+                                            }
+                                            personCars.computeIfAbsent(driver, k -> new java.util.ArrayList<>())
+                                                .add(java.util.Map.of(
+                                                    "role", "驾驶人",
+                                                    "carName", car.getDisplayName() == null ? "" : car.getDisplayName(),
+                                                    "carIcon", car.getVehicleTypeIcon() == null ? "🚗" : car.getVehicleTypeIcon()));
+                                        }
+                                    }
+                                }
+                                List<PersonVo> carPeople = people.stream()
+                                    .filter(p -> personCars.containsKey(p.getDisplayName()))
+                                    .toList();
+                                List<PersonVo> otherPeople = people.stream()
+                                    .filter(p -> !personCars.containsKey(p.getDisplayName()))
+                                    .toList();
+                                model.put("personCars", personCars);
+                                model.put("carPeople", carPeople);
+                                model.put("otherPeople", otherPeople);
                                 model.put(ModelConst.TEMPLATE_ID, TEMPLATE_ID);
                                 return templateNameResolver
                                     .resolveTemplateNameOrDefault(request.exchange(), THEME_TEMPLATE)

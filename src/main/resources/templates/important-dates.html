@@ -204,39 +204,71 @@
         </div>
       </div>
 
-      <!-- 身边的人：两种视图都显示，标题与说明随视图变化 -->
-      <h2 class="id-block-title id-only-life">牵挂的人 <span class="id-count" th:text="${#lists.size(people)}">1</span></h2>
-      <p class="id-hero-sub id-only-life">他们的生日与纪念日，都替你记着。</p>
-      <h2 class="id-block-title id-only-car" th:if="${showCarSection != null and showCarSection}">
-        牵挂的人 <span class="id-count" th:text="${#lists.size(people)}">1</span>
-      </h2>
-      <p class="id-hero-sub id-only-car" th:if="${showCarSection != null and showCarSection}">
-        谁开着哪辆车，都记在这里：<b>车主</b>、<b>常用驾驶人</b> 会带徽章。
-      </p>
-      <p class="id-hero-sub" th:if="${#lists.isEmpty(people)}">还没有添加。</p>
-      <div class="id-board" th:unless="${#lists.isEmpty(people)}">
-        <div class="id-memo id-person" th:each="p : ${people}"
-             th:classappend="${carSkinEnabled != null and carSkinEnabled and (carOwners != null and carOwners.contains(p.displayName) or carDrivers != null and carDrivers.contains(p.displayName))} ? ((p.gender == '男') ? 'id-person-skin-cool' : ((p.gender == '女') ? 'id-person-skin-cute' : '')) : ''">
-          <div class="id-memo-days" th:if="${p.daysUntil >= 0}">
-            <span th:text="${p.daysUntil}">61</span>
-            <small>天后</small>
-          </div>
-          <div class="id-memo-title" style="padding-right:0;">
-            <img th:if="${showAvatar != null and showAvatar and p.avatar != null and !p.avatar.isBlank()}" th:src="${p.avatar}" alt="" style="width:34px;height:34px;border-radius:8px;object-fit:cover;flex:none;margin-right:10px;box-shadow:inset 0 0 0 1px rgba(128,128,128,.2);"/><span class="id-memo-avatar" th:unless="${showAvatar != null and showAvatar and p.avatar != null and !p.avatar.isBlank()}" th:text="${#strings.substring(p.displayName, 0, 1)}">老</span>
-            <span th:text="${p.displayName}">老婆</span>
-            <span th:if="${p.relation}" style="font-size:.8em;opacity:.75;" th:text="|（${p.relation}）|">（配偶）</span>
-          </div>
-          <div class="id-car-badge" th:if="${carOwners != null and carOwners.contains(p.displayName) or carDrivers != null and carDrivers.contains(p.displayName)}">
-            <span class="id-badge" th:if="${carOwners != null and carOwners.contains(p.displayName)}">车主</span>
-            <span class="id-badge" th:if="${carDrivers != null and carDrivers.contains(p.displayName)}">驾驶人</span>
-          </div>
-          <div class="id-memo-sub" th:if="${p.nickname != null && !p.nickname.isBlank()}"
-               th:text="|昵称：${p.nickname}|">昵称：三哥</div>
-          <div class="id-memo-date">
-            生日 <span th:text="${p.birthdayText}">1999-10-**</span>
-            <span th:if="${p.nextSolarDate != null}" th:text="|（${p.nextSolarDate}）|">（2026-10-**）</span>
+      <!-- ===== 生活视图：牵挂的人（生日与纪念日倒计时） ===== -->
+      <div class="id-only-life">
+        <h2 class="id-block-title">牵挂的人 <span class="id-count" th:text="${#lists.size(people)}">1</span></h2>
+        <p class="id-hero-sub">他们的生日与纪念日，都替你记着。</p>
+        <p class="id-hero-sub" th:if="${#lists.isEmpty(people)}">还没有添加。</p>
+        <div class="id-board" th:unless="${#lists.isEmpty(people)}">
+          <div class="id-memo id-person" th:each="p : ${people}">
+            <div class="id-memo-days" th:if="${p.daysUntil >= 0}">
+              <span th:text="${p.daysUntil}">61</span>
+              <small>天后</small>
+            </div>
+            <div class="id-memo-title" style="padding-right:0;">
+              <img th:if="${showAvatar != null and showAvatar and p.avatar != null and !p.avatar.isBlank()}" th:src="${p.avatar}" alt="" style="width:34px;height:34px;border-radius:8px;object-fit:cover;flex:none;margin-right:10px;box-shadow:inset 0 0 0 1px rgba(128,128,128,.2);"/><span class="id-memo-avatar" th:unless="${showAvatar != null and showAvatar and p.avatar != null and !p.avatar.isBlank()}" th:text="${#strings.substring(p.displayName, 0, 1)}">老</span>
+              <span th:text="${p.displayName}">老婆</span>
+              <span th:if="${p.relation}" style="font-size:.8em;opacity:.75;" th:text="|（${p.relation}）|">（配偶）</span>
+            </div>
+            <div class="id-memo-sub" th:if="${p.nickname != null && !p.nickname.isBlank()}"
+                 th:text="|昵称：${p.nickname}|">昵称：三哥</div>
+            <div class="id-memo-date">
+              生日 <span th:text="${p.birthdayText}">1999-10-**</span>
+              <span th:if="${p.nextSolarDate != null}" th:text="|（${p.nextSolarDate}）|">（2026-10-**）</span>
+            </div>
           </div>
         </div>
+      </div>
+
+      <!-- ===== 爱车视图：车主与驾驶人（关系徽章含车名）+ 其他重要的人 ===== -->
+      <div class="id-only-car" th:if="${showCarSection != null and showCarSection}">
+        <h2 class="id-block-title">车主与驾驶人 <span class="id-count" th:text="${#lists.size(carPeople)}">1</span></h2>
+        <p class="id-hero-sub">谁开着哪辆车，都记在这里。</p>
+        <p class="id-hero-sub" th:if="${#lists.isEmpty(carPeople)}">还没有把人和爱车关联起来，去「座驾」里选一位车主吧～</p>
+        <div class="id-board" th:unless="${#lists.isEmpty(carPeople)}">
+          <div class="id-memo id-person" th:each="p : ${carPeople}"
+               th:classappend="${carSkinEnabled != null and carSkinEnabled} ? ((p.gender == '男') ? 'id-person-skin-cool' : ((p.gender == '女') ? 'id-person-skin-cute' : '')) : ''">
+            <div class="id-memo-title" style="padding-right:0;">
+              <img th:if="${showAvatar != null and showAvatar and p.avatar != null and !p.avatar.isBlank()}" th:src="${p.avatar}" alt="" style="width:34px;height:34px;border-radius:8px;object-fit:cover;flex:none;margin-right:10px;box-shadow:inset 0 0 0 1px rgba(128,128,128,.2);"/><span class="id-memo-avatar" th:unless="${showAvatar != null and showAvatar and p.avatar != null and !p.avatar.isBlank()}" th:text="${#strings.substring(p.displayName, 0, 1)}">老</span>
+              <span th:text="${p.displayName}">老婆</span>
+              <span th:if="${p.relation}" style="font-size:.8em;opacity:.75;" th:text="|（${p.relation}）|">（配偶）</span>
+            </div>
+            <div class="id-car-badge" th:if="${personCars[p.displayName] != null}">
+              <span class="id-badge" th:each="rel : ${personCars[p.displayName]}"
+                    th:text="|${rel.carIcon} ${rel.role} · ${rel.carName}|">🚗 车主 · 小白</span>
+            </div>
+            <div class="id-memo-sub" th:if="${p.nickname != null && !p.nickname.isBlank()}"
+                 th:text="|昵称：${p.nickname}|">昵称：三哥</div>
+          </div>
+        </div>
+
+        <th:block th:if="${otherPeople != null and !#lists.isEmpty(otherPeople)}">
+          <h2 class="id-block-title" style="font-size:1rem;margin-top:22px;">
+            其他重要的人 <span class="id-count" th:text="${#lists.size(otherPeople)}">1</span>
+          </h2>
+          <p class="id-hero-sub">还没和爱车关联的家人朋友。</p>
+          <div class="id-board">
+            <div class="id-memo id-person" th:each="p : ${otherPeople}">
+              <div class="id-memo-title" style="padding-right:0;">
+                <img th:if="${showAvatar != null and showAvatar and p.avatar != null and !p.avatar.isBlank()}" th:src="${p.avatar}" alt="" style="width:34px;height:34px;border-radius:8px;object-fit:cover;flex:none;margin-right:10px;box-shadow:inset 0 0 0 1px rgba(128,128,128,.2);"/><span class="id-memo-avatar" th:unless="${showAvatar != null and showAvatar and p.avatar != null and !p.avatar.isBlank()}" th:text="${#strings.substring(p.displayName, 0, 1)}">张</span>
+                <span th:text="${p.displayName}">张三</span>
+                <span th:if="${p.relation}" style="font-size:.8em;opacity:.75;" th:text="|（${p.relation}）|">（朋友）</span>
+              </div>
+              <div class="id-memo-sub" th:if="${p.nickname != null && !p.nickname.isBlank()}"
+                   th:text="|昵称：${p.nickname}|">昵称：三哥</div>
+            </div>
+          </div>
+        </th:block>
       </div>
     </div>
 
