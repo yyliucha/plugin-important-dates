@@ -15,7 +15,7 @@
 | **D** | 同车同日多事项提醒合并(后台列表仍逐项) | ✅ | `ImportantDateRouter` 按 `carName + dateText` 分组合并,标题形如 `小鹏 · 交强险 / 商业险 / 年检`;日期不同则不合并 |
 | **E** | 进入上线检验期 / 切换每年规则的一次性提示 | ✅ | `console/src/utils/vehicle.ts#inspectionNotice()` 判定阶段(第 6 年起 `ONSITE`、第 11 年起 `YEARLY`);后台座驾页顶部横幅提示 + 「知道了」写回 `Car.spec.inspectionNoticeAck`(幂等去重,已售/报废车不提示) |
 | **F** | 年检提前 30 天 + 办理时长提示 | ✅ | 表单提示:「年检默认提前 30 天提醒(办理含上线检验通常需 2–3 个工作日)」;`REMINDER_PRESETS` 年检默认 30 天 |
-| **G** | 仪表盘小分页(默认每页 5 条、可配可关闭),口径与前台一致 | ✅ | 设置项 `dashboardPageSize`(默认 5)、`dashboardPagination`(默认开);接口新增 **`allReminders`**(完整列表,不受"每类最多 N 条"降噪限制);`ReminderWidget.vue` 本地分页(‹ 1 / N › + 共 X 条,越界回退最后一页,60 秒自动刷新保留当前页) |
+| **G** | 仪表盘小分页(默认每页 5 条、可配可关闭),口径与前台一致 | ✅ | 设置项 `dashboardPageSize`(默认 5)、`dashboardPagination`(默认开);接口新增 **`allReminders`**(完整列表,不受"每类最多 N 条"降噪限制);`ReminderWidget.vue` 本地分页(‹ 1 / N › + **始终显示**「共 X 条 · 每页 N 条」,越界回退最后一页,60 秒自动刷新保留当前页;关闭分页时只显示条数) |
 
 ## 实现要点(已全部落地)
 
@@ -25,23 +25,14 @@
 4. **E 提示** — 后台座驾页顶部横幅:「「车名」已进入上线检验期(第 6 年起不再免检:第 6、10 年需上线检验,第 11 年起每年一次),年检提醒已按规则自动滚动」;点「知道了」把阶段写入 `Car.spec.inspectionNoticeAck`,并记一条操作日志。
 5. **收尾** — 版本号切 `1.2.1-SNAPSHOT`(`gradle.properties` + `plugin.yaml`);`gradlew clean build` 产出 `plugin-important-dates-1.2.1-SNAPSHOT.jar`;版本说明 `docs/release-notes-1.2.1-SNAPSHOT.md`(中文)+ `.en.md`(英文)。
 
-## 收尾待执行命令(因本机 shell 运行器故障中断,恢复后照此执行)
+## 交付物(本地,未推送 GitHub)
 
-```powershell
-cd F:\dsh\plugin-important-dates
-# 1) 旧计划文档已被本文件取代(需求批次编号 1.2.2 → 发布编号 1.2.1)
-git rm docs/feature-1.2.2-plan.md
-# 2) 端到端留证截图入库(截图生成于 F:\dsh\halo-test\ui-121-*.png)
-Copy-Item F:\dsh\halo-test\ui-121-car-insurer.png        docs\manual-test\e121-car-insurer.png
-Copy-Item F:\dsh\halo-test\ui-121-car-reminders2.png     docs\manual-test\e121-car-reminders.png
-Copy-Item F:\dsh\halo-test\ui-121-notice.png             docs\manual-test\e121-inspection-notice.png
-Copy-Item F:\dsh\halo-test\ui-121-dashboard-pager.png    docs\manual-test\e121-dashboard-pager.png
-# 3) 提交(英文提交信息)
-git add -A
-git commit -m "release: 1.2.1-SNAPSHOT development build - vehicle-level insurer, per-item repeat interval, derived inspection with manual override and insurance-synced dates, merged same-day reminders, dashboard widget paging, one-time inspection rule notice; docs and regression notes (smoke 50/50, browser 13/13, migration idempotent)"
-```
+- `build/libs/plugin-important-dates-1.2.1-SNAPSHOT.jar`(453 KB,含控制台 UI 产物 `console/main.8fTCD449.js`;SHA256 `707779CA…4DB4B3D0`);
+- `docs/release-notes-1.2.1-SNAPSHOT.md`(中文)/ `docs/release-notes-1.2.1-SNAPSHOT.en.md`(英文);
+- 留证截图:`docs/manual-test/e121-*.png`(表单、到期项、规则提示、仪表盘分页);
+- 回归脚本(仓库外,便于复用):`F:\dsh\halo-test\halo-smoke.mjs`、`browser-121-e2e.mjs`、`migrate-check.mjs`、`verify-widget-footer.mjs`、`upgrade-121.mjs`。
 
-交付物(本地,未推送 GitHub):`build/libs/plugin-important-dates-1.2.1-SNAPSHOT.jar`(453 KB,含控制台 UI 产物)、`docs/release-notes-1.2.1-SNAPSHOT.md`(中文)、`docs/release-notes-1.2.1-SNAPSHOT.en.md`(英文)。
+> 升级提示(用户侧):安装新 jar 后请**强刷浏览器(Ctrl+Shift+R)**。Halo 控制台会缓存插件的 console 包;旧包文件名已被新构建替换,不强刷会出现「侧边栏没有『记得』、仪表盘小组件消失」等现象(实测确认,强刷即恢复,与服务端无关)。
 
 ## 验证基线
 
@@ -51,7 +42,9 @@ git commit -m "release: 1.2.1-SNAPSHOT development build - vehicle-level insurer
 - **全新 Halo 2.26 实例冒烟回归 `halo-smoke.mjs` 50/50 PASS**(工作目录 `F:\dsh\halo-test\work-122`,端口 8090,日志 `F:\dsh\halo-test\smoke-121-final.log`)。用例总数 44 → 50,新增 6 项:循环间隔 0(不滚动,过期即过期提醒)、循环间隔 24(滚动到未来 330 天)、年检未填日期自动推算(第 4 年「免检申领」+ 第 6 年「上线检验」两个阶段)、`Car.spec.inspectionNoticeAck` 持久化、车辆级保险公司 + 单项覆盖 + 保单号 + 循环间隔同时落库、`allReminders` 完整列表与 `dashboardPageSize`/`dashboardPagination` 下发;
 - **浏览器端到端 13/13 PASS**(`F:\dsh\halo-test\browser-121-e2e.mjs`,日志 `browser-121-final.log`):同车同日合并为一条、上线检验期一次性提示与「知道了」去重(写回 `inspectionNoticeAck=ONSITE`)、车辆级保险公司字段与常用公司快捷提示、循环间隔五种选项与默认值回填、年检推算展示(「按规则自动推算:2026-09-20(免检申领)」+ 依据)、「手动指定日期」开关(自动取消同期并预填推算结果,取消后恢复同期)、车船税默认与交强险同期且只读联动、保存后落库校验、仪表盘小组件分页(共 9 条 / 每页 5 条 → 可翻到第 2 页)、小组件显示合并行、控制台零脚本错误;
 - **迁移幂等验证 PASS**(`F:\dsh\halo-test\migrate-check.mjs`):造一条「项目级保险公司、无车辆级」的旧数据 → 重启 Halo → 断言车辆级 = 中国人保、交强险/商业险重复值被清空、车船税的不同公司「太平洋保险」保留;再次重启后 `metadata.version` 仍为 1(无写入),即幂等;
-- 截图留证:`ui-121-car-insurer.png`(车辆级保险公司 + 快捷公司)、`ui-121-car-reminders.png` / `ui-121-car-reminders2.png`(到期项精简、循环间隔、年检推算与同期联动)、`ui-121-notice.png`(上线检验期提示)、`ui-121-dashboard-pager.png`(小组件分页)。
+- 截图留证:`ui-121-car-insurer.png`(车辆级保险公司 + 快捷公司)、`ui-121-car-reminders.png` / `ui-121-car-reminders2.png`(到期项精简、循环间隔、年检推算与同期联动)、`ui-121-notice.png`(上线检验期提示)、`ui-121-dashboard-pager.png`(小组件分页)、`ui-121-widget-footer.png`(底部栏「‹ 2 / 9 › 共 9 条 · 每页 1 条」);
+- **小组件底部栏 4/4 PASS**(`F:\dsh\halo-test\verify-widget-footer.mjs`):默认每页 5 条时显示「共 9 条 · 每页 5 条」与 `1 / 1`;每页 1 条时分 9 页且可翻到第 2 页;关闭分页后只剩「共 9 条」(无 ‹ ›、无每页说明);控制台零脚本错误;
+- **用户站点实测反馈**:装包后出现「侧边栏无『记得』、插件设置页签看不到、仪表盘小组件消失」,经确认是**浏览器缓存旧 console 包**所致(强刷后全部恢复),服务端与制品无问题——已把该提示写入版本说明与本文档。
 
 剩余(等用户测试通过后):
 
