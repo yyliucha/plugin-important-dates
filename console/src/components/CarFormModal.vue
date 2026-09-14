@@ -164,6 +164,7 @@
 
       <!-- ===== 到期提醒 ===== -->
       <div class="section-title">到期提醒（保险 / 年检 / 保养 / 车船税…）</div>
+      <p class="hint">年检默认提前 30 天提醒（办理含上线检验通常需 2–3 个工作日，建议提前安排）；保险类默认每年循环，年检按首次登记日期与车型规则自动推算，均可手动覆盖。</p>
       <div v-for="(r, idx) in form.reminders" :key="idx" class="reminder-card">
         <div class="row">
           <label class="field third">
