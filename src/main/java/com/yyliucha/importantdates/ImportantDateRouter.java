@@ -251,6 +251,9 @@ public class ImportantDateRouter {
                         }
                         result.put("reminders", limited);
                         result.put("overflowCount", overflow);
+                        // 完整列表（不做"每类最多 N 条"降噪）：供控制台仪表盘小组件分页展示，
+                        // 口径与前台一致，仅页数由 dashboardPageSize 决定。
+                        result.put("allReminders", merged);
                         return result;
                     })
                         .flatMap(map -> ServerResponse.ok()
