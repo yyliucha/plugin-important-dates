@@ -50,10 +50,10 @@
 - 截图留证:`ui-121-car-insurer.png`(车辆级保险公司 + 快捷公司)、`ui-121-car-reminders.png` / `ui-121-car-reminders2.png`(到期项精简、循环间隔、年检推算与同期联动)、`ui-121-notice.png`(上线检验期提示)、`ui-121-dashboard-pager.png`(小组件分页)、`ui-121-widget-footer.png`(底部栏「‹ 2 / 9 › 共 9 条 · 每页 1 条」);
 - **用户站点实测反馈**:装包后出现「侧边栏无『记得』、插件设置页签看不到、仪表盘小组件消失」,经确认是**浏览器缓存旧 console 包**所致(强刷后全部恢复),服务端与制品无问题——已把该提示写入版本说明、README 与本文档。
 
-剩余(需用户决定或操作):
+剩余(需用户操作):
 
-1. 推送 GitHub 并创建 Release(**待用户确认**):`git push` → `gh release create v1.2.1 --title v1.2.1 --notes-file <中英合并说明> build/libs/plugin-important-dates-1.2.1.jar --latest`,等待 CI 通过;
-2. 应用市场提交(需用户后台操作):版本号 `1.2.1`、勾选「设置为最新版本」、版本说明用 `docs/release-notes-1.2.1.md`、README 字段粘贴 `README.store.md`、封面/图标用 `docs/store-assets/`。
+1. ~~推送 GitHub 并创建 Release~~ ✅ 已完成:提交已推送(`fe493fd..db42a0f`),Release **v1.2.1**(标题 = tag、`--latest`、非预发布、唯一制品 `plugin-important-dates-1.2.1.jar`)发布于 <https://github.com/yyliucha/plugin-important-dates/releases/tag/v1.2.1>,tag 指向构建该包的提交 `db42a0f`,CI(build)已通过;
+2. **应用市场提交(需用户在插件后台操作)**:版本号 `1.2.1`、勾选「设置为最新版本」、版本说明粘贴 `docs/release-notes-1.2.1.md`、README 字段粘贴 `README.store.md`、封面/图标用 `docs/store-assets/`(提交说明可沿用 `docs/app-store-resubmission.md` 中的 AI 参与说明)。
 
 ## 已知环境注意点
 
