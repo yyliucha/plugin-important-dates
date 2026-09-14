@@ -182,6 +182,8 @@ export interface CarReminder {
   enabled?: boolean;
   insurer?: string;
   policyNo?: string;
+  /** 循环间隔（月）：0=不循环，12=每年，24=每两年；留空按项目默认 */
+  repeatMonths?: number;
   intervalMonths?: number;
   intervalKm?: number;
   lastServiceDate?: string;
@@ -201,6 +203,8 @@ export interface CarSpec {
   engineNo?: string;
   registeredDate?: string;
   purchaseDate?: string;
+  /** 保险公司（车辆级：车下所有险种共用） */
+  insurer?: string;
   purchasePrice?: number;
   mileageKm?: number;
   mileageUpdatedAt?: string;
