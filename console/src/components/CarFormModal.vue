@@ -604,16 +604,29 @@ function lockedDateText(r: FormReminder): string {
 }
 
 function toggleSync(r: FormReminder, e: Event) {
-  r.syncInsurance = (e.target as HTMLInputElement).checked;
+  const on = (e.target as HTMLInputElement).checked;
+  r.syncInsurance = on;
+  // 「与保险同期」= 日期由交强险决定；勾选时自然取消「手动指定日期」
+  if (on && r.key === "INSPECTION") {
+    r.manualDate = false;
+  }
 }
 
 function toggleManualDate(r: FormReminder, e: Event) {
   const manual = (e.target as HTMLInputElement).checked;
   r.manualDate = manual;
-  // 打开手动指定时，用推算结果预填，方便微调
-  if (manual && !r.date) {
-    r.date = inspectionPreview().date || "";
+  if (manual) {
+    // 「手动指定日期」= 自行填写；必须取消与保险同期，否则日期仍被联动锁住
+    r.syncInsurance = false;
+    // 用推算结果预填，方便微调
+    if (!r.date) {
+      r.date = inspectionPreview().date || "";
+    }
+    return;
   }
+  // 取消手动指定 → 回到自动：年检/车船税恢复默认「与保险同期」，手填日期不再保留
+  r.date = "";
+  r.syncInsurance = isSyncable(r.key) ? true : undefined;
 }
 
 function toggleOverrideInsurer(r: FormReminder, e: Event) {
@@ -1002,7 +1015,7 @@ watch(
             item.customMonths = Number(r.repeatMonths);
           }
           if (isSyncable(r.key)) {
-            // 未填日期或与交强险同日 → 视为「与保险同期」（1.2.2 默认口径）
+            // 未填日期或与交强险同日 → 视为「与保险同期」（1.2.1 默认口径）
             const synced = !r.date || (!!compulsoryRawDate && r.date === compulsoryRawDate);
             item.syncInsurance = synced;
             if (r.key === "INSPECTION") {
@@ -1334,7 +1347,7 @@ watch(
   border-top: 1px solid #e5e7eb;
 }
 
-/* ===== 1.2.2：保险公司快捷输入、到期项子块 ===== */
+/* ===== 1.2.1：保险公司快捷输入、到期项子块 ===== */
 .chip-row {
   display: flex;
   flex-wrap: wrap;

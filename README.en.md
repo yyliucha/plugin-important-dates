@@ -36,11 +36,16 @@ A Halo 2.x plugin that remembers things for you: anniversaries, birthdays and th
 **🚗 Vehicles (cars / e-bikes / bicycles)**
 - **17 categories** (sedan / SUV / MPV / sports / off-road / pickup / wagon / hatchback / crossover / van / RV / truck / bus / motorcycle / **e-bike / bicycle** / other), energy type (fuel / EV / PHEV / HEV / human), brand & model, colour, VIN, engine no., registration & purchase dates, mileage, status (in use / sold / scrapped)
 - **Photo album**: upload or multi-select from the attachment library, drag to reorder, set cover; **each photo can be toggled visible/hidden** (hidden ones stay admin-only — handy for licence and insurance papers)
-- **Due reminders**: compulsory & commercial insurance, inspection, maintenance (computed from last service + interval), road tax, licence renewal, custom items; per-item lead days and on/off; **yearly items roll over automatically**; sold/scrapped vehicles stop reminding
+- **Due reminders**: compulsory & commercial insurance, inspection, maintenance (computed from last service + interval), road tax, licence renewal, custom items; per-item lead days, on/off and **repeat interval** (every year / two years / three years / one-off / custom months); sold/scrapped vehicles stop reminding
+- **One insurer per vehicle**: a vehicle-level insurer shared by every policy item (with quick picks for common companies); a single item can still override it, and existing data is migrated idempotently at startup
+- **Inspection derived from the rules**: the next inspection is derived from the first registration date plus the vehicle category (sticker in years 2/4, on-site in years 6/10, yearly from year 11) with the stage and its basis shown; a manual date can override it, and the default lead time is 30 days
+- **Inspection and road tax follow the insurance date** by default (untick to enter a separate date); the same date is saved
+- **Same car, same day merged**: compulsory insurance, commercial insurance, road tax and inspection due on one day become a single reminder line, while the admin list still shows each item
+- **One-time rule notice**: when a vehicle enters the on-site inspection period (year 6) or switches to yearly inspection (year 11), the console shows a notice once
 - **Linked people**: owner + regular drivers (optional); vehicle cards and person cards share the **same badge style** (cool for male, cute for female, neutral when unlinked)
 
 **🔔 Reminders (three places, your choice)**
-- **Dashboard widget** (Halo 2.21+): always visible, refreshed every minute (Dashboard → Edit → Add widget → Widget centre → group “记得”)
+- **Dashboard widget** (Halo 2.21+): always visible, refreshed every minute, with **paging (5 items per page by default, adjustable or switchable off)** showing the complete reminder list (Dashboard → Edit → Add widget → Widget centre → group “记得”)
 - **Admin + public banners**: “Tomorrow is「Wedding Anniversary」” / “Insurance of「小白」is due in 7 days”
 - **Site-wide toast** (optional): position, wording and auto-close are configurable
 - Dates and vehicle due items are **merged into one list sorted by days left**; the toast shows at most N items per type and merges the rest into a summary
@@ -68,7 +73,7 @@ A Halo 2.x plugin that remembers things for you: anniversaries, birthdays and th
 
 ## Compatibility
 
-- **Halo 2.26+** (built against the official 2.26 docs and extension points; Java 17 bytecode; full regression on a clean 2.26 instance: 44/44 passed)
+- **Halo 2.26+** (built against the official 2.26 docs and extension points; Java 17 bytecode; full regression on a clean 2.26 instance: 50/50 passed)
 - Administrators get all permissions after installation; no role setup needed
 
 ## Install & upgrade
@@ -113,7 +118,7 @@ cd plugin-important-dates
 ./gradlew build
 ```
 
-The artifact is written to `build/libs/plugin-important-dates-<version>.jar` (current development version: `1.2.0-SNAPSHOT`; next release: `1.2.0`).
+The artifact is written to `build/libs/plugin-important-dates-<version>.jar` (current development version: `1.2.1-SNAPSHOT`; next release: `1.2.1` — the `1.2.1` number was never released, so nothing is skipped).
 
 ## License
 

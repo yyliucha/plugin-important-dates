@@ -2035,7 +2035,7 @@ function formatTime(iso?: string): string {
   gap: 14px;
 }
 
-/* ===== 年检规则一次性提示（1.2.2 E） ===== */
+/* ===== 年检规则一次性提示（1.2.1 E） ===== */
 .rule-notice {
   display: flex;
   flex-direction: column;

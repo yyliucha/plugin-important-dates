@@ -107,7 +107,7 @@ public class Car extends AbstractExtension {
         private String insurer;
 
         /**
-         * 年检规则提示的确认标记（1.2.2）：记录用户已确认过的提示阶段
+         * 年检规则提示的确认标记（1.2.1）：记录用户已确认过的提示阶段
          * （ONSITE=第 6 年起上线检验期、YEARLY=第 11 年起每年一次），
          * 用于「一次性提示」去重；为空表示尚未提示过。
          */

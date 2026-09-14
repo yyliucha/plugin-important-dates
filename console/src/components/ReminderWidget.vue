@@ -128,7 +128,8 @@ async function load() {
 
 function daysLabel(days: number): string {
   const n = Number(days);
-  if (n <= 0) return "今天 🎉";
+  if (n < 0) return `已过期 ${-n} 天`;
+  if (n === 0) return "今天 🎉";
   if (n === 1) return "明天";
   return `${n} 天后`;
 }
