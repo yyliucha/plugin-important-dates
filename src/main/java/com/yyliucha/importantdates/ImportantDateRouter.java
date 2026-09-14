@@ -168,6 +168,8 @@ public class ImportantDateRouter {
                     result.put("toastDefaultClose", cfg.toastDefaultClose());
                     result.put("toastCloseMenu", cfg.toastCloseMenu());
                     result.put("toastMaxPerType", cfg.toastMaxPerType());
+                    result.put("dashboardPageSize", cfg.dashboardPageSize());
+                    result.put("dashboardPagination", cfg.dashboardPagination());
                     // 页面横幅由 frontendReminder 控制；全站悬浮提醒由 toastEnabled 控制
                     if (!cfg.frontendReminder() && !cfg.toastEnabled()) {
                         result.put("reminders", java.util.Collections.emptyList());
@@ -292,6 +294,8 @@ public class ImportantDateRouter {
             String toastDefaultClose = textValue(t, "toastDefaultClose", "once");
             boolean toastCloseMenu = boolValue(t, "toastCloseMenu", true);
             boolean showAvatar = boolValue(p, "showAvatar", false);
+            int dashboardPageSize = intValue(b, "dashboardPageSize", 5);
+            boolean dashboardPagination = boolValue(b, "dashboardPagination", true);
             boolean carEventsEnabled = boolValue(c, "carEventsEnabled", true);
             boolean carFrontendSection = boolValue(c, "carFrontendSection", true);
             boolean carSkinEnabled = boolValue(c, "carSkinEnabled", true);
@@ -299,7 +303,8 @@ public class ImportantDateRouter {
             return new ReminderConfig(days, frontendReminder, showImportantTag,
                 toastCloseSeconds, toastEnabled, toastPosition, toastTitle, toastTemplate,
                 toastEmptyText, toastDefaultClose, toastCloseMenu, showAvatar,
-                carEventsEnabled, carFrontendSection, carSkinEnabled, toastMaxPerType);
+                carEventsEnabled, carFrontendSection, carSkinEnabled, toastMaxPerType,
+                dashboardPageSize, dashboardPagination);
         });
     }
 
@@ -341,7 +346,7 @@ public class ImportantDateRouter {
         String toastTemplate, String toastEmptyText, String toastDefaultClose,
         boolean toastCloseMenu, boolean showAvatar,
         boolean carEventsEnabled, boolean carFrontendSection, boolean carSkinEnabled,
-        int toastMaxPerType) {
+        int toastMaxPerType, int dashboardPageSize, boolean dashboardPagination) {
     }
 }
 
