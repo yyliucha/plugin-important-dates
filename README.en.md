@@ -36,6 +36,7 @@ A Halo 2.x plugin that remembers things for you: anniversaries, birthdays and th
 **🚗 Vehicles (cars / e-bikes / bicycles)**
 - **17 categories** (sedan / SUV / MPV / sports / off-road / pickup / wagon / hatchback / crossover / van / RV / truck / bus / motorcycle / **e-bike / bicycle** / other), energy type (fuel / EV / PHEV / HEV / human), brand & model, colour, VIN, engine no., registration & purchase dates, mileage, status (in use / sold / scrapped)
 - **Photo album**: upload or multi-select from the attachment library, drag to reorder, set cover; **each photo can be toggled visible/hidden** (hidden ones stay admin-only — handy for licence and insurance papers)
+- **Attachment library scope**: under Settings → Photo settings you can point the **person avatar** and the **vehicle album** at a category (group) and a storage policy; when nothing matches, the scope **widens automatically** and the dialog explains what is in effect and how many images match (no more empty lists), with a one-click "show all images"
 - **Due reminders**: compulsory & commercial insurance, inspection, maintenance (computed from last service + interval), road tax, licence renewal, custom items; per-item lead days, on/off and **repeat interval** (every year / two years / three years / one-off / custom months); sold/scrapped vehicles stop reminding
 - **One insurer per vehicle**: a vehicle-level insurer shared by every policy item (with quick picks for common companies); a single item can still override it, and existing data is migrated idempotently at startup
 - **Inspection derived from the rules**: the next inspection is derived from the first registration date plus the vehicle category (sticker in years 2/4, on-site in years 6/10, yearly from year 11) with the stage and its basis shown; a manual date can override it, and the default lead time is 30 days
@@ -118,7 +119,7 @@ cd plugin-important-dates
 ./gradlew build
 ```
 
-The artifact is written to `build/libs/plugin-important-dates-<version>.jar` (current version: `1.2.1`; previous stable: `1.2.0` — the `1.2.1` number was never released before, so nothing is skipped). Hard-refresh your browser once after installing a new build.
+The artifact is written to `build/libs/plugin-important-dates-<version>.jar` (current version: `1.2.2`; previous stable: `1.2.1`). Hard-refresh your browser once after installing a new build.
 
 ## License
 
