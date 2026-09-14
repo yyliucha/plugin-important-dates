@@ -204,6 +204,26 @@ public class ImportantDateRouter {
                             item.put("overdue", e.isOverdue());
                             merged.add(item);
                         }
+                        // 同一辆车、同一天到期的多个事项合并为一条（交强险 / 商业险 / 车船税 / 年检 同日时不再各占一行）
+                        java.util.Map<String, java.util.Map<String, Object>> carGroups = new LinkedHashMap<>();
+                        java.util.List<java.util.Map<String, Object>> mergedCar = new java.util.ArrayList<>();
+                        for (java.util.Map<String, Object> item : merged) {
+                            if (!"car".equals(item.get("type"))) {
+                                mergedCar.add(item);
+                                continue;
+                            }
+                            String groupKey = item.get("carName") + "|" + item.get("dateText");
+                            java.util.Map<String, Object> exist = carGroups.get(groupKey);
+                            if (exist == null) {
+                                carGroups.put(groupKey, item);
+                                mergedCar.add(item);
+                            } else {
+                                exist.put("label", exist.get("label") + " / " + item.get("label"));
+                                exist.put("title", exist.get("carName") + " · " + exist.get("label"));
+                            }
+                        }
+                        merged.clear();
+                        merged.addAll(mergedCar);
                         // 谁近谁靠前（同级时日期事件优先）
                         merged.sort(java.util.Comparator
                             .comparingLong((Map<String, Object> m) -> ((Number) m.get("daysUntil")).longValue())
