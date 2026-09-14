@@ -205,6 +205,8 @@ export interface CarSpec {
   purchaseDate?: string;
   /** 保险公司（车辆级：车下所有险种共用） */
   insurer?: string;
+  /** 年检规则提示确认标记（ONSITE / YEARLY；用于一次性提示去重） */
+  inspectionNoticeAck?: string;
   purchasePrice?: number;
   mileageKm?: number;
   mileageUpdatedAt?: string;

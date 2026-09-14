@@ -107,6 +107,14 @@ public class Car extends AbstractExtension {
         private String insurer;
 
         /**
+         * 年检规则提示的确认标记（1.2.2）：记录用户已确认过的提示阶段
+         * （ONSITE=第 6 年起上线检验期、YEARLY=第 11 年起每年一次），
+         * 用于「一次性提示」去重；为空表示尚未提示过。
+         */
+        @Schema(description = "年检提示确认标记")
+        private String inspectionNoticeAck;
+
+        /**
          * 购买价格（敏感：仅后台）。
          */
         @Schema(description = "购买价格（敏感）")
