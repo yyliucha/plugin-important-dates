@@ -235,19 +235,36 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
                 if (r == null || Boolean.FALSE.equals(r.getEnabled())) {
                     continue;
                 }
+                String ruleNote = null;
+                String label = VehicleSupport.reminderLabel(r.getKey(), r.getLabel());
                 LocalDate due = resolveDueDate(r, today);
+                if (due == null && "INSPECTION".equals(r.getKey())) {
+                    // 年检：未手填日期时按「首次登记日期 + 车型规则」自动推算
+                    String baseDate = spec.getRegisteredDate() != null && !spec.getRegisteredDate().isBlank()
+                        ? spec.getRegisteredDate() : spec.getPurchaseDate();
+                    var next = VehicleSupport.nextInspection(baseDate, spec.getVehicleType(), today);
+                    if (next.date() == null) {
+                        continue;
+                    }
+                    due = parseDate(next.date());
+                    ruleNote = next.rule();
+                    if (next.phase() != null && !next.phase().isBlank()) {
+                        label = label + "·" + next.phase();
+                    }
+                }
                 if (due == null) {
                     continue;
                 }
                 CarVo.CarEventVo ev = new CarVo.CarEventVo();
                 ev.setKey(r.getKey());
-                ev.setLabel(VehicleSupport.reminderLabel(r.getKey(), r.getLabel()));
+                ev.setLabel(label);
                 ev.setDate(due.toString());
                 ev.setDateText(due.toString());
                 long daysUntil = java.time.temporal.ChronoUnit.DAYS.between(today, due);
                 ev.setDaysUntil(daysUntil);
                 ev.setOverdue(daysUntil < 0);
                 ev.setRemindDays(r.getRemindDays());
+                ev.setRuleNote(ruleNote);
                 ev.setCarName(spec.getDisplayName());
                 ev.setCarIcon(VehicleSupport.typeIcon(spec.getVehicleType()));
                 ev.setCarType(spec.getVehicleType());
@@ -276,10 +293,13 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
         if (due == null) {
             return null;
         }
-        if (VehicleSupport.isYearly(r.getKey())) {
+        // 循环间隔（月）：显式设置优先；未设置时取项目默认（保险/车船税/驾照=每年，年检=每年，保养=不循环）
+        int repeatMonths = r.getRepeatMonths() != null
+            ? r.getRepeatMonths() : VehicleSupport.defaultRepeatMonths(r.getKey());
+        if (repeatMonths > 0) {
             int guard = 0;
-            while (due.isBefore(today) && guard++ < 3) {
-                due = due.plusYears(1);
+            while (due.isBefore(today) && guard++ < 60) {
+                due = due.plusMonths(repeatMonths);
             }
         }
         return due;

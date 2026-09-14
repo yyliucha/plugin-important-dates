@@ -115,6 +115,9 @@ public class CarVo {
         private String carIcon;
         /** 所属座驾分类标识。 */
         private String carType;
+        /** 推算依据 / 阶段说明（如"按非营运小微型载客汽车规则推算"）。 */
+        private String ruleNote;
+
         /** 提醒项类型：date（重要日期）/ car（座驾到期）。 */
         private String eventType = "car";
     }

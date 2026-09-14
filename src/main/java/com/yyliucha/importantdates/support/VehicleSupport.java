@@ -101,6 +101,89 @@ public final class VehicleSupport {
         return REMINDER_LABELS.getOrDefault(key == null ? "" : key, "到期事项");
     }
 
+/** 默认循环间隔（月）；0 表示不循环。年检走自动推算（见 nextInspection）。 */
+    public static int defaultRepeatMonths(String key) {
+        if (key == null) {
+            return 0;
+        }
+        return switch (key) {
+            case "INSURANCE_COMPULSORY", "INSURANCE_COMMERCIAL", "TAX", "LICENSE" -> 12;
+            case "INSPECTION" -> 12;
+            default -> 0;
+        };
+    }
+
+    /** 年检推算结果：日期 + 阶段 + 依据说明 + 是否需要人工确认（如电瓶车/自行车免年检）。 */
+    public record InspectionNext(String date, String phase, String rule, boolean manualNeeded) {
+    }
+
+    /**
+     * 按「首次登记日期 + 车辆分类」推算下一个年检节点（非营运小微型载客汽车规则）：
+     * 第 2、4 年 → 免检申领标志；第 6、10 年 → 上线检验；第 11 年起 → 每年上线检验。
+     * 摩托车：前 4 年每 2 年申领，之后每年上线（各地可能不同，界面提示可手动覆盖）。
+     * 电瓶车 / 自行车：免年检，返回 manualNeeded=true。
+     */
+    public static InspectionNext nextInspection(String registeredDate, String vehicleType, java.time.LocalDate today) {
+        java.time.LocalDate base = null;
+        if (registeredDate != null && !registeredDate.isBlank()) {
+            try {
+                base = java.time.LocalDate.parse(registeredDate.trim());
+            } catch (Exception ignored) {
+                base = null;
+            }
+        }
+        String type = vehicleType == null ? "" : vehicleType;
+        if ("EBIKE".equals(type) || "BICYCLE".equals(type)) {
+            return new InspectionNext(null, "", "电瓶车 / 自行车通常无需年检，可按当地规定手动填写", true);
+        }
+        if (base == null) {
+            return new InspectionNext(null, "", "缺少首次登记日期，无法自动推算，请手动填写", true);
+        }
+        boolean motorcycle = "MOTORCYCLE".equals(type);
+        String rule = motorcycle
+            ? "按摩托车规则推算（前 4 年每 2 年申领免检标志，之后每年上线检验；以当地车管所为准）"
+            : "按非营运小微型载客汽车规则推算（第 2、4 年申领免检标志；第 6、10 年上线检验；第 11 年起每年上线检验）";
+
+        java.time.LocalDate best = null;
+        String bestPhase = "";
+        for (int year = 2; year <= 30; year++) {
+            boolean node;
+            String phase;
+            if (motorcycle) {
+                node = year <= 4 ? year % 2 == 0 : true;
+                phase = year <= 4 ? "免检申领" : "上线检验";
+            } else {
+                if (year == 2 || year == 4) {
+                    node = true;
+                    phase = "免检申领";
+                } else if (year == 6 || year == 10) {
+                    node = true;
+                    phase = "上线检验";
+                } else if (year >= 11) {
+                    node = true;
+                    phase = "上线检验";
+                } else {
+                    node = false;
+                    phase = "";
+                }
+            }
+            if (!node) {
+                continue;
+            }
+            java.time.LocalDate candidate = base.plusYears(year);
+            if (!candidate.isBefore(today)) {
+                best = candidate;
+                bestPhase = phase;
+                break;
+            }
+            best = candidate;
+            bestPhase = phase;
+        }
+        if (best == null) {
+            return new InspectionNext(null, "", "无法推算，请手动填写", true);
+        }
+        return new InspectionNext(best.toString(), bestPhase, rule, false);
+    }
     public static boolean isYearly(String key) {
         return key != null && YEARLY_KEYS.contains(key);
     }

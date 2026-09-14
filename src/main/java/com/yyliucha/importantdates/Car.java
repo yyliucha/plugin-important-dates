@@ -101,6 +101,12 @@ public class Car extends AbstractExtension {
         private String purchaseDate;
 
         /**
+         * 保险公司（车辆级：车下所有险种共用，单项可用 Reminder.insurer 覆盖）。
+         */
+        @Schema(description = "保险公司（车辆级）")
+        private String insurer;
+
+        /**
          * 购买价格（敏感：仅后台）。
          */
         @Schema(description = "购买价格（敏感）")
@@ -241,6 +247,13 @@ public class Car extends AbstractExtension {
          */
         @Schema(description = "提前提醒天数")
         private Integer remindDays;
+
+        /**
+         * 循环间隔（月）：0=不循环（一次性）；12=每年；24=每两年。为空时按项目类型取默认值
+         * （交强险/商业险/车船税/驾照=12，年检=自动推算，保养=按间隔月数或不循环）。
+         */
+        @Schema(description = "循环间隔（月）")
+        private Integer repeatMonths;
 
         /**
          * 是否启用。
