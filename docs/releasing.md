@@ -43,7 +43,20 @@ This file records how releases are prepared, so every release looks consistent.
 2. Update `README.md` + regenerate `README.store.md`; refresh screenshots if the UI changed.
 3. Write the release notes: `docs/release-notes-<version>.md` (Chinese, for the store) and `docs/release-notes-<version>.en.md` (English).
 4. `./gradlew clean build` → verify the jar metadata (`plugin.yaml` inside the jar shows the new version).
-5. Verify on a clean Halo 2.26 instance: `halo-smoke.mjs` (44/44) plus the browser checks.
+5. Verify on a clean Halo 2.26 instance: `halo-smoke.mjs` (50/50, includes the 1.2.1 car checks) plus the browser end-to-end script (`browser-121-e2e.mjs`, 13/13) and the migration script (`migrate-check.mjs`).
 6. Commit and push (English message), wait for CI to pass.
 7. Create the release: title = `<tag>`, notes = Chinese section + English section (see above), one jar asset, `--latest` for stable or `--prerelease` for previews.
 8. Submit the store version with the Chinese notes, then update the store app info if needed.
+
+## Local build notes (Windows dev box)
+
+- `build/libs/plugin-important-dates-<version>.jar` must contain the console bundle: check for `console/main.*.js` inside the jar before shipping.
+  The `buildFrontend` task may report success while producing nothing when npm cannot be started from Gradle
+  (error: `A problem occurred starting process 'command 'npm''`). Set `NPM_CMD` to the npm executable, e.g.
+  `$env:NPM_CMD = "C:\Users\Administrator\AppData\Local\nvm\v22.20.0\npm.cmd"`, or build the UI first
+  (`cd console; npm run build`) and then package with `./gradlew build -x buildFrontend`.
+- Regression scripts live outside the repo in `F:\dsh\halo-test`: start Halo with
+  `--halo.work-dir=F:/dsh/halo-test/work-xxx` (**forward slashes** — backslashes break H2's `r2dbc:///` URL) and
+  keep it running as a detached process (`Start-Process -RedirectStandardOutput ...`), not inside a job that can be killed.
+- After installing a new build, **hard-refresh the browser**: the Halo console caches plugin console bundles, and a
+  stale bundle shows up as a missing "记得" menu, missing settings tabs or a missing dashboard widget.

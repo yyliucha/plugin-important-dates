@@ -118,7 +118,7 @@ cd plugin-important-dates
 ./gradlew build
 ```
 
-The artifact is written to `build/libs/plugin-important-dates-<version>.jar` (current development version: `1.2.1-SNAPSHOT`; next release: `1.2.1` — the `1.2.1` number was never released, so nothing is skipped).
+The artifact is written to `build/libs/plugin-important-dates-<version>.jar` (current version: `1.2.1`; previous stable: `1.2.0` — the `1.2.1` number was never released before, so nothing is skipped). Hard-refresh your browser once after installing a new build.
 
 ## License
 

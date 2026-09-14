@@ -1,7 +1,7 @@
 # 1.2.1 需求执行状态与交接(A–G)
 
-> 目标版本:**`1.2.1`(开发版 `1.2.1-SNAPSHOT`;正式版需用户测试通过后发布)**
-> 编号说明:需求批次原按 `1.2.2` 记录,但 `1.2.1` 号段从未发布过 Release(市场/仓库最新正式版为 `1.2.0`),按用户指示**不跳号**——本轮成果以 `1.2.1-SNAPSHOT` 交付,测试通过后发布正式版 `1.2.1`。
+> 目标版本:**`1.2.1`(正式版,已构建并全量回归通过;开发版 `1.2.1-SNAPSHOT` 为用户测试用先行包)**
+> 编号说明:需求批次原按 `1.2.2` 记录,但 `1.2.1` 号段从未发布过 Release(上一正式版为 `1.2.0`),按用户指示**不跳号**——本轮成果即正式版 `1.2.1`。
 > 约束:零系统配置写入、零主题文件写入、全部官方扩展点;老数据迁移必须**幂等**、只操作插件自身数据。
 > 最近一次提交见本文件所在提交;每项完成后在下方更新状态与验证方式。
 
@@ -25,31 +25,35 @@
 4. **E 提示** — 后台座驾页顶部横幅:「「车名」已进入上线检验期(第 6 年起不再免检:第 6、10 年需上线检验,第 11 年起每年一次),年检提醒已按规则自动滚动」;点「知道了」把阶段写入 `Car.spec.inspectionNoticeAck`,并记一条操作日志。
 5. **收尾** — 版本号切 `1.2.1-SNAPSHOT`(`gradle.properties` + `plugin.yaml`);`gradlew clean build` 产出 `plugin-important-dates-1.2.1-SNAPSHOT.jar`;版本说明 `docs/release-notes-1.2.1-SNAPSHOT.md`(中文)+ `.en.md`(英文)。
 
-## 交付物(本地,未推送 GitHub)
+## 交付物(正式版已构建,未推送 GitHub)
 
-- `build/libs/plugin-important-dates-1.2.1-SNAPSHOT.jar`(453 KB,含控制台 UI 产物 `console/main.8fTCD449.js`;SHA256 `707779CA…4DB4B3D0`);
-- `docs/release-notes-1.2.1-SNAPSHOT.md`(中文)/ `docs/release-notes-1.2.1-SNAPSHOT.en.md`(英文);
+- **`build/libs/plugin-important-dates-1.2.1.jar`**(453 KB,内含 `plugin.yaml version: 1.2.1` 与控制台产物 `console/main.8fTCD449.js`;SHA256 `2FBDBE0B…DAFDD7F2`)——本包已在全新 2.26 实例跑完 50/50 冒烟与 13/13 浏览器端到端;
+- 开发版(用户测试用,先前交付):`plugin-important-dates-1.2.1-SNAPSHOT.jar`(SHA256 `707779CA…4DB4B3D0`)与 `docs/release-notes-1.2.1-SNAPSHOT.md` / `.en.md`(保留作历史记录,与 `1.2.0-SNAPSHOT` 的处理一致);
+- 正式版版本说明:`docs/release-notes-1.2.1.md`(中文,应用市场用)/ `docs/release-notes-1.2.1.en.md`(英文,GitHub Release 用);
 - 留证截图:`docs/manual-test/e121-*.png`(表单、到期项、规则提示、仪表盘分页);
-- 回归脚本(仓库外,便于复用):`F:\dsh\halo-test\halo-smoke.mjs`、`browser-121-e2e.mjs`、`migrate-check.mjs`、`verify-widget-footer.mjs`、`upgrade-121.mjs`。
+- 回归脚本(仓库外,便于复用):`F:\dsh\halo-test\halo-smoke.mjs`、`browser-121-e2e.mjs`、`migrate-check.mjs`、`verify-widget-footer.mjs`、`upgrade-121.mjs`;
+- 文档同步:README.md / README.en.md / README.store.md(已按 `docs/screenshots/` 说明重新生成绝对图片地址)、`docs/screenshots/README.md`、`docs/store-assets/app-info.md`、`docs/releasing.md`(补充本机构建与强刷提示)。
 
-> 升级提示(用户侧):安装新 jar 后请**强刷浏览器(Ctrl+Shift+R)**。Halo 控制台会缓存插件的 console 包;旧包文件名已被新构建替换,不强刷会出现「侧边栏没有『记得』、仪表盘小组件消失」等现象(实测确认,强刷即恢复,与服务端无关)。
+> 升级提示(用户侧):安装新 jar 后请**强刷浏览器(Ctrl+Shift+R)**。Halo 控制台会缓存插件的 console 包;旧包文件名已被新构建替换,不强刷会出现「侧边栏没有『记得』、插件设置页签看不到、仪表盘小组件消失」等现象(实测确认,强刷即恢复,与服务端无关)。
 
 ## 验证基线
 
 已完成(全部通过):
 
 - `gradlew compileJava` 通过;`gradlew clean build` 通过(含前端 `vite build` 与控制台产物打包);`npm run build` 通过;临时 `tsconfig.check.json` 下 `tsc --noEmit` 无新增类型错误(仅既有 `lunar-javascript` 缺声明与 `index.ts` 的 `@ts-expect-error` 两条历史告警);
-- **全新 Halo 2.26 实例冒烟回归 `halo-smoke.mjs` 50/50 PASS**(工作目录 `F:\dsh\halo-test\work-122`,端口 8090,日志 `F:\dsh\halo-test\smoke-121-final.log`)。用例总数 44 → 50,新增 6 项:循环间隔 0(不滚动,过期即过期提醒)、循环间隔 24(滚动到未来 330 天)、年检未填日期自动推算(第 4 年「免检申领」+ 第 6 年「上线检验」两个阶段)、`Car.spec.inspectionNoticeAck` 持久化、车辆级保险公司 + 单项覆盖 + 保单号 + 循环间隔同时落库、`allReminders` 完整列表与 `dashboardPageSize`/`dashboardPagination` 下发;
-- **浏览器端到端 13/13 PASS**(`F:\dsh\halo-test\browser-121-e2e.mjs`,日志 `browser-121-final.log`):同车同日合并为一条、上线检验期一次性提示与「知道了」去重(写回 `inspectionNoticeAck=ONSITE`)、车辆级保险公司字段与常用公司快捷提示、循环间隔五种选项与默认值回填、年检推算展示(「按规则自动推算:2026-09-20(免检申领)」+ 依据)、「手动指定日期」开关(自动取消同期并预填推算结果,取消后恢复同期)、车船税默认与交强险同期且只读联动、保存后落库校验、仪表盘小组件分页(共 9 条 / 每页 5 条 → 可翻到第 2 页)、小组件显示合并行、控制台零脚本错误;
+- **正式版 `1.2.1` 全新实例回归**:冒烟 `halo-smoke.mjs` **50/50 PASS**(工作目录 `F:\dsh\halo-test\work-121`,日志 `smoke-121-stable.log`)+ 浏览器端到端 `browser-121-e2e.mjs` **13/13 PASS**(日志 `browser-121-stable.log`);
+- 开发版 `1.2.1-SNAPSHOT` 此前同样通过 50/50 与 13/13(工作目录 `work-122`,日志 `smoke-121-final.log` / `browser-121-final.log`);
+- 冒烟用例总数 44 → 50,新增 6 项:循环间隔 0(不滚动,过期即过期提醒)、循环间隔 24(滚动到未来 330 天)、年检未填日期自动推算(第 4 年「免检申领」+ 第 6 年「上线检验」两个阶段)、`Car.spec.inspectionNoticeAck` 持久化、车辆级保险公司 + 单项覆盖 + 保单号 + 循环间隔同时落库、`allReminders` 完整列表与 `dashboardPageSize`/`dashboardPagination` 下发;
+- 浏览器 13 项覆盖:同车同日合并为一条、上线检验期一次性提示与「知道了」去重(写回 `inspectionNoticeAck=ONSITE`)、车辆级保险公司字段与常用公司快捷提示、循环间隔五种选项与默认值回填、年检推算展示(「按规则自动推算:2026-09-20(免检申领)」+ 依据)、「手动指定日期」开关(自动取消同期并预填推算结果,取消后恢复同期)、车船税默认与交强险同期且只读联动、保存后落库校验、仪表盘小组件分页(共 9 条 / 每页 5 条 → 可翻到第 2 页)、小组件显示合并行、控制台零脚本错误;
 - **迁移幂等验证 PASS**(`F:\dsh\halo-test\migrate-check.mjs`):造一条「项目级保险公司、无车辆级」的旧数据 → 重启 Halo → 断言车辆级 = 中国人保、交强险/商业险重复值被清空、车船税的不同公司「太平洋保险」保留;再次重启后 `metadata.version` 仍为 1(无写入),即幂等;
-- 截图留证:`ui-121-car-insurer.png`(车辆级保险公司 + 快捷公司)、`ui-121-car-reminders.png` / `ui-121-car-reminders2.png`(到期项精简、循环间隔、年检推算与同期联动)、`ui-121-notice.png`(上线检验期提示)、`ui-121-dashboard-pager.png`(小组件分页)、`ui-121-widget-footer.png`(底部栏「‹ 2 / 9 › 共 9 条 · 每页 1 条」);
 - **小组件底部栏 4/4 PASS**(`F:\dsh\halo-test\verify-widget-footer.mjs`):默认每页 5 条时显示「共 9 条 · 每页 5 条」与 `1 / 1`;每页 1 条时分 9 页且可翻到第 2 页;关闭分页后只剩「共 9 条」(无 ‹ ›、无每页说明);控制台零脚本错误;
-- **用户站点实测反馈**:装包后出现「侧边栏无『记得』、插件设置页签看不到、仪表盘小组件消失」,经确认是**浏览器缓存旧 console 包**所致(强刷后全部恢复),服务端与制品无问题——已把该提示写入版本说明与本文档。
+- 截图留证:`ui-121-car-insurer.png`(车辆级保险公司 + 快捷公司)、`ui-121-car-reminders.png` / `ui-121-car-reminders2.png`(到期项精简、循环间隔、年检推算与同期联动)、`ui-121-notice.png`(上线检验期提示)、`ui-121-dashboard-pager.png`(小组件分页)、`ui-121-widget-footer.png`(底部栏「‹ 2 / 9 › 共 9 条 · 每页 1 条」);
+- **用户站点实测反馈**:装包后出现「侧边栏无『记得』、插件设置页签看不到、仪表盘小组件消失」,经确认是**浏览器缓存旧 console 包**所致(强刷后全部恢复),服务端与制品无问题——已把该提示写入版本说明、README 与本文档。
 
-剩余(等用户测试通过后):
+剩余(需用户决定或操作):
 
-1. 按 `docs/releasing.md` 发布正式版 **`1.2.1`**(版本号去掉 `-SNAPSHOT`、重新构建 jar、中文 + 英文版本说明已就绪:`docs/release-notes-1.2.1-SNAPSHOT.md` / `.en.md` 需改名并更新标题),然后推送 GitHub Release(标题 = tag,`--prerelease` → 正式版用 `--latest`)、提交应用市场;
-2. 正式版发布前把本文件的 `-SNAPSHOT` 字样与 README 的「当前开发版」说明一并更新。
+1. 推送 GitHub 并创建 Release(**待用户确认**):`git push` → `gh release create v1.2.1 --title v1.2.1 --notes-file <中英合并说明> build/libs/plugin-important-dates-1.2.1.jar --latest`,等待 CI 通过;
+2. 应用市场提交(需用户后台操作):版本号 `1.2.1`、勾选「设置为最新版本」、版本说明用 `docs/release-notes-1.2.1.md`、README 字段粘贴 `README.store.md`、封面/图标用 `docs/store-assets/`。
 
 ## 已知环境注意点
 
