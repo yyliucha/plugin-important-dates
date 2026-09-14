@@ -353,16 +353,16 @@
       <div class="lib-panel">
         <div class="lib-header">
           <span class="lib-title">从附件库选择照片（可多选）</span>
-          <span class="lib-group-hint">{{ libGroupHint }}</span>
           <button type="button" class="lib-close" aria-label="Close" @click="closeLib">✕</button>
         </div>
+        <div class="lib-scope-note lib-group-hint">{{ libGroupHint }}</div>
         <div class="lib-scope-bar">
           <label class="check">
             <input type="checkbox" :checked="showAllLib" @change="toggleShowAll" />
             <span>显示全部图片（忽略分类 / 策略）</span>
           </label>
           <span class="hint">
-            当前范围 <b>{{ libScopeCount }}</b> 张 · 附件库共 <b>{{ libTotalCount }}</b> 张图片
+            当前显示 <b>{{ libItems.length }}</b> 张 · 附件库共 <b>{{ libScope.total }}</b> 张图片
           </span>
         </div>
         <div class="lib-body">
@@ -372,11 +372,11 @@
             <VButton size="sm" @click="fetchLibrary">重试</VButton>
           </div>
           <div v-else-if="!libItems.length" class="lib-empty">
-            <template v-if="libTotalCount === 0">
+            <template v-if="libScope.total === 0">
               附件库里还没有图片：点上方「上传图片」，或到后台「附件」页面添加后再回来。
             </template>
             <template v-else>
-              当前范围（{{ libGroupHint }}）下没有图片，但附件库共有 <b>{{ libTotalCount }}</b> 张图片。
+              没有符合条件的图片（{{ libGroupHint }}）。
               <VButton size="sm" @click="toggleShowAll">显示全部图片</VButton>
             </template>
           </div>
@@ -441,6 +441,20 @@ import {
   nextInspection,
   syncableKey,
 } from "@/utils/vehicle";
+import {
+  UNGROUPED,
+  fetchGroups,
+  fetchImageLibrary,
+  fetchPolicies,
+  groupLabelOf,
+  policyLabelOf,
+  readAttachmentScope,
+  resolveScope,
+  scopeHint,
+  type AttachmentItem,
+  type NamedOption,
+  type ScopeResult,
+} from "@/utils/attachmentLibrary";
 
 const props = defineProps<{
   visible: boolean;
@@ -530,18 +544,28 @@ const dragIndex = ref(-1);
 const libVisible = ref(false);
 const libLoading = ref(false);
 const libError = ref("");
-const libItems = ref<{ name: string; displayName: string; permalink: string }[]>([]);
+const libAllItems = ref<AttachmentItem[]>([]);
+const libItems = ref<AttachmentItem[]>([]);
 const libSelected = ref<string[]>([]);
 const showAllLib = ref(false);
-const libTotalCount = ref(0);
-const libScopeCount = ref(0);
-const avatarGroupName = ref("");
-const avatarPolicyName = ref("");
+const libScope = ref<ScopeResult>({
+  kind: "all",
+  items: [],
+  strictCount: 0,
+  groupCount: 0,
+  policyCount: 0,
+  total: 0,
+});
+const libGroups = ref<NamedOption[]>([]);
+const libPolicies = ref<NamedOption[]>([]);
+const libGroupName = ref("");
+const libPolicyName = ref("");
+
+const libGroupLabel = computed(() => groupLabelOf(libGroupName.value, libGroups.value));
+const libPolicyLabel = computed(() => policyLabelOf(libPolicyName.value, libPolicies.value));
 
 const libGroupHint = computed(() =>
-  avatarGroupName.value || avatarPolicyName.value
-    ? `范围：${avatarGroupName.value ? "分类 " + avatarGroupName.value : ""}${avatarGroupName.value && avatarPolicyName.value ? " + " : ""}${avatarPolicyName.value ? "策略 " + avatarPolicyName.value : ""}（取自插件设置）`
-    : "不限定范围（插件设置未指定）"
+  scopeHint(libScope.value, { group: libGroupLabel.value, policy: libPolicyLabel.value })
 );
 
 function personTitle(p: Person): string {
@@ -722,31 +746,20 @@ function dropPhoto(target: number) {
 async function loadSettings() {
   try {
     const cfg = await fetchPluginJsonConfig("plugin-important-dates");
-    let obj: { avatarGroupName?: string; avatarPolicyName?: string } = {};
-    const raw = (cfg as Record<string, unknown> | undefined)?.attachment;
-    if (typeof raw === "string") {
-      obj = raw ? JSON.parse(raw) : {};
-    } else if (raw && typeof raw === "object") {
-      obj = raw as { avatarGroupName?: string; avatarPolicyName?: string };
-    }
-    // 座驾相册使用独立设置（car* 优先；旧版本未拆分时回退到 avatar*）
-    avatarGroupName.value = (obj as { carGroupName?: string }).carGroupName?.trim() || obj.avatarGroupName?.trim() || "";
-    avatarPolicyName.value = (obj as { carPolicyName?: string }).carPolicyName?.trim() || obj.avatarPolicyName?.trim() || "";
+    const scope = await readAttachmentScope(cfg as Record<string, unknown> | undefined, true);
+    libGroupName.value = scope.groupName;
+    libPolicyName.value = scope.policyName;
   } catch {
-    avatarGroupName.value = "";
-    avatarPolicyName.value = "";
+    libGroupName.value = "";
+    libPolicyName.value = "";
   }
 }
 
+/** 上传用的存储策略：设置中指定优先，否则取系统第一条可见策略 */
 async function resolvePolicyName(): Promise<string> {
-  if (avatarPolicyName.value) return avatarPolicyName.value;
-  try {
-    const { data } = await axiosInstance.get("/apis/storage.halo.run/v1alpha1/policies");
-    const items = data?.items || [];
-    return items[0]?.metadata?.name || "default-policy";
-  } catch {
-    return "default-policy";
-  }
+  if (libPolicyName.value && libPolicyName.value !== UNGROUPED) return libPolicyName.value;
+  const policies = await fetchPolicies();
+  return policies[0]?.name || "default-policy";
 }
 
 function triggerUpload() {
@@ -757,8 +770,9 @@ async function uploadOne(file: File): Promise<string | null> {
   const fd = new FormData();
   fd.append("file", file);
   fd.append("policyName", await resolvePolicyName());
-  if (avatarGroupName.value) {
-    fd.append("groupName", avatarGroupName.value);
+  // __ungrouped__（未分组）不应作为分组名提交
+  if (libGroupName.value && libGroupName.value !== UNGROUPED) {
+    fd.append("groupName", libGroupName.value);
   }
   const { data } = await axiosInstance.post<{ status?: { permalink?: string } }>(
     "/apis/api.console.halo.run/v1alpha1/attachments/upload",
@@ -802,49 +816,40 @@ async function fetchLibrary() {
   libError.value = "";
   try {
     await loadSettings();
-    const { data } = await axiosInstance.get<{
-      items?: {
-        metadata?: { name?: string };
-        spec?: { displayName?: string; mediaType?: string; groupName?: string; policyName?: string };
-        status?: { permalink?: string };
-      }[];
-    }>("/apis/storage.halo.run/v1alpha1/attachments", {
-      params: { page: 1, size: 200, sort: "metadata.creationTimestamp,desc" },
-    });
-    const all = (data?.items || []).filter((a) => {
-      const url = a.status?.permalink || "";
-      const mt = (a.spec?.mediaType || "").toLowerCase();
-      return url && (mt.startsWith("image/") || /\.(png|jpe?g|jpeg|gif|webp|svg|avif|bmp)$/i.test(url));
-    });
-    libTotalCount.value = all.length;
-    const scoped = all.filter((a) => {
-      const groupOk = !avatarGroupName.value || (a.spec?.groupName || "") === avatarGroupName.value;
-      const policyOk = !avatarPolicyName.value || (a.spec?.policyName || "") === avatarPolicyName.value;
-      return groupOk && policyOk;
-    });
-    libScopeCount.value = scoped.length;
-    const chosen = showAllLib.value ? all : scoped;
-    libItems.value = chosen.map((a) => ({
-      name: a.metadata?.name || "",
-      displayName: a.spec?.displayName || a.metadata?.name || "",
-      permalink: a.status?.permalink || "",
-    }));
+    const [items, groups, policies] = await Promise.all([
+      fetchImageLibrary(),
+      fetchGroups(),
+      fetchPolicies(),
+    ]);
+    libAllItems.value = items;
+    libGroups.value = groups;
+    libPolicies.value = policies;
+    applyScope();
   } catch (error) {
     libError.value = `加载附件库失败：${(error as Error)?.message || "请稍后重试"}`;
+    libAllItems.value = [];
     libItems.value = [];
   } finally {
     libLoading.value = false;
   }
 }
 
+/** 按「分类 + 策略」解析展示范围：命中为空时依次放宽并说明，避免显示 0 张 */
+function applyScope() {
+  const scope = resolveScope(libAllItems.value, libGroupName.value, libPolicyName.value);
+  libScope.value = scope;
+  libItems.value = showAllLib.value ? libAllItems.value : scope.items;
+}
+
 function toggleShowAll() {
   showAllLib.value = !showAllLib.value;
   libSelected.value = [];
-  void fetchLibrary();
+  applyScope();
 }
 function openLibrary() {
   libVisible.value = true;
   libSelected.value = [];
+  showAllLib.value = false;
   void fetchLibrary();
 }
 
@@ -1407,5 +1412,14 @@ watch(
   padding: 0;
   text-decoration: underline;
 }
-</style>
+
+/* 附件库范围说明：单独一行，避免长文案挤压标题（1.2.2） */
+.lib-scope-note {
+  padding: 6px 18px;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #6b7280;
+}</style>
 

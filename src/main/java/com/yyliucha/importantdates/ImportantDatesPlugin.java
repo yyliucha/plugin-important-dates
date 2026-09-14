@@ -174,7 +174,8 @@ public class ImportantDatesPlugin extends BasePlugin {
                                 }
                                 for (JsonNode field : schema) {
                                     String name = field.path("name").asText();
-                                    if ("avatarGroupName".equals(name) || "avatarPolicyName".equals(name)) {
+                                    if ("avatarGroupName".equals(name) || "avatarPolicyName".equals(name)
+                                        || "carGroupName".equals(name) || "carPolicyName".equals(name)) {
                                         ((ObjectNode) field).put("help", message);
                                     }
                                 }
@@ -233,18 +234,26 @@ public class ImportantDatesPlugin extends BasePlugin {
                                     : "实时同步 ✓ " + target + "可选策略 " + policies.size() + " 个（已过滤隐藏项）。点击可查看：默认策略 / 全部可见策略。";
                                 boolean optionChanged = !field.path("options").toString().equals(newOpts.toString())
                                     || !newHelp.equals(field.path("help").asText(""));
-                                // 首次安装默认选中第一个真实项（未配置时），避免用户不选导致无可选项
-                                if (optionChanged || field.path("value").asText("").isEmpty()) {
+                                // 已保存的值若已不存在（分组/策略被删除）→ 回到「不限定」，避免长期误过滤成 0 张
+                                String current = field.path("value").asText("");
+                                boolean valueStale = false;
+                                if (!current.isEmpty()) {
+                                    boolean found = false;
+                                    for (JsonNode opt : newOpts) {
+                                        if (current.equals(opt.path("value").asText())) {
+                                            found = true;
+                                            break;
+                                        }
+                                    }
+                                    valueStale = !found;
+                                }
+                                // 注意：**不再**在未配置时自动选中第一个真实项——那会让附件库静默只剩某个
+                                // 分类/策略下的图片（实测出现"范围内 0 张"），未配置即保持「不限定 / 默认策略」。
+                                if (optionChanged || valueStale) {
                                     ((ObjectNode) field).set("options", newOpts);
                                     ((ObjectNode) field).put("help", newHelp);
-                                    if (field.path("value").asText("").isEmpty()) {
-                                        for (JsonNode opt : newOpts) {
-                                            String v = opt.path("value").asText();
-                                            if (!v.isEmpty()) {
-                                                ((ObjectNode) field).put("value", v);
-                                                break;
-                                            }
-                                        }
+                                    if (valueStale) {
+                                        ((ObjectNode) field).put("value", "");
                                     }
                                     changed = true;
                                 }

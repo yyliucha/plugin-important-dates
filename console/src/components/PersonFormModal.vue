@@ -125,23 +125,21 @@
         <div class="lib-panel">
           <div class="lib-header">
             <span class="lib-title">从附件库选择图片</span>
-            <span class="lib-group-hint">
-              {{ libGroupHint }}
-            </span>
             <button type="button" class="lib-close" aria-label="Close" @click="closeLib">✕</button>
           </div>
+          <div class="lib-scope-note lib-group-hint">{{ libGroupHint }}</div>
           <div class="lib-body">
             <div v-if="libLoading" class="hint" style="padding: 20px 4px;">加载中…</div>
             <div v-else-if="libError" class="lib-error">
               {{ libError }}
               <VButton size="sm" @click="openLibrary">重试</VButton>
             </div>
-            <div v-else-if="!libItems.length" class="hint" style="padding: 20px 4px;">
-              附件库暂无可用图片。请先点「上传图片」，或到「附件」管理页面上传后再选择。
+            <div v-else-if="!scopedLibItems.length" class="hint" style="padding: 20px 4px;">
+              没有符合条件的图片（{{ libGroupHint }}）。请先点「上传图片」，或到「附件」管理页面上传后再选择。
             </div>
             <div v-else class="lib-grid">
               <div
-                v-for="a in filteredLibItems"
+                v-for="a in scopedLibItems"
                 :key="a.name"
                 class="lib-item"
                 :class="{ selected: libSelected?.name === a.name }"
@@ -188,6 +186,19 @@ import { axiosInstance } from "@halo-dev/api-client";
 import SunLunarPicker from "@/components/SunLunarPicker.vue";
 import { createPerson, fetchPluginJsonConfig, updatePerson } from "@/api";
 import type { DateType, Person } from "@/types";
+import {
+  UNGROUPED,
+  fetchGroups,
+  fetchImageLibrary,
+  fetchPolicies,
+  groupLabelOf,
+  policyLabelOf,
+  readAttachmentScope,
+  resolveScope,
+  scopeHint,
+  type AttachmentItem,
+  type ScopeResult,
+} from "@/utils/attachmentLibrary";
 
 const props = defineProps<{
   visible: boolean;
@@ -208,52 +219,40 @@ const uploading = ref(false);
 const libVisible = ref(false);
 const libLoading = ref(false);
 const libError = ref("");
-const libItems = ref<{ name: string; displayName: string; permalink: string; policyName: string }[]>([]);
-const libSelected = ref<{ name: string; displayName: string; permalink: string; policyName: string } | null>(null);
+const libItems = ref<AttachmentItem[]>([]);
+const libSelected = ref<AttachmentItem | null>(null);
 const avatarGroupName = ref("");
 const avatarPolicyName = ref("");
-
-const libGroupHint = computed(() => {
-  const parts: string[] = [];
-  if (avatarGroupName.value) parts.push(`分类：${displayOf(groupLabelMap.value, avatarGroupName.value)}`);
-  if (avatarPolicyName.value) parts.push(`策略：${displayOf(policyLabelMap.value, avatarPolicyName.value)}`);
-  return parts.length ? `仅显示：${parts.join(" + ")}（取自插件设置）` : "不限定来源（插件设置未指定）";
+const avatarGroupLabel = ref("");
+const avatarPolicyLabel = ref("");
+const libScope = ref<ScopeResult>({
+  kind: "all",
+  items: [],
+  strictCount: 0,
+  groupCount: 0,
+  policyCount: 0,
+  total: 0,
 });
+const libGroupLabel = computed(() => avatarGroupLabel.value || avatarGroupName.value);
+const libPolicyLabel = computed(() => avatarPolicyLabel.value || avatarPolicyName.value);
 
-const filteredLibItems = computed(() => {
-  let items = libItems.value;
-  if (avatarGroupName.value) {
-    items = items.filter((a) => a.groupName === avatarGroupName.value);
-  }
-  if (avatarPolicyName.value) {
-    items = items.filter((a) => a.policyName === avatarPolicyName.value);
-  }
-  return items;
-});
+const libGroupHint = computed(() =>
+  scopeHint(libScope.value, { group: libGroupLabel.value, policy: libPolicyLabel.value })
+);
 
-/** 加载插件设置中的来源（分类 / 策略） */
+/** 实际展示的图片（按设置范围，命中为空时自动放宽；不再要求分类与策略同时命中） */
+const scopedLibItems = computed(() => libScope.value.items);
+
+/** 加载插件设置中的来源（分类 / 策略）——未配置即「不限定」，不再自动选第一个分组，避免误过滤成 0 张 */
 async function loadGroups() {
   try {
     const cfg = await fetchPluginJsonConfig("plugin-important-dates");
-    let obj: { avatarGroupName?: string; avatarPolicyName?: string } = {};
-    const raw = (cfg as Record<string, unknown> | undefined)?.attachment;
-    if (typeof raw === "string") {
-      obj = raw ? JSON.parse(raw) : {};
-    } else if (raw && typeof raw === "object") {
-      obj = raw as { avatarGroupName?: string; avatarPolicyName?: string };
-    }
-    avatarGroupName.value = obj.avatarGroupName?.trim() || "";
-    avatarPolicyName.value = obj.avatarPolicyName?.trim() || "";
+    const scope = await readAttachmentScope(cfg as Record<string, unknown> | undefined, false);
+    avatarGroupName.value = scope.groupName;
+    avatarPolicyName.value = scope.policyName;
   } catch {
     avatarGroupName.value = "";
     avatarPolicyName.value = "";
-  }
-  // 首次使用/未配置时,回退到系统第一个可见项(仅本次生效,不写配置)
-  if (!avatarGroupName.value && groupNames.value.length) {
-    avatarGroupName.value = groupNames.value[0];
-  }
-  if (!avatarPolicyName.value && policyNames.value.length) {
-    avatarPolicyName.value = policyNames.value[0];
   }
 }
 
@@ -262,17 +261,13 @@ function triggerUpload() {
 }
 
 /** 存储策略：设置中指定的策略优先，否则取列表第一条 */
+/** 存储策略：设置中指定的策略优先，否则取系统第一条可见策略 */
 async function resolvePolicyName(): Promise<string> {
-  if (avatarPolicyName.value) {
+  if (avatarPolicyName.value && avatarPolicyName.value !== UNGROUPED) {
     return avatarPolicyName.value;
   }
-  try {
-    const { data } = await axiosInstance.get("/apis/storage.halo.run/v1alpha1/policies");
-    const items = data?.items || [];
-    return items[0]?.metadata?.name || "default-policy";
-  } catch {
-    return "default-policy";
-  }
+  const policies = await fetchPolicies();
+  return policies[0]?.name || "default-policy";
 }
 
 async function onFileChange(e: Event) {
@@ -287,7 +282,7 @@ async function onFileChange(e: Event) {
     const fd = new FormData();
     fd.append("file", file);
     fd.append("policyName", await resolvePolicyName());
-    if (avatarGroupName.value && avatarGroupName.value !== "__ungrouped__") {
+    if (avatarGroupName.value && avatarGroupName.value !== UNGROUPED) {
       fd.append("groupName", avatarGroupName.value);
     }
     const { data } = await axiosInstance.post<{ status?: { permalink?: string } }>(
@@ -310,29 +305,16 @@ async function fetchLibrary() {
   libError.value = "";
   try {
     await loadGroups();
-    // 附件分组信息位于 spec.groupName（2.26 无 group-name 标签），客户端过滤
-    const { data } = await axiosInstance.get<{
-      items?: { metadata?: { name?: string }; spec?: { displayName?: string; mediaType?: string; policyName?: string; groupName?: string }; status?: { permalink?: string } }[];
-    }>("/apis/storage.halo.run/v1alpha1/attachments", {
-      params: { page: 1, size: 100, sort: "metadata.creationTimestamp,desc" },
-    });
-    libItems.value = (data?.items || [])
-      .filter((a) => {
-        const url = a.status?.permalink || "";
-        const mt = (a.spec?.mediaType || "").toLowerCase();
-        // mediaType 可能为 application/octet-stream（部分上传链路），按扩展名兜底
-        return url && (mt.startsWith("image/") || /\.(png|jpe?g|jpeg|gif|webp|svg|avif|bmp)$/i.test(url));
-      })
-      .map((a) => ({
-        name: a.metadata?.name || "",
-        displayName: a.spec?.displayName || a.metadata?.name || "",
-        permalink: a.status?.permalink || "",
-        policyName: (a.spec as { policyName?: string } | undefined)?.policyName || "",
-        groupName: (a.spec as { groupName?: string } | undefined)?.groupName || "",
-      }));
+    const [items, groups, policies] = await Promise.all([fetchImageLibrary(100), fetchGroups(), fetchPolicies()]);
+    libItems.value = items;
+    avatarGroupLabel.value = groupLabelOf(avatarGroupName.value, groups);
+    avatarPolicyLabel.value = policyLabelOf(avatarPolicyName.value, policies);
+    // 按设置范围解析（分类 + 策略命中为空时自动放宽并说明）
+    libScope.value = resolveScope(items, avatarGroupName.value, avatarPolicyName.value);
   } catch (error) {
     libError.value = `加载附件库失败：${(error as Error)?.message || "请稍后重试"}`;
     libItems.value = [];
+    libScope.value = { kind: "all", items: [], strictCount: 0, groupCount: 0, policyCount: 0, total: 0 };
   } finally {
     libLoading.value = false;
   }
@@ -401,55 +383,9 @@ const form = reactive<PersonForm>(empty());
 // 放在 form 声明之后：watch 的 getter 在 setup 阶段会立即求值，过早引用 form 会触发 TDZ
 watch(() => form.avatar, () => { avatarBroken.value = false; });
 
-/** 名称 → 显示名 映射(用于把配置里的原始名翻译成界面可读名) */
-const groupLabelMap = ref<Record<string, string>>({});
-const policyLabelMap = ref<Record<string, string>>({});
-const groupNames = ref<string[]>([]);
-const policyNames = ref<string[]>([]);
-
-function displayOf(map: Record<string, string>, name: string): string {
-  return map[name] || name;
-}
-
-/** 打开弹窗时：加载最新插件设置 + 系统 分组/策略 显示名映射 */
+/** 打开弹窗时：加载最新插件设置（分类 / 策略来源） */
 async function loadMeta() {
   await loadGroups();
-  try {
-    const g = await axiosInstance.get<{ items?: { metadata?: { name?: string; labels?: Record<string, string>; deletionTimestamp?: string }; spec?: { displayName?: string } }[] }>(
-      "/apis/storage.halo.run/v1alpha1/groups", { params: { page: 1, size: 100 } }
-    );
-    const gm: Record<string, string> = {};
-    const gn: string[] = [];
-    for (const it of g.data?.items || []) {
-      const n = it.metadata?.name || "";
-      if (n && it.metadata?.labels?.["halo.run/hidden"] !== "true" && !it.metadata?.deletionTimestamp) {
-        gm[n] = it.spec?.displayName || n;
-        gn.push(n);
-      }
-    }
-    groupLabelMap.value = gm;
-    groupNames.value = gn;
-  } catch {
-    groupLabelMap.value = {};
-  }
-  try {
-    const p = await axiosInstance.get<{ items?: { metadata?: { name?: string; labels?: Record<string, string>; deletionTimestamp?: string }; spec?: { displayName?: string } }[] }>(
-      "/apis/storage.halo.run/v1alpha1/policies", { params: { page: 1, size: 100 } }
-    );
-    const pm: Record<string, string> = {};
-    const pn: string[] = [];
-    for (const it of p.data?.items || []) {
-      const n = it.metadata?.name || "";
-      if (n && it.metadata?.labels?.["halo.run/hidden"] !== "true" && !it.metadata?.deletionTimestamp) {
-        pm[n] = it.spec?.displayName || n;
-        pn.push(n);
-      }
-    }
-    policyLabelMap.value = pm;
-    policyNames.value = pn;
-  } catch {
-    policyLabelMap.value = {};
-  }
 }
 
 watch(
@@ -794,7 +730,16 @@ async function save() {
   font-size: 12px;
   color: #6b7280;
 }
-</style>
+
+/* 附件库范围说明：单独一行，避免长文案挤压标题（1.2.2） */
+.lib-scope-note {
+  padding: 6px 18px;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #6b7280;
+}</style>
 
 
 
