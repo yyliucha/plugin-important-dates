@@ -23,28 +23,32 @@
           <span class="whitespace-nowrap text-sm font-bold text-red-600">{{ daysLabel(r.daysUntil) }}</span>
         </div>
 
-        <!-- 小分页：数据一次拉全，翻页只切本地状态（不重新请求） -->
-        <div v-if="paginationEnabled && totalPages > 1" class="pager">
-          <button
-            type="button"
-            class="pager-btn"
-            :disabled="page <= 1"
-            title="上一页"
-            @click="changePage(page - 1)"
-          >
-            ‹
-          </button>
-          <span class="pager-text">{{ page }} / {{ totalPages }}</span>
-          <button
-            type="button"
-            class="pager-btn"
-            :disabled="page >= totalPages"
-            title="下一页"
-            @click="changePage(page + 1)"
-          >
-            ›
-          </button>
-          <span class="pager-total">共 {{ items.length }} 条</span>
+        <!-- 底部：完整条数 + 小分页（数据一次拉全，翻页只切本地状态，不重新请求） -->
+        <div class="pager">
+          <template v-if="paginationEnabled">
+            <button
+              type="button"
+              class="pager-btn"
+              :disabled="page <= 1"
+              :title="totalPages > 1 ? '上一页' : '已是第一页'"
+              @click="changePage(page - 1)"
+            >
+              ‹
+            </button>
+            <span class="pager-text">{{ page }} / {{ totalPages }}</span>
+            <button
+              type="button"
+              class="pager-btn"
+              :disabled="page >= totalPages"
+              :title="totalPages > 1 ? '下一页' : '只有一页'"
+              @click="changePage(page + 1)"
+            >
+              ›
+            </button>
+          </template>
+          <span class="pager-total">
+            共 {{ items.length }} 条<template v-if="paginationEnabled"> · 每页 {{ pageSize }} 条</template>
+          </span>
         </div>
 
         <div class="text-xs text-gray-500">
