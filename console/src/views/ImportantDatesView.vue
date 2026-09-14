@@ -235,6 +235,23 @@
 
     <!-- ================= 座驾 ================= -->
     <template v-if="activeTab === 'cars' && !loading">
+      <!-- E：年检规则一次性提示（第 6 年起上线检验期 / 第 11 年起每年一次） -->
+      <div v-if="inspectionNotices.length" class="rule-notice">
+        <div
+          v-for="item in inspectionNotices"
+          :key="`${item.car.metadata.name}-${item.notice.key}`"
+          class="rule-notice-item"
+        >
+          <span class="rule-notice-icon">🔔</span>
+          <div class="rule-notice-body">
+            <div class="rule-notice-text">「{{ item.car.spec.displayName }}」{{ item.notice.text }}。</div>
+            <div class="rule-notice-hint">
+              年检日期按规则自动推算（车龄 {{ item.notice.years }} 年）；如需以车管所通知为准，可在年检项勾选「手动指定日期」。
+            </div>
+          </div>
+          <VButton size="sm" @click="dismissInspectionNotice(item)">知道了</VButton>
+        </div>
+      </div>
       <div v-if="!cars.length" style="padding: 60px 0">
         <VEmpty
           title="还没添加座驾"
@@ -559,6 +576,7 @@ import SunLunarPicker from "@/components/SunLunarPicker.vue";
 import type { Car, CarReminder, DateType, ImportantDate, LogAction, LogTargetType, OperationLog, Person } from "@/types";
 import { VEHICLE_TYPES } from "@/types";
 import { lunarMonthDayText, nextSolarDate } from "@/utils/lunar";
+import { type InspectionNotice, inspectionNotice, resolveDueDate, startOfToday } from "@/utils/vehicle";
 
 const loading = ref(true);
 const saving = ref(false);
@@ -769,8 +787,6 @@ function skinOf(c: Car): "cool" | "cute" | "neutral" {
   return "neutral";
 }
 
-const YEARLY_REMINDER_KEYS = ["INSURANCE_COMPULSORY", "INSURANCE_COMMERCIAL", "INSPECTION", "TAX", "LICENSE"];
-
 function reminderLabelOf(r: CarReminder): string {
   if (r.label && r.label.trim()) return r.label.trim();
   const map: Record<string, string> = {
@@ -794,35 +810,64 @@ function daysUntil(dateText: string): number | null {
   return Math.round((due.getTime() - today.getTime()) / 86400000);
 }
 
-/** 后台列表用：计算启用的到期项（含按年滚动与保养推算），按剩余天数升序 */
+/** 后台列表用：计算启用的到期项（含循环间隔、保养推算与年检自动推算），按剩余天数升序 */
 function carEventsOf(c: Car): { label: string; date: string; daysUntil: number }[] {
   const list: { label: string; date: string; daysUntil: number }[] = [];
+  const today = startOfToday();
+  const registrationBase = c.spec.registeredDate || c.spec.purchaseDate || "";
   for (const r of c.spec.reminders || []) {
     if (r.enabled === false) continue;
-    let dueText = r.date || "";
-    if (!dueText && r.key === "MAINTENANCE" && r.lastServiceDate && r.intervalMonths) {
-      const last = new Date(`${r.lastServiceDate}T00:00:00`);
-      if (!Number.isNaN(last.getTime())) {
-        last.setMonth(last.getMonth() + Number(r.intervalMonths));
-        dueText = last.toISOString().slice(0, 10);
-      }
-    }
-    if (!dueText) continue;
-    let due = new Date(`${dueText}T00:00:00`);
-    if (Number.isNaN(due.getTime())) continue;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (YEARLY_REMINDER_KEYS.includes(r.key || "")) {
-      let guard = 0;
-      while (due.getTime() < today.getTime() && guard++ < 3) {
-        due = new Date(due.setFullYear(due.getFullYear() + 1));
-      }
-    }
-    const days = daysUntil(due.toISOString().slice(0, 10));
+    // 与后端 ImportantDateFinderImpl.resolveDueDate 同一口径：循环间隔 0 = 不滚动，年检按规则推算
+    const resolved = resolveDueDate(r, {
+      registeredDate: registrationBase,
+      vehicleType: c.spec.vehicleType,
+      today,
+    });
+    if (!resolved) continue;
+    const days = daysUntil(resolved.date);
     if (days === null) continue;
-    list.push({ label: reminderLabelOf(r), date: due.toISOString().slice(0, 10), daysUntil: days });
+    list.push({
+      label: resolved.phase ? `${reminderLabelOf(r)}·${resolved.phase}` : reminderLabelOf(r),
+      date: resolved.date,
+      daysUntil: days,
+    });
   }
   return list.sort((a, b) => a.daysUntil - b.daysUntil);
+}
+
+// ---------- E：年检规则一次性提示（第 6 年起上线检验期 / 第 11 年起每年一次） ----------
+
+/** 已进入上线检验期、且尚未确认过的车辆（确认标记写入 Car.spec.inspectionNoticeAck） */
+const inspectionNotices = computed(() => {
+  const list: { car: Car; notice: InspectionNotice }[] = [];
+  for (const c of cars.value) {
+    if (c.spec.status === "SOLD" || c.spec.status === "SCRAPPED") continue;
+    const notice = inspectionNotice(c.spec.registeredDate || c.spec.purchaseDate, c.spec.vehicleType);
+    if (!notice || c.spec.inspectionNoticeAck === notice.key) continue;
+    list.push({ car: c, notice });
+  }
+  return list;
+});
+
+async function dismissInspectionNotice(item: { car: Car; notice: InspectionNotice }) {
+  try {
+    const next: Car = {
+      ...item.car,
+      spec: { ...item.car.spec, inspectionNoticeAck: item.notice.key },
+    };
+    await updateCar(next);
+    item.car.spec.inspectionNoticeAck = item.notice.key;
+    Toast.success("已确认，不再提示");
+    await appendLog(
+      "UPDATE",
+      item.car.spec.displayName,
+      item.car.metadata.name,
+      `确认年检规则提示（${item.notice.key === "YEARLY" ? "每年上线检验" : "上线检验期"}）`,
+      "CAR"
+    );
+  } catch (error) {
+    Toast.error(`操作失败：${(error as Error)?.message || "未知错误"}`);
+  }
 }
 
 // ---------- 拖拽排序（重要日期 / 人员 / 座驾） ----------
@@ -1988,6 +2033,46 @@ function formatTime(iso?: string): string {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: 14px;
+}
+
+/* ===== 年检规则一次性提示（1.2.2 E） ===== */
+.rule-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.rule-notice-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid #fde68a;
+  background: #fffbeb;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.rule-notice-icon {
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.rule-notice-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.rule-notice-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: #92400e;
+}
+
+.rule-notice-hint {
+  font-size: 12px;
+  color: #b45309;
+  margin-top: 2px;
 }
 
 .car-card {

@@ -71,8 +71,8 @@
       </div>
       <div class="row">
         <label class="field half">
-          <span class="label">注册日期</span>
-          <input v-model="form.registeredDate" type="date" class="input" />
+          <span class="label">首次登记日期（用于年检推算）</span>
+          <input ref="registeredDateInput" v-model="form.registeredDate" type="date" class="input" />
         </label>
         <label class="field half">
           <span class="label">购买日期</span>
@@ -93,6 +93,35 @@
         <span class="label">里程更新日期</span>
         <input v-model="form.mileageUpdatedAt" type="date" class="input" />
       </label>
+
+      <!-- ===== 保险公司（车辆级） ===== -->
+      <div class="field">
+        <span class="label">保险公司（车辆级：车下所有险种共用，仅后台可见）</span>
+        <input
+          v-model="form.insurer"
+          class="input"
+          list="insurer-options"
+          placeholder="例如：中国人保（留空表示未填写，逐个险种仍可单独指定）"
+        />
+        <datalist id="insurer-options">
+          <option v-for="name in COMMON_INSURERS" :key="name" :value="name" />
+        </datalist>
+        <div class="chip-row">
+          <span class="hint">常用：</span>
+          <button
+            v-for="name in COMMON_INSURERS.slice(0, 6)"
+            :key="name"
+            type="button"
+            class="chip"
+            @click="form.insurer = name"
+          >
+            {{ name }}
+          </button>
+          <button v-if="form.insurer" type="button" class="chip chip-clear" @click="form.insurer = ''">
+            清空
+          </button>
+        </div>
+      </div>
 
       <!-- ===== 关联人员 ===== -->
       <div class="section-title">关联人员（可选，用于统一徽章与前台显示）</div>
@@ -164,8 +193,12 @@
 
       <!-- ===== 到期提醒 ===== -->
       <div class="section-title">到期提醒（保险 / 年检 / 保养 / 车船税…）</div>
-      <p class="hint">年检默认提前 30 天提醒（办理含上线检验通常需 2–3 个工作日，建议提前安排）；保险类默认每年循环，年检按首次登记日期与车型规则自动推算，均可手动覆盖。</p>
+      <p class="hint">
+        年检默认提前 30 天提醒（办理含上线检验通常需 2–3 个工作日，建议提前安排）；保险类默认每年循环，
+        年检按首次登记日期与车型规则自动推算，均可手动覆盖；循环间隔选「不循环」表示提醒一次后不再滚动。
+      </p>
       <div v-for="(r, idx) in form.reminders" :key="idx" class="reminder-card">
+        <!-- 第 1 行：项目 / 名称 / 保单号 / 到期日 -->
         <div class="row">
           <label class="field third">
             <span class="label">项目</span>
@@ -177,40 +210,109 @@
             <span class="label">名称</span>
             <input v-model="r.label" class="input" placeholder="例如：轮胎更换" />
           </label>
-          <label class="field third">
-            <span class="label">到期日</span>
-            <input v-model="r.date" type="date" class="input" />
-          </label>
-          <label class="field third">
-            <span class="label">提前天数</span>
-            <input v-model.number="r.remindDays" type="number" min="0" class="input" placeholder="默认" />
-          </label>
-        </div>
-
-        <div v-if="isInsurance(r.key)" class="row">
-          <label class="field half">
-            <span class="label">保险公司（仅后台）</span>
-            <input v-model="r.insurer" class="input" placeholder="例如：人保" />
-          </label>
-          <label class="field half">
+          <label v-if="isInsurance(r.key)" class="field third">
             <span class="label">保单号（仅后台）</span>
             <input v-model="r.policyNo" class="input" placeholder="仅后台" />
           </label>
+          <label class="field third">
+            <span class="label">到期日</span>
+            <input v-if="dateLocked(r)" class="input locked" :value="lockedDateText(r)" disabled />
+            <input v-else v-model="r.date" type="date" class="input" />
+          </label>
         </div>
 
-        <div v-if="r.key === 'MAINTENANCE'" class="row">
+        <!-- 第 2 行：提前天数 / 循环间隔 -->
+        <div class="row">
           <label class="field third">
-            <span class="label">上次保养日期</span>
-            <input v-model="r.lastServiceDate" type="date" class="input" />
+            <span class="label">提前提醒天数</span>
+            <input
+              v-model.number="r.remindDays"
+              type="number"
+              min="0"
+              class="input"
+              :placeholder="`默认 ${presetDays(r.key)}`"
+            />
           </label>
           <label class="field third">
-            <span class="label">间隔月数</span>
-            <input v-model.number="r.intervalMonths" type="number" min="0" class="input" placeholder="例如：6" />
+            <span class="label">循环间隔</span>
+            <select class="input" :value="repeatSelectValue(r)" @change="onRepeatSelect(r, $event)">
+              <option v-for="o in REPEAT_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
+              <option :value="REPEAT_CUSTOM">自定义月数…</option>
+            </select>
           </label>
-          <label class="field third">
-            <span class="label">上次保养里程</span>
-            <input v-model.number="r.lastServiceKm" type="number" min="0" class="input" placeholder="例如：10000" />
+          <label v-if="isCustomRepeat(r)" class="field third">
+            <span class="label">自定义月数</span>
+            <input v-model.number="r.customMonths" type="number" min="1" class="input" placeholder="例如：18" />
           </label>
+        </div>
+
+        <!-- B 年检：按规则自动推算 / 手动指定 -->
+        <div v-if="r.key === 'INSPECTION'" class="sub-box">
+          <label class="check">
+            <input type="checkbox" :checked="r.manualDate === true" @change="toggleManualDate(r, $event)" />
+            <span>手动指定日期</span>
+          </label>
+          <template v-if="r.manualDate !== true">
+            <div v-if="inspectionPreview().date" class="hint strong">
+              按规则自动推算：{{ inspectionPreview().date }}（{{ inspectionPreview().phase }}）
+            </div>
+            <div class="hint" :class="{ warn: !inspectionPreview().date }">{{ inspectionPreview().rule }}</div>
+            <div v-if="!registrationBase" class="hint warn">
+              请先填写首次登记日期（或购买日期）用于自动推算；
+              <button type="button" class="link-btn" @click="focusRegisteredDate">去填写</button>
+            </div>
+            <div v-else class="hint">
+              推算依据：首次登记日期 {{ registrationBase }}
+              <template v-if="!form.registeredDate">（暂无登记日期，暂用购买日期，建议补充更准确）</template>
+            </div>
+          </template>
+          <div v-else class="hint">已改为手动指定：以上方「到期日」为准，清空则不提醒年检。</div>
+        </div>
+
+        <!-- C 与保险同期 -->
+        <div v-if="isSyncable(r.key)" class="sub-box">
+          <label class="check">
+            <input type="checkbox" :checked="syncChecked(r)" @change="toggleSync(r, $event)" />
+            <span>与保险同期（跟随交强险到期日）</span>
+          </label>
+          <div v-if="syncChecked(r)" class="hint">
+            <template v-if="compulsoryDate">已联动：{{ compulsoryDate }}（与交强险同日）</template>
+            <template v-else>还没有交强险到期日：请先在「交强险」项填写，或取消勾选后独立填写。</template>
+          </div>
+        </div>
+
+        <!-- 保养：按上次保养推算 -->
+        <div v-if="r.key === 'MAINTENANCE'" class="sub-box">
+          <div class="row">
+            <label class="field third">
+              <span class="label">上次保养日期</span>
+              <input v-model="r.lastServiceDate" type="date" class="input" />
+            </label>
+            <label class="field third">
+              <span class="label">保养间隔月数</span>
+              <input v-model.number="r.intervalMonths" type="number" min="0" class="input" placeholder="例如：6" />
+            </label>
+            <label class="field third">
+              <span class="label">上次保养里程</span>
+              <input v-model.number="r.lastServiceKm" type="number" min="0" class="input" placeholder="例如：10000" />
+            </label>
+          </div>
+          <div class="hint">「保养间隔月数」用于按上次保养日期推算下次到期日；「循环间隔」用于到期后是否继续滚动。</div>
+        </div>
+
+        <!-- 保险：可选覆盖车辆级保险公司 -->
+        <div v-if="isInsurance(r.key)" class="sub-box">
+          <label class="check">
+            <input type="checkbox" :checked="r.overrideInsurer === true" @change="toggleOverrideInsurer(r, $event)" />
+            <span>使用其他保险公司</span>
+          </label>
+          <div v-if="r.overrideInsurer === true" class="row">
+            <label class="field half">
+              <span class="label">本项保险公司（覆盖车辆级）</span>
+              <input v-model="r.insurer" class="input" list="insurer-options" placeholder="例如：中国平安" />
+            </label>
+          </div>
+          <div v-else class="hint">本项使用车辆级保险公司：{{ form.insurer || "（车辆级尚未填写）" }}</div>
         </div>
 
         <div class="reminder-footer">
@@ -330,6 +432,15 @@ import {
   type VehicleStatus,
   type VehicleType,
 } from "@/types";
+import {
+  COMMON_INSURERS,
+  REPEAT_CUSTOM,
+  REPEAT_OPTIONS,
+  defaultRepeatMonths,
+  insuranceKey,
+  nextInspection,
+  syncableKey,
+} from "@/utils/vehicle";
 
 const props = defineProps<{
   visible: boolean;
@@ -340,6 +451,20 @@ const emit = defineEmits<{
   (e: "update:visible", v: boolean): void;
   (e: "saved"): void;
 }>();
+
+/** 表单内的到期项：在存储字段之外附带若干界面状态（保存时不写入） */
+interface FormReminder extends CarReminder {
+  /** 年检：手动指定日期（关闭时按登记日期 + 车型规则自动推算） */
+  manualDate?: boolean;
+  /** 年检 / 车船税：与交强险同期（默认开） */
+  syncInsurance?: boolean;
+  /** 循环间隔：选择「自定义月数」 */
+  customRepeat?: boolean;
+  /** 循环间隔：自定义月数输入值 */
+  customMonths?: number;
+  /** 保险项：覆盖车辆级保险公司 */
+  overrideInsurer?: boolean;
+}
 
 interface CarForm {
   displayName: string;
@@ -353,6 +478,7 @@ interface CarForm {
   engineNo: string;
   registeredDate: string;
   purchaseDate: string;
+  insurer: string;
   purchasePrice: number | null;
   mileageKm: number | null;
   mileageUpdatedAt: string;
@@ -363,7 +489,7 @@ interface CarForm {
   note: string;
   visible: boolean;
   important: boolean;
-  reminders: CarReminder[];
+  reminders: FormReminder[];
 }
 
 const empty = (): CarForm => ({
@@ -378,6 +504,7 @@ const empty = (): CarForm => ({
   engineNo: "",
   registeredDate: "",
   purchaseDate: "",
+  insurer: "",
   purchasePrice: null,
   mileageKm: null,
   mileageUpdatedAt: "",
@@ -396,6 +523,7 @@ const saving = ref(false);
 const uploading = ref(false);
 const persons = ref<Person[]>([]);
 const fileInput = ref<HTMLInputElement>();
+const registeredDateInput = ref<HTMLInputElement>();
 const dragIndex = ref(-1);
 
 // 附件库多选
@@ -430,17 +558,135 @@ function toggleDriver(name: string) {
 }
 
 function isInsurance(key?: string): boolean {
-  return key === "INSURANCE_COMPULSORY" || key === "INSURANCE_COMMERCIAL";
+  return insuranceKey(key);
+}
+
+function isSyncable(key?: string): boolean {
+  return syncableKey(key);
+}
+
+function presetDays(key?: string): number {
+  return REMINDER_PRESETS.find((p) => p.key === key)?.defaultDays ?? 7;
+}
+
+/** 交强险到期日（年检 / 车船税「与保险同期」的联动基准） */
+const compulsoryDate = computed(
+  () => form.reminders.find((r) => r.key === "INSURANCE_COMPULSORY" && r.enabled !== false)?.date || ""
+);
+
+/** 年检推算基准：首次登记日期优先，其次购买日期 */
+const registrationBase = computed(() => form.registeredDate || form.purchaseDate || "");
+
+/** 年检规则推算结果（展示用；最终以服务端计算为准） */
+function inspectionPreview() {
+  return nextInspection(registrationBase.value, form.vehicleType);
+}
+
+function focusRegisteredDate() {
+  registeredDateInput.value?.scrollIntoView({ behavior: "smooth", block: "center" });
+  registeredDateInput.value?.focus();
+}
+
+function syncChecked(r: FormReminder): boolean {
+  return isSyncable(r.key) && r.syncInsurance !== false;
+}
+
+/** 到期日是否由规则决定（与保险同期 / 年检自动推算），此时手填输入框禁用 */
+function dateLocked(r: FormReminder): boolean {
+  if (syncChecked(r) && compulsoryDate.value) return true;
+  return r.key === "INSPECTION" && r.manualDate !== true;
+}
+
+function lockedDateText(r: FormReminder): string {
+  if (syncChecked(r) && compulsoryDate.value) return compulsoryDate.value;
+  if (r.key === "INSPECTION" && r.manualDate !== true) return inspectionPreview().date || "";
+  return "";
+}
+
+function toggleSync(r: FormReminder, e: Event) {
+  r.syncInsurance = (e.target as HTMLInputElement).checked;
+}
+
+function toggleManualDate(r: FormReminder, e: Event) {
+  const manual = (e.target as HTMLInputElement).checked;
+  r.manualDate = manual;
+  // 打开手动指定时，用推算结果预填，方便微调
+  if (manual && !r.date) {
+    r.date = inspectionPreview().date || "";
+  }
+}
+
+function toggleOverrideInsurer(r: FormReminder, e: Event) {
+  const on = (e.target as HTMLInputElement).checked;
+  r.overrideInsurer = on;
+  if (!on) {
+    r.insurer = undefined;
+  }
+}
+
+function repeatSelectValue(r: FormReminder): number {
+  if (r.customRepeat) return REPEAT_CUSTOM;
+  return r.repeatMonths != null ? Number(r.repeatMonths) : defaultRepeatMonths(r.key);
+}
+
+function isCustomRepeat(r: FormReminder): boolean {
+  return r.customRepeat === true;
+}
+
+function onRepeatSelect(r: FormReminder, e: Event) {
+  const value = Number((e.target as HTMLSelectElement).value);
+  if (value === REPEAT_CUSTOM) {
+    r.customRepeat = true;
+    if (r.customMonths == null) {
+      r.customMonths = r.repeatMonths != null && r.repeatMonths > 0 ? Number(r.repeatMonths) : 18;
+    }
+    return;
+  }
+  r.customRepeat = false;
+  r.customMonths = undefined;
+  r.repeatMonths = value;
+}
+
+/** 保存时使用的循环间隔（月）：0 = 不循环 */
+function effectiveRepeat(r: FormReminder): number {
+  if (r.customRepeat) {
+    const months = Number(r.customMonths);
+    return Number.isFinite(months) && months > 0 ? Math.floor(months) : 12;
+  }
+  return r.repeatMonths != null ? Number(r.repeatMonths) : defaultRepeatMonths(r.key);
+}
+
+/** 保存时写入的到期日：同期项取交强险日期；年检自动推算时留空交给服务端 */
+function saveDate(r: FormReminder): string | undefined {
+  if (syncChecked(r) && compulsoryDate.value) return compulsoryDate.value;
+  if (r.key === "INSPECTION" && r.manualDate !== true) return undefined;
+  return r.date || undefined;
 }
 
 function addReminder() {
-  form.reminders.push({ key: "INSURANCE_COMPULSORY", date: "", enabled: true });
+  form.reminders.push({
+    key: "INSURANCE_COMPULSORY",
+    date: "",
+    enabled: true,
+    remindDays: presetDays("INSURANCE_COMPULSORY"),
+    repeatMonths: defaultRepeatMonths("INSURANCE_COMPULSORY"),
+  });
 }
 
-function onReminderKeyChange(r: CarReminder) {
+function onReminderKeyChange(r: FormReminder) {
   const preset = REMINDER_PRESETS.find((p) => p.key === r.key);
   if (preset && (r.remindDays === undefined || r.remindDays === null)) {
     r.remindDays = preset.defaultDays;
+  }
+  // 项目切换后回到该项目的默认规则
+  r.repeatMonths = defaultRepeatMonths(r.key);
+  r.customRepeat = false;
+  r.customMonths = undefined;
+  r.manualDate = r.key === "INSPECTION" ? false : undefined;
+  r.syncInsurance = isSyncable(r.key) ? true : undefined;
+  if (!insuranceKey(r.key)) {
+    r.overrideInsurer = undefined;
+    r.insurer = undefined;
   }
 }
 
@@ -659,6 +905,7 @@ async function save() {
         engineNo: form.engineNo.trim() || undefined,
         registeredDate: form.registeredDate || undefined,
         purchaseDate: form.purchaseDate || undefined,
+        insurer: form.insurer.trim() || undefined,
         purchasePrice: form.purchasePrice ?? undefined,
         mileageKm: form.mileageKm ?? undefined,
         mileageUpdatedAt: form.mileageUpdatedAt || undefined,
@@ -670,14 +917,17 @@ async function save() {
         visible: form.visible,
         important: form.important,
         sortOrder: props.car?.spec.sortOrder ?? 0,
+        // 车辆级字段之外，保留非表单字段（如年检提示确认标记）
+        inspectionNoticeAck: props.car?.spec.inspectionNoticeAck,
         reminders: form.reminders.map((r) => ({
           key: r.key || "CUSTOM",
           label: r.label?.trim() || undefined,
-          date: r.date || undefined,
+          date: saveDate(r),
           remindDays: r.remindDays ?? undefined,
           enabled: r.enabled !== false,
-          insurer: r.insurer?.trim() || undefined,
-          policyNo: r.policyNo?.trim() || undefined,
+          insurer: insuranceKey(r.key) && r.overrideInsurer === true ? r.insurer?.trim() || undefined : undefined,
+          policyNo: insuranceKey(r.key) ? r.policyNo?.trim() || undefined : undefined,
+          repeatMonths: effectiveRepeat(r),
           intervalMonths: r.intervalMonths ?? undefined,
           intervalKm: r.intervalKm ?? undefined,
           lastServiceDate: r.lastServiceDate || undefined,
@@ -714,6 +964,11 @@ watch(
     const c = props.car;
     if (c) {
       const s = c.spec;
+      const rawReminders = s.reminders || [];
+      const compulsoryRaw = rawReminders.find(
+        (r) => r.key === "INSURANCE_COMPULSORY" && r.enabled !== false
+      );
+      const compulsoryRawDate = compulsoryRaw?.date || "";
       Object.assign(form, {
         displayName: s.displayName || "",
         brand: s.brand || "",
@@ -726,6 +981,7 @@ watch(
         engineNo: s.engineNo || "",
         registeredDate: s.registeredDate || "",
         purchaseDate: s.purchaseDate || "",
+        insurer: s.insurer || "",
         purchasePrice: s.purchasePrice ?? null,
         mileageKm: s.mileageKm ?? null,
         mileageUpdatedAt: s.mileageUpdatedAt || "",
@@ -736,7 +992,31 @@ watch(
         note: s.note || "",
         visible: s.visible === true,
         important: s.important !== false,
-        reminders: (s.reminders || []).map((r) => ({ ...r })),
+        reminders: rawReminders.map((r) => {
+          const item: FormReminder = { ...r };
+          // 循环间隔：未设置时按项目默认展示；非预设值视为「自定义月数」
+          if (r.repeatMonths == null) {
+            item.repeatMonths = defaultRepeatMonths(r.key);
+          } else if (!REPEAT_OPTIONS.some((o) => o.value === Number(r.repeatMonths))) {
+            item.customRepeat = true;
+            item.customMonths = Number(r.repeatMonths);
+          }
+          if (isSyncable(r.key)) {
+            // 未填日期或与交强险同日 → 视为「与保险同期」（1.2.2 默认口径）
+            const synced = !r.date || (!!compulsoryRawDate && r.date === compulsoryRawDate);
+            item.syncInsurance = synced;
+            if (r.key === "INSPECTION") {
+              item.manualDate = synced ? false : !!r.date;
+            }
+          }
+          if (r.key === "INSPECTION" && item.manualDate === undefined) {
+            item.manualDate = !!r.date;
+          }
+          if (insuranceKey(r.key)) {
+            item.overrideInsurer = !!(r.insurer && r.insurer.trim());
+          }
+          return item;
+        }),
       });
     } else {
       Object.assign(form, empty());
@@ -1052,6 +1332,67 @@ watch(
   justify-content: flex-end;
   padding: 12px 18px;
   border-top: 1px solid #e5e7eb;
+}
+
+/* ===== 1.2.2：保险公司快捷输入、到期项子块 ===== */
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.chip {
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  color: #4b5563;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: #4f7cff;
+  color: #4f7cff;
+}
+
+.chip-clear {
+  color: #b91c1c;
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.input.locked {
+  background: #f3f4f6;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
+.sub-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px dashed #e5e7eb;
+  padding-top: 8px;
+}
+
+.hint.strong {
+  color: #1d4ed8;
+}
+
+.hint.warn {
+  color: #b45309;
+}
+
+.link-btn {
+  border: none;
+  background: transparent;
+  color: #4f7cff;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
 }
 </style>
 
