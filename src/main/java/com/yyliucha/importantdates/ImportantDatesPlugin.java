@@ -71,6 +71,8 @@ public class ImportantDatesPlugin extends BasePlugin {
         migrateToastDefaults();
         // 操作日志自动清理（按设置保留天数）
         logCleaner.start();
+        // 座驾：老数据幂等迁移（项目级保险公司 → 车辆级，并去重）
+        migrateCarInsurers();
         // 附件设置下拉动态化：把系统真实的「分类/策略」注入到插件 Setting 表单选项
         startAttachmentOptionsRefresher();
     }
@@ -308,6 +310,44 @@ public class ImportantDatesPlugin extends BasePlugin {
      * 直接把设置保存为旧默认文案的便签迁移为新默认文案（1.1.2 起）。
      * 仅当值与旧默认文案完全一致时替换（尊重用户自定义），有变化才写库。
      */
+    /**
+     * 座驾数据迁移（幂等）：把旧数据里"每个险种各填一份的保险公司"提升为车辆级字段，
+     * 并把与车辆级一致的重复值清空（保留项目级仅用于"不同公司"的少数覆盖场景）。
+     * 只读写插件自身的 Car 扩展，可重复执行。
+     */
+    private void migrateCarInsurers() {
+        extensionClient.listAll(Car.class,
+                run.halo.app.extension.ListOptions.builder().build(),
+                org.springframework.data.domain.Sort.unsorted())
+            .flatMap(car -> {
+                Car.CarSpec spec = car.getSpec();
+                if (spec == null || spec.getReminders() == null) {
+                    return Mono.empty();
+                }
+                boolean changed = false;
+                if (spec.getInsurer() == null || spec.getInsurer().isBlank()) {
+                    for (Car.Reminder r : spec.getReminders()) {
+                        if (r != null && r.getInsurer() != null && !r.getInsurer().isBlank()) {
+                            spec.setInsurer(r.getInsurer().trim());
+                            changed = true;
+                            break;
+                        }
+                    }
+                }
+                if (spec.getInsurer() != null && !spec.getInsurer().isBlank()) {
+                    for (Car.Reminder r : spec.getReminders()) {
+                        if (r != null && r.getInsurer() != null
+                            && r.getInsurer().trim().equals(spec.getInsurer())) {
+                            r.setInsurer(null);
+                            changed = true;
+                        }
+                    }
+                }
+                return changed ? extensionClient.update(car).then() : Mono.empty();
+            })
+            .onErrorResume(e -> Mono.empty())
+            .subscribe();
+    }
     private void migrateToastDefaults() {
         extensionClient.fetch(ConfigMap.class, CONFIG_MAP_NAME)
             .flatMap(cm -> {
