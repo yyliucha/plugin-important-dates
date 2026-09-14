@@ -1,10 +1,7 @@
 ## v1.2.0
 
-### Important notice (read first)
+### Testing and upgrade notes
 
-> **This release has not been fully tested. It may cause data corruption or even data loss (potentially destructive bugs).**
-> Please **back up your site data (database and attachments) before upgrading** and proceed with caution; validate on a staging site first.
->
 > Scope of testing so far: automated regression on a clean Halo 2.26 instance (44/44 checks) plus browser interaction checks. Long-running operation, migration of existing data, multi-theme compatibility and extreme data volumes are **not** covered yet.
 >
 > A development build (`1.2.0-SNAPSHOT`) was published earlier as a preview. This is the stable `1.2.0` release with the same feature set; further fixes and improvements will follow. Feedback is welcome.

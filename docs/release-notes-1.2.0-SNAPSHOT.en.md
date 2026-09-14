@@ -1,8 +1,6 @@
 ## v1.2.0-SNAPSHOT
 
 > **This is a preview / development build** of the upcoming `1.2.0`. The vehicle module can be tried end to end, but the plugin is still under development: features may change and problems may exist. A stable `1.2.0` will follow.
->
-> **Testing is incomplete. Bugs may be destructive (data corruption or data loss).** Please back up your site data before installing and avoid using it on a production site.
 
 ### Renamed
 

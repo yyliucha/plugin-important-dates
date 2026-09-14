@@ -2,8 +2,6 @@
 
 > **This is a preview / development build** that fixes an issue reported against `1.2.1`. A stable `1.2.2` will follow once testing passes.
 >
-> **Testing is incomplete. Bugs may be destructive (data corruption or data loss).** Please back up your site data before installing and avoid using it on a production site.
->
 > **Hard-refresh your browser once after installing (Ctrl+Shift+R)**: the Halo console caches plugin console bundles, so a stale bundle hides the new UI.
 
 ### Fixed: the attachment library no longer comes up empty when the configured scope does not match

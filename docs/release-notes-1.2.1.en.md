@@ -1,10 +1,7 @@
 ## v1.2.1
 
-### Important notice (read first)
+### Testing and upgrade notes
 
-> **This release has not been fully tested. It may cause data corruption or even data loss (potentially destructive bugs).**
-> Please **back up your site data (database and attachments) before upgrading** and proceed with caution; validate on a staging site first.
->
 > Scope of testing so far: automated regression on a clean Halo 2.26 instance (**50/50 checks**) plus browser end-to-end checks (**13/13**) and an idempotent migration check on existing data. Long-running operation, multi-theme compatibility and extreme data volumes are **not** covered yet.
 >
 > A development build (`1.2.1-SNAPSHOT`) was published earlier as a preview. This is the stable `1.2.1` release with the same feature set (plus the widget footer that now always reports the total). Feedback is welcome.

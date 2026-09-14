@@ -2,11 +2,8 @@
 
 ### 中文
 
-### ⚠️ 重要提示（请先读）
+### 测试与升级说明
 
-> **本版本功能测试尚不完整，可能存在导致数据异常甚至数据丢失的严重问题（毁灭性 Bug）。**
-> 请**务必先完整备份站点数据（数据库 + 附件）**，并**谨慎升级**；建议先在测试站点验证无误后再用于生产环境。
->
 > 说明：本版的实际测试范围是「全新 Halo 2.26 实例的自动化回归 44/44 + 浏览器交互验证」，**尚未覆盖**长期运行、历史数据迁移、多主题兼容、极端数据量等场景；开发版（`1.2.0-SNAPSHOT`）已先行发布供体验，本次为**正式版 1.2.0**，功能与开发版一致，后续会持续修复与完善，欢迎反馈问题。
 
 > **应用更名**：原名「重要日期」→ 现名「**记得**」。原因：本次新增完整的**座驾（爱车）模块**并扩展为前台「生活 / 爱车」双视图，功能已从"记日期"变成"记日子、记人、记爱车"，旧名字无法覆盖；「记得」既保留"记得每个重要日子"，也涵盖"记得保养、记得年检"。插件 ID（`plugin-important-dates`）不变，**更名不影响数据、设置、前台地址与升级路径**，老用户升级即可。
@@ -42,11 +39,8 @@
 
 ### English
 
-### Important notice (read first)
+### Testing and upgrade notes
 
-> **This release has not been fully tested. It may cause data corruption or even data loss (potentially destructive bugs).**
-> Please **back up your site data (database and attachments) before upgrading** and proceed with caution; validate on a staging site first.
->
 > Scope of testing so far: automated regression on a clean Halo 2.26 instance (44/44 checks) plus browser interaction checks. Long-running operation, migration of existing data, multi-theme compatibility and extreme data volumes are **not** covered yet.
 >
 > A development build (`1.2.0-SNAPSHOT`) was published earlier as a preview. This is the stable `1.2.0` release with the same feature set; further fixes and improvements will follow. Feedback is welcome.

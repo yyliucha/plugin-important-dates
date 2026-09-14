@@ -2,8 +2,6 @@
 
 > **This is a preview / development build** of the upcoming `1.2.1`. A stable `1.2.1` will follow once testing passes.
 > The `1.2.1` number was never released before, so this build is the next stable line — no version is skipped.
->
-> **Testing is incomplete. Bugs may be destructive (data corruption or data loss).** Please back up your site data before installing and avoid using it on a production site.
 
 ### Vehicle due items that match real paperwork
 
