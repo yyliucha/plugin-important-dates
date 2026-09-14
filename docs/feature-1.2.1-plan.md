@@ -39,6 +39,18 @@
 
 **交付**:`build/libs/plugin-important-dates-1.2.2-SNAPSHOT.jar`(控制台产物 `console/main.3-IwBc8D.js`;SHA256 `77141E4F4E27E2358A985B5ED30DBE51DED7858922B408D501DFC4703D74A09E`)+ `docs/release-notes-1.2.2-SNAPSHOT.md` / `.en.md`;正式版 `1.2.2` 等用户测试通过后发布。
 
+## 1.2.3 修复(车辆卡片尺寸)
+
+| 问题 | 根因 | 修复 | 状态 |
+|---|---|---|---|
+| 后台「座驾」页签:**相册有照片后封面铺满屏幕**(1920×1080 原图渲染成 1180×664,卡片 1212×836) | `console/src/views/ImportantDatesView.vue` 的 `<style scoped>` 被**提前闭合**,约 3KB CSS(`.cars-grid` / `.car-card` / `.car-cover` / `.car-events` / `.rule-notice` / `.person-avatar-char` 等)落在 `</style>` 之后,构建时整段丢弃 → 这些规则从未生效(无照片时不易察觉) | 修正样式块闭合位置到文件末尾,全部规则重新生效;新增尺寸复现脚本 `repro-car-card.mjs` 作为回归 | ✅ |
+
+**实测效果**:卡片 1212×836 → **395×191**;封面 1180×664 → **84×62**(`object-fit: cover` 裁切);座驾列表恢复多列网格与紧凑样式。
+
+**1.2.3-SNAPSHOT 验证(全新 Halo 2.26 实例)**:冒烟 `halo-smoke.mjs` **50/50**;浏览器端到端 `browser-121-e2e.mjs` **13/13**;附件库来源范围专项 `verify-album-scope.mjs` **5/5**;尺寸复现 `repro-car-card.mjs` 符合设计值。
+
+**交付**:`build/libs/plugin-important-dates-1.2.3-SNAPSHOT.jar`(控制台产物 `console/main.BuhsGVMx.js`,CSS 由 16.65 KB 恢复到 19.29 KB——即被丢弃的规则已回到包内;SHA256 `673591FE967DC2E21B7826EF3D7DA5C12E89671FF1B59C8378BCC05E26978E1A`)+ `docs/release-notes-1.2.3-SNAPSHOT.md` / `.en.md`;正式版 `1.2.3` 等用户测试通过后发布。
+
 ## 交付物(正式版已构建,未推送 GitHub)
 
 - **`build/libs/plugin-important-dates-1.2.1.jar`**(453 KB,内含 `plugin.yaml version: 1.2.1` 与控制台产物 `console/main.8fTCD449.js`;SHA256 `2FBDBE0B…DAFDD7F2`)——本包已在全新 2.26 实例跑完 50/50 冒烟与 13/13 浏览器端到端;

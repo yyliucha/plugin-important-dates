@@ -2012,8 +2012,6 @@ function formatTime(iso?: string): string {
   display: flex;
   justify-content: flex-end;
 }
-</style>
-
 
 .person-avatar-char {
   width: 36px;
@@ -2196,5 +2194,6 @@ function formatTime(iso?: string): string {
 .car-actions {
   margin-top: 4px;
 }
+</style>
 
 
