@@ -119,7 +119,7 @@ cd plugin-important-dates
 ./gradlew build
 ```
 
-The artifact is written to `build/libs/plugin-important-dates-<version>.jar` (current version: `1.2.3`; previous stable: `1.2.2`). Hard-refresh your browser once after installing a new build.
+The artifact is written to `build/libs/plugin-important-dates-<version>.jar` (current version: `1.2.4`; previous stable: `1.2.3`). Hard-refresh your browser once after installing a new build.
 
 ## License
 
