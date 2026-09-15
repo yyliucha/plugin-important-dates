@@ -49,7 +49,20 @@
 
 **1.2.3-SNAPSHOT 验证(全新 Halo 2.26 实例)**:冒烟 `halo-smoke.mjs` **50/50**;浏览器端到端 `browser-121-e2e.mjs` **13/13**;附件库来源范围专项 `verify-album-scope.mjs` **5/5**;尺寸复现 `repro-car-card.mjs` 符合设计值。
 
-**交付**:`build/libs/plugin-important-dates-1.2.3-SNAPSHOT.jar`(控制台产物 `console/main.BuhsGVMx.js`,CSS 由 16.65 KB 恢复到 19.29 KB——即被丢弃的规则已回到包内;SHA256 `673591FE967DC2E21B7826EF3D7DA5C12E89671FF1B59C8378BCC05E26978E1A`)+ `docs/release-notes-1.2.3-SNAPSHOT.md` / `.en.md`;正式版 `1.2.3` 等用户测试通过后发布。
+**交付**:`build/libs/plugin-important-dates-1.2.3-SNAPSHOT.jar`(控制台产物 `console/main.BuhsGVMx.js`,CSS 由 16.65 KB 恢复到 19.29 KB——即被丢弃的规则已回到包内;SHA256 `673591FE967DC2E21B7826EF3D7DA5C12E89671FF1B59C8378BCC05E26978E1A`)+ `docs/release-notes-1.2.3-SNAPSHOT.md` / `.en.md`;正式版 `1.2.3` 已发布(2026-09-14,v1.2.3 Latest)。
+
+## 1.2.4 修复(拖拽排序 503)
+
+| 问题 | 根因 | 修复 | 状态 |
+|---|---|---|---|
+| 拖拽人员/日期/座驾调序时提示「保存排序失败:Request failed with status code 503」,弹窗显示反向代理的 `503 Service Temporarily Unavailable`,**Halo 日志无任何记录** | 旧实现把整表重排后用 `Promise.all` 并发提交,且每次提交是「GET 最新版本 → PUT」两步;实测一次拖拽 = **6 GET + 6 PUT、最大并发 6、全部挤在 45ms 内**。站点前有反向代理时,nginx 的 `limit_req`/`limit_conn` **默认以 503 自行拒绝**,请求到不了 Halo → 服务端日志为空 | ①只写真正位移的连续区间(非 1..n 稠密数据回退整表重排);②改用 **JSON Patch**(`op:add /spec/sortOrder`)只改一个字段,去掉 GET,请求数减半;③**串行**提交(间隔 40ms),最大并发降到 1;④对 429/5xx **退避重试** 3 次;⑤报错文案点明反向代理 | ✅ |
+
+**实测对比**:写请求 6 PUT(+6 GET)→ **5 PATCH(0 GET)**;最大并发 **6 → 1**;全部 2xx 且顺序正确落库。
+
+**1.2.4-SNAPSHOT 验证(全新 Halo 2.26 实例)**:冒烟 `halo-smoke.mjs` **50/50**;浏览器端到端 `browser-121-e2e.mjs` **13/13**;附件库来源范围 `verify-album-scope.mjs` **5/5**;**拖拽排序专项 `verify-sort-save.mjs` 6/6**(并发=1、无逐条 GET、仅 PATCH、无 5xx、顺序落库正确)。同时加固 `halo-smoke.mjs` 就绪检测:要求「插件接口 + 前台页面」连续两次正常,避免安装后 Halo 重启插件的窗口期(前台瞬时 500 `Scheme not found`)被误判。
+
+**交付**:`build/libs/plugin-important-dates-1.2.4-SNAPSHOT.jar`(控制台产物 `console/main.Dtn6WhNb.js`)+ `docs/release-notes-1.2.4-SNAPSHOT.md` / `.en.md`;正式版 `1.2.4` 等用户测试通过后发布。
+
 
 ## 交付物(正式版已构建,未推送 GitHub)
 

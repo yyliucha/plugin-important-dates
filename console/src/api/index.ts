@@ -121,6 +121,43 @@ export async function deletePerson(name: string): Promise<void> {
 
 // ---------- 座驾（1.2.0） ----------
 
+/** 排序（拖拽）保存：只改 spec.sortOrder，用 JSON Patch 一步到位（避免 GET+PUT 双倍请求） */
+export type SortKind = "date" | "person" | "car";
+
+const SORT_BASE: Record<SortKind, string> = {
+  date: BASE,
+  person: PERSON_BASE,
+  car: CAR_BASE,
+};
+
+/**
+ * 写入单个对象的 sortOrder。
+ *
+ * 站点常有反向代理（nginx / CDN）限速或限制并发连接，一次拖拽若并发打出十几个请求会被直接 503
+ * （此时服务端没有日志）。因此这里：① 用 PATCH 只改一个字段，不再先 GET 再 PUT；② 对 429/5xx
+ * 做指数退避重试；③ 由调用方串行调用。
+ */
+export async function patchSortOrder(kind: SortKind, name: string, sortOrder: number): Promise<void> {
+  const url = `${SORT_BASE[kind]}/${name}`;
+  const body = [{ op: "add", path: "/spec/sortOrder", value: sortOrder }];
+  const attempts = 3;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      await axiosInstance.patch(url, body, {
+        headers: { "Content-Type": "application/json-patch+json" },
+      });
+      return;
+    } catch (error) {
+      const status = (error as { response?: { status?: number } })?.response?.status ?? 0;
+      const retriable = status === 0 || status === 429 || (status >= 500 && status <= 599);
+      if (!retriable || i === attempts) {
+        throw error;
+      }
+      await new Promise((r) => setTimeout(r, 300 * i));
+    }
+  }
+}
+
 export async function listCars(): Promise<Car[]> {
   const { data } = await axiosInstance.get<ListResult<Car>>(CAR_BASE, {
     params: {

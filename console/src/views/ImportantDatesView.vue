@@ -565,6 +565,7 @@ import {
   listImportantDates,
   listOperationLogs,
   listPersons,
+  patchSortOrder,
   updateCar,
   updateImportantDate,
   updatePerson,
@@ -923,50 +924,50 @@ function dropCar(targetIndex: number) {
   void persistOrder("car", reordered.map((c) => c.metadata.name));
 }
 
-/** 把顺序落库：已排序列（按新顺序）+ 其余（按当前顺序），统一写入 1..n */
+/** 把顺序落库：只写「真正需要改动的连续区间」，并且**串行**逐个提交（避免一次拖拽并发打出一串请求） */
 async function persistOrder(kind: "date" | "person" | "car", orderedNames: string[]) {
   try {
-    if (kind === "date") {
-      const byName = new Map(dates.value.map((d) => [d.metadata.name, d]));
-      const ordered = orderedNames.map((n) => byName.get(n)!).filter(Boolean);
-      const rest = sortedDates.value.filter((d) => !orderedNames.includes(d.metadata.name));
-      const full = [...ordered, ...rest];
-      let order = 1;
-      const toUpdate: ImportantDate[] = [];
-      for (const d of full) {
-        const next = { ...d, spec: { ...d.spec, sortOrder: order++ } };
-        if ((d.spec.sortOrder || 0) !== next.spec.sortOrder) toUpdate.push(next);
-      }
-      if (toUpdate.length) {
-        await Promise.all(toUpdate.map((u) => updateImportantDate(u)));
-      }
+    const list: { metadata: { name: string }; spec: { sortOrder?: number } }[] =
+      kind === "date" ? sortedDates.value : kind === "car" ? sortedCars.value : sortedPersons.value;
+    const byName = new Map(list.map((i) => [i.metadata.name, i]));
+    const ordered = orderedNames.map((n) => byName.get(n)).filter(Boolean) as typeof list;
+    const rest = list.filter((i) => !orderedNames.includes(i.metadata.name));
+    const full = [...ordered, ...rest];
+
+    // 当前顺序 → 新顺序：找出发生变化的位置区间，把写入压到最小
+    const currentIndex = new Map(list.map((i, idx) => [i.metadata.name, idx]));
+    const changed = full.map((i, idx) => (currentIndex.get(i.metadata.name) === idx ? -1 : idx)).filter((i) => i >= 0);
+    if (!changed.length) {
       Toast.success("已保存排序");
-    } else {
-      const isCar = kind === "car";
-      const source: { metadata: { name: string }; spec: { sortOrder?: number } }[] = isCar
-        ? cars.value
-        : persons.value;
-      const sortedList = isCar ? sortedCars.value : sortedPersons.value;
-      const byName = new Map(source.map((p) => [p.metadata.name, p]));
-      const ordered = orderedNames.map((n) => byName.get(n)!).filter(Boolean);
-      const rest = sortedList.filter((p) => !orderedNames.includes(p.metadata.name));
-      const full = [...ordered, ...rest];
-      let order = 1;
-      const toUpdate: { item: Person | Car; next: Person | Car }[] = [];
-      for (const p of full) {
-        const next = { ...p, spec: { ...p.spec, sortOrder: order++ } } as Person | Car;
-        if ((p.spec.sortOrder || 0) !== next.spec.sortOrder) toUpdate.push({ item: p as Person | Car, next });
-      }
-      if (toUpdate.length) {
-        await Promise.all(
-          toUpdate.map(({ next }) => (isCar ? updateCar(next as Car) : updatePerson(next as Person)))
-        );
-      }
-      Toast.success("已保存排序");
+      return;
     }
+    // 数据若非「1..n 连续」形态（手工改过），回退为整表重排，避免区间外的老值落在区间数值里
+    const dense = list.every((item, idx) => (item.spec.sortOrder || 0) === idx + 1);
+    const from = dense ? Math.min(...changed) : 0;
+    const to = dense ? Math.max(...changed) : full.length - 1;
+
+    const writes: { name: string; sortOrder: number }[] = [];
+    for (let i = from; i <= to; i++) {
+      const item = full[i];
+      const sortOrder = i + 1;
+      if ((item.spec.sortOrder || 0) !== sortOrder) {
+        writes.push({ name: item.metadata.name, sortOrder });
+      }
+    }
+    // 串行提交：一次拖拽通常只有 1~3 条，逐个发（并发会被反向代理限流/限制连接数 → 503）
+    for (const w of writes) {
+      await patchSortOrder(kind, w.name, w.sortOrder);
+      await new Promise((r) => setTimeout(r, 40));
+    }
+    Toast.success("已保存排序");
     await load();
   } catch (error) {
-    Toast.error(`保存排序失败：${(error as Error)?.message || "未知错误"}`);
+    const status = (error as { response?: { status?: number } })?.response?.status;
+    const hint =
+      status === 503 || status === 502 || status === 504
+        ? "站点反向代理暂时不可用（HTTP " + status + "），已自动重试仍失败，请稍后再拖一次"
+        : (error as Error)?.message || "未知错误";
+    Toast.error(`保存排序失败：${hint}`);
     await load();
   }
 }
