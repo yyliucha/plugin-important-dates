@@ -232,3 +232,45 @@ export function policyLabelOf(name: string, policies: NamedOption[]): string {
   if (!value) return "";
   return policies.find((p) => p.name === value)?.label || value;
 }
+
+// ---------- 「引用已失效」检测（1.2.5） ----------
+//
+// 我们存的是附件的访问地址（相册 photos[].url、大头贴 avatar）。附件在 Halo「附件」里被删除、
+// 或存储策略变化 / 被其它插件（如防直链类）拦截导致文件不可访问后，这些地址就会变成 404 —— 前台与
+// 后台显示裂图。这里在打开列表时**批量取一次附件清单**做比对（不是每张图发一次请求），把失效的
+// 引用标出来。外部地址（非本站 /upload/**）无法判断，一律不标记，避免误报。
+
+/** 去掉 query / hash，得到可比对的地址 */
+export function permalinkKey(url?: string): string {
+  if (!url) return "";
+  return url.split("#")[0].split("?")[0].trim();
+}
+
+/** 取当前仍存在的附件地址集合；取不到时返回 null（此时不做任何标记） */
+export async function fetchLivePermalinks(size = 500): Promise<Set<string> | null> {
+  try {
+    const { data } = await axiosInstance.get<{ items?: { status?: { permalink?: string } }[] }>(
+      "/apis/storage.halo.run/v1alpha1/attachments",
+      { params: { page: 1, size } }
+    );
+    const set = new Set<string>();
+    for (const a of data?.items || []) {
+      const key = permalinkKey(a.status?.permalink);
+      if (key) set.add(key);
+    }
+    return set;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 该地址是否已失效：只判断本站 `/upload/**` 且能拿到附件清单的情况。
+ * @param live 附件清单（null = 没取到，一律返回 false，避免误报）
+ */
+export function isBrokenLocalImage(url: string | undefined, live: Set<string> | null): boolean {
+  if (!live) return false;
+  const key = permalinkKey(url);
+  if (!key || !key.startsWith("/upload/")) return false;
+  return !live.has(key);
+}

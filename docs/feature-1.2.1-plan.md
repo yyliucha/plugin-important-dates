@@ -59,6 +59,20 @@
 
 **实测对比**:写请求 6 PUT(+6 GET)→ **5 PATCH(0 GET)**;最大并发 **6 → 1**;全部 2xx 且顺序正确落库。
 
+## 1.2.5 新能力(图片引用失效的降级与标记)
+
+**背景**:插件存的是附件的访问地址(相册 `photos[].url`、大头贴 `avatar`)。附件被删除、存储策略变化,或被**其它插件的全局规则拦截**(如防直链类插件把 `/upload/**` 变 404)后,这些地址失效 → 前台/后台裂图,且不知是哪条记录在引用。用户认可方案:**不受其它插件影响 = 即使被影响也不裂图,并能定位**。
+
+| 层面 | 实现 | 状态 |
+|---|---|---|
+| 前台降级 | 封面失效 → 车型图标;大头贴失效 → 首字头像;相册失效图 → 「图片已不可用(附件可能已被删除)」占位卡(`important-dates.html` 的 `onerror` + `.id-avatar-slot` / `.id-album-broken`) | ✅ |
+| 后台标记 | 车辆卡片 `含失效图片 N`、人员卡片 `大头贴已失效`;座驾表单相册行 🚫 占位 + 说明 + 一键移除/换图 | ✅ |
+| 检测方式 | 打开列表时**批量取一次附件清单**比对(`fetchLivePermalinks` / `isBrokenLocalImage`,新增于 `console/src/utils/attachmentLibrary.ts`);只判断本站 `/upload/**`(去掉 query/hash),外部地址不标记;清单取不到时不标记(零误报) | ✅ |
+
+**1.2.5-SNAPSHOT 验证(全新 Halo 2.26 实例)**:冒烟 **50/50**、浏览器端到端 **13/13**、附件库来源范围 **5/5**、拖拽排序 **6/6**,以及**新增图片失效专项 `verify-image-fallback.mjs` 7/7**(构造真实附件 + 人为不存在的 `/upload/definitely-missing-*.png`,断言两类后台标签、相册行提示、前台封面与大头贴降级、相册占位、零脚本错误)。截图:`docs/manual-test/e125-front-fallback.png`、`e125-console-broken.png`。
+
+**交付**:`build/libs/plugin-important-dates-1.2.5-SNAPSHOT.jar`(控制台产物 `console/main.lBCCSvfy.js`;SHA256 `9401D2D13B2867019BAA7729035E1B93FB939760327EF6C7E5D3BA3FD634A302`)+ `docs/release-notes-1.2.5-SNAPSHOT.md` / `.en.md`;正式版 `1.2.5` 等用户测试通过后发布。
+
 **1.2.4-SNAPSHOT 验证(全新 Halo 2.26 实例)**:冒烟 `halo-smoke.mjs` **50/50**;浏览器端到端 `browser-121-e2e.mjs` **13/13**;附件库来源范围 `verify-album-scope.mjs` **5/5**;**拖拽排序专项 `verify-sort-save.mjs` 6/6**(并发=1、无逐条 GET、仅 PATCH、无 5xx、顺序落库正确)。同时加固 `halo-smoke.mjs` 就绪检测:要求「插件接口 + 前台页面」连续两次正常,避免安装后 Halo 重启插件的窗口期(前台瞬时 500 `Scheme not found`)被误判。
 
 **交付**:`build/libs/plugin-important-dates-1.2.4-SNAPSHOT.jar`(控制台产物 `console/main.Dtn6WhNb.js`)+ `docs/release-notes-1.2.4-SNAPSHOT.md` / `.en.md`;正式版 `1.2.4` 等用户测试通过后发布。

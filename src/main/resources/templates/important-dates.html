@@ -52,6 +52,11 @@
       .id-car-cover-more{position:absolute;right:6px;bottom:6px;background:rgba(15,23,42,.55);color:#fff;font-size:.7rem;border-radius:999px;padding:1px 7px;}
       .id-car-cover-empty{cursor:help;flex-direction:column;gap:2px;border:1px dashed rgba(128,128,128,.45);}
       .id-car-cover-hint{font-size:.62rem;opacity:.7;letter-spacing:.02em;}
+      /* 图片不可用时的降级：大头贴回退首字、相册占位（1.2.5） */
+      .id-avatar-slot{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;flex:none;margin-right:10px;}
+      .id-avatar-slot img{width:34px;height:34px;border-radius:8px;object-fit:cover;display:block;box-shadow:inset 0 0 0 1px rgba(128,128,128,.2);}
+      .id-avatar-slot .id-memo-avatar{margin-right:0;}
+      .id-album-broken{display:flex;align-items:center;justify-content:center;min-height:120px;width:100%;border:1px dashed rgba(148,163,184,.6);border-radius:12px;color:#94a3b8;font-size:.85rem;padding:18px;}
       .id-tip{position:fixed;left:50%;bottom:32px;transform:translateX(-50%) translateY(8px);background:rgba(17,24,39,.94);color:#f8fafc;padding:11px 20px;border-radius:12px;font-size:.9rem;box-shadow:0 10px 30px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .2s ease,transform .2s ease;z-index:9999;max-width:min(90vw,520px);text-align:center;}
       .id-tip.show{opacity:1;transform:translateX(-50%) translateY(0);}
       .id-car-name{font-weight:700;font-size:1.05rem;display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0;word-break:keep-all;}
@@ -186,7 +191,7 @@
             <button type="button" class="id-album-close" data-album-close="1" aria-label="关闭">✕</button>
           </div>
           <div class="id-album-body">
-            <img th:each="photo : ${c.photos}" th:src="${photo.url}" th:alt="${c.displayName}" loading="lazy" />
+            <img th:each="photo : ${c.photos}" th:src="${photo.url}" th:alt="${c.displayName}" loading="lazy" onerror="this.style.display='none';var d=document.createElement('div');d.className='id-album-broken';d.textContent='图片已不可用（附件可能已被删除）';this.parentNode.insertBefore(d,this.nextSibling);" />
           </div>
         </div>
       </th:block>
@@ -227,7 +232,7 @@
               <small>天后</small>
             </div>
             <div class="id-memo-title" style="padding-right:0;">
-              <img th:if="${showAvatar != null and showAvatar and p.avatar != null and !p.avatar.isBlank()}" th:src="${p.avatar}" alt="" style="width:34px;height:34px;border-radius:8px;object-fit:cover;flex:none;margin-right:10px;box-shadow:inset 0 0 0 1px rgba(128,128,128,.2);"/><span class="id-memo-avatar" th:unless="${showAvatar != null and showAvatar and p.avatar != null and !p.avatar.isBlank()}" th:text="${#strings.substring(p.displayName, 0, 1)}">老</span>
+              <span class="id-avatar-slot" th:if="${showAvatar != null and showAvatar and p.avatar != null and !p.avatar.isBlank()}"><img th:src="${p.avatar}" alt="" onerror="this.style.display='none';var s=this.nextElementSibling;if(s){s.style.display='flex';}"/><span class="id-memo-avatar" style="display:none" th:text="${#strings.substring(p.displayName, 0, 1)}">老</span></span><span class="id-memo-avatar" th:unless="${showAvatar != null and showAvatar and p.avatar != null and !p.avatar.isBlank()}" th:text="${#strings.substring(p.displayName, 0, 1)}">老</span>
               <span th:text="${p.displayName}">老婆</span>
               <span th:if="${p.relation}" style="font-size:.8em;opacity:.75;" th:text="|（${p.relation}）|">（配偶）</span>
             </div>
@@ -250,7 +255,7 @@
           <div class="id-memo id-person" th:each="p : ${carPeople}"
                th:classappend="${carSkinEnabled != null and carSkinEnabled} ? ((p.gender == '男') ? 'id-person-skin-cool' : ((p.gender == '女') ? 'id-person-skin-cute' : '')) : ''">
             <div class="id-memo-title" style="padding-right:0;">
-              <img th:if="${showAvatar != null and showAvatar and p.avatar != null and !p.avatar.isBlank()}" th:src="${p.avatar}" alt="" style="width:34px;height:34px;border-radius:8px;object-fit:cover;flex:none;margin-right:10px;box-shadow:inset 0 0 0 1px rgba(128,128,128,.2);"/><span class="id-memo-avatar" th:unless="${showAvatar != null and showAvatar and p.avatar != null and !p.avatar.isBlank()}" th:text="${#strings.substring(p.displayName, 0, 1)}">老</span>
+              <span class="id-avatar-slot" th:if="${showAvatar != null and showAvatar and p.avatar != null and !p.avatar.isBlank()}"><img th:src="${p.avatar}" alt="" onerror="this.style.display='none';var s=this.nextElementSibling;if(s){s.style.display='flex';}"/><span class="id-memo-avatar" style="display:none" th:text="${#strings.substring(p.displayName, 0, 1)}">老</span></span><span class="id-memo-avatar" th:unless="${showAvatar != null and showAvatar and p.avatar != null and !p.avatar.isBlank()}" th:text="${#strings.substring(p.displayName, 0, 1)}">老</span>
               <span th:text="${p.displayName}">老婆</span>
               <span th:if="${p.relation}" style="font-size:.8em;opacity:.75;" th:text="|（${p.relation}）|">（配偶）</span>
             </div>
@@ -271,7 +276,7 @@
           <div class="id-board">
             <div class="id-memo id-person" th:each="p : ${otherPeople}">
               <div class="id-memo-title" style="padding-right:0;">
-                <img th:if="${showAvatar != null and showAvatar and p.avatar != null and !p.avatar.isBlank()}" th:src="${p.avatar}" alt="" style="width:34px;height:34px;border-radius:8px;object-fit:cover;flex:none;margin-right:10px;box-shadow:inset 0 0 0 1px rgba(128,128,128,.2);"/><span class="id-memo-avatar" th:unless="${showAvatar != null and showAvatar and p.avatar != null and !p.avatar.isBlank()}" th:text="${#strings.substring(p.displayName, 0, 1)}">张</span>
+                <span class="id-avatar-slot" th:if="${showAvatar != null and showAvatar and p.avatar != null and !p.avatar.isBlank()}"><img th:src="${p.avatar}" alt="" onerror="this.style.display='none';var s=this.nextElementSibling;if(s){s.style.display='flex';}"/><span class="id-memo-avatar" style="display:none" th:text="${#strings.substring(p.displayName, 0, 1)}">张</span></span><span class="id-memo-avatar" th:unless="${showAvatar != null and showAvatar and p.avatar != null and !p.avatar.isBlank()}" th:text="${#strings.substring(p.displayName, 0, 1)}">张</span>
                 <span th:text="${p.displayName}">张三</span>
                 <span th:if="${p.relation}" style="font-size:.8em;opacity:.75;" th:text="|（${p.relation}）|">（朋友）</span>
               </div>

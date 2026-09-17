@@ -173,7 +173,14 @@
           @drop="dropPhoto(idx)"
         >
           <span class="drag-handle" title="拖拽排序">⠿</span>
-          <img :src="p.url" alt="" class="thumb" />
+          <img
+            v-if="!isBrokenPhoto(p.url)"
+            :src="p.url"
+            alt=""
+            class="thumb"
+            @error="markPhotoFailed(p.url)"
+          />
+          <span v-else class="thumb thumb-broken" title="图片地址已失效">🚫</span>
           <div class="album-meta">
             <span class="album-name">{{ p.name || "未命名" }}</span>
             <div class="album-tags">
@@ -185,6 +192,9 @@
                 <input v-model="p.frontVisible" type="checkbox" />
                 <span>展示</span>
               </label>
+              <span v-if="isBrokenPhoto(p.url)" class="broken-note">
+                图片已不可用（附件可能已被删除），请移除或重新选择
+              </span>
             </div>
           </div>
           <VButton size="sm" type="danger" @click="form.photos.splice(idx, 1)">移除</VButton>
@@ -445,6 +455,8 @@ import {
   UNGROUPED,
   fetchGroups,
   fetchImageLibrary,
+  fetchLivePermalinks,
+  isBrokenLocalImage,
   fetchPolicies,
   groupLabelOf,
   policyLabelOf,
@@ -563,6 +575,23 @@ const libPolicyName = ref("");
 
 const libGroupLabel = computed(() => groupLabelOf(libGroupName.value, libGroups.value));
 const libPolicyLabel = computed(() => policyLabelOf(libPolicyName.value, libPolicies.value));
+
+// ---------- 相册图片「引用已失效」标记（1.2.5）----------
+const livePermalinks = ref<Set<string> | null>(null);
+const failedPhotoUrls = ref<Set<string>>(new Set());
+
+/** 图片不可用：附件清单判定失效，或本次加载失败 */
+function isBrokenPhoto(url: string): boolean {
+  return isBrokenLocalImage(url, livePermalinks.value) || failedPhotoUrls.value.has(url);
+}
+function markPhotoFailed(url: string) {
+  const next = new Set(failedPhotoUrls.value);
+  next.add(url);
+  failedPhotoUrls.value = next;
+}
+async function loadAttachmentIndex() {
+  livePermalinks.value = await fetchLivePermalinks();
+}
 
 const libGroupHint = computed(() =>
   scopeHint(libScope.value, { group: libGroupLabel.value, policy: libPolicyLabel.value })
@@ -974,6 +1003,8 @@ watch(
   async (v) => {
     if (!v) return;
     void loadSettings();
+    void loadAttachmentIndex();
+    failedPhotoUrls.value = new Set();
     try {
       persons.value = await listPersons();
     } catch {
@@ -1421,5 +1452,21 @@ watch(
   font-size: 12px;
   line-height: 1.6;
   color: #6b7280;
+}
+/* 相册图片「引用已失效」标记（1.2.5） */
+.thumb-broken {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  background: #fef2f2;
+  border: 1px dashed #fca5a5;
+  color: #b91c1c;
+  flex: none;
+}
+
+.broken-note {
+  font-size: 12px;
+  color: #b91c1c;
 }</style>
 

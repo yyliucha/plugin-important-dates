@@ -184,10 +184,12 @@
         >
           <div class="person-head">
             <div class="person-name">
-              <img v-if="p.spec.avatar" class="person-avatar" :src="p.spec.avatar" alt=""
+              <img v-if="p.spec.avatar && !avatarBrokenOf(p)" class="person-avatar" :src="p.spec.avatar" alt=""
                onerror="this.style.display='none';var s=document.createElement('span');s.className='person-avatar person-avatar-char';s.style.display='inline-flex';s.textContent=this.closest('.person-name')?.querySelector('span')?.textContent?.slice(0,1)||'?';this.parentNode.insertBefore(s,this);" />
+              <span v-else-if="p.spec.avatar" class="person-avatar person-avatar-char">{{ (p.spec.displayName || "?").slice(0, 1) }}</span>
               <span>{{ p.spec.displayName }}</span>
               <VTag v-if="p.spec.visible === false" theme="danger" class="hidden-tag">已隐藏</VTag>
+              <VTag v-if="avatarBrokenOf(p)" theme="danger" class="broken-tag">大头贴已失效</VTag>
             </div>
             <VSpace>
               <VTag v-if="p.spec.relation" theme="secondary">{{ p.spec.relation }}</VTag>
@@ -274,7 +276,12 @@
         >
           <div class="car-head">
             <div class="car-cover" :class="`car-cover-${skinOf(c)}`">
-              <img v-if="carCover(c)" :src="carCover(c) || ''" alt="" />
+              <img
+                v-if="carCover(c) && !useCoverFallback(c)"
+                :src="carCover(c) || ''"
+                alt=""
+                @error="markImageFailed(`car:${c.metadata.name}`)"
+              />
               <span v-else class="car-cover-icon">{{ carIcon(c) }}</span>
             </div>
             <div class="car-title">
@@ -283,6 +290,9 @@
                 <VTag v-if="c.spec.status === 'SOLD'" theme="secondary">已出售</VTag>
                 <VTag v-else-if="c.spec.status === 'SCRAPPED'" theme="danger">已报废</VTag>
                 <VTag v-if="c.spec.visible !== true" theme="danger" class="hidden-tag">未展示</VTag>
+                <VTag v-if="brokenPhotoCount(c)" theme="danger" class="broken-tag">
+                  含失效图片 {{ brokenPhotoCount(c) }}
+                </VTag>
               </div>
               <div class="car-sub">
                 {{ carTypeLabel(c) }}<template v-if="c.spec.brand || c.spec.model"> · {{ [c.spec.brand, c.spec.model].filter(Boolean).join(" ") }}</template>
@@ -578,6 +588,7 @@ import type { Car, CarReminder, DateType, ImportantDate, LogAction, LogTargetTyp
 import { VEHICLE_TYPES } from "@/types";
 import { lunarMonthDayText, nextSolarDate } from "@/utils/lunar";
 import { type InspectionNotice, inspectionNotice, resolveDueDate, startOfToday } from "@/utils/vehicle";
+import { fetchLivePermalinks, isBrokenLocalImage } from "@/utils/attachmentLibrary";
 
 const loading = ref(true);
 const saving = ref(false);
@@ -670,6 +681,8 @@ async function load() {
     persons.value = personList;
     cars.value = carList;
     await loadRemindConfig();
+    // 附件清单：用于标出「引用已失效」的相册 / 大头贴（取不到时不做标记）
+    void loadAttachmentIndex();
   } finally {
     loading.value = false;
   }
@@ -786,6 +799,44 @@ function skinOf(c: Car): "cool" | "cute" | "neutral" {
   if (gender === "男") return "cool";
   if (gender === "女") return "cute";
   return "neutral";
+}
+
+// ---------- 图片引用已失效（附件被删除 / 被其它插件拦截）----------
+/** 仍存在的附件地址集合；null = 未取到（此时不做任何标记，避免误报） */
+const livePermalinks = ref<Set<string> | null>(null);
+
+async function loadAttachmentIndex() {
+  livePermalinks.value = await fetchLivePermalinks();
+}
+
+/** 相册里失效的图片数量 */
+function brokenPhotoCount(c: Car): number {
+  return (c.spec.photos || []).filter((p) => isBrokenLocalImage(p.url, livePermalinks.value)).length;
+}
+
+/** 大头贴是否已失效 */
+function avatarBrokenOf(p: Person): boolean {
+  return isBrokenLocalImage(p.spec.avatar, livePermalinks.value);
+}
+
+/** 图片加载失败（含被其它插件拦截）时的兜底记录 */
+const failedImages = ref<Set<string>>(new Set());
+function markImageFailed(key: string) {
+  const next = new Set(failedImages.value);
+  next.add(key);
+  failedImages.value = next;
+}
+function imageFailed(key: string): boolean {
+  return failedImages.value.has(key);
+}
+
+/** 封面是否走兜底（无图 / 清单判定失效 / 实际加载失败） */
+function useCoverFallback(c: Car): boolean {
+  return (
+    !carCover(c) ||
+    isBrokenLocalImage(carCover(c), livePermalinks.value) ||
+    imageFailed(`car:${c.metadata.name}`)
+  );
 }
 
 function reminderLabelOf(r: CarReminder): string {
@@ -2194,6 +2245,11 @@ function formatTime(iso?: string): string {
 
 .car-actions {
   margin-top: 4px;
+}
+
+/* 「引用已失效」标记（1.2.5） */
+.broken-tag {
+  margin-left: 6px;
 }
 </style>
 
