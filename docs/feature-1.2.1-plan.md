@@ -84,7 +84,7 @@
 
 **验证(全新 Halo 2.26 实例,均针对最终包)**:冒烟 **50/50**、浏览器端到端 **13/13**、附件库来源范围 **5/5**、拖拽排序 **6/6**、图片失效降级 **7/7**、**新增 1.2.5 新能力 `verify-features-125.mjs` 6/6**(自检 8 项 / 顺延 12 个月 / 缩略图 `?width=480` / 前台排序筛选 / 横幅逐条忽略 / 零脚本错误)。截图:`docs/manual-test/e125-selfcheck.png`。
 
-**交付(本地,未推送、未发版)**:`build/libs/plugin-important-dates-1.2.5-SNAPSHOT.jar`(控制台产物 `console/main.Dfvrs8Fg.js`;SHA256 `3322CF78…B2F1FFD5`)+ `docs/release-notes-1.2.5-SNAPSHOT.md` / `.en.md`。
+**交付(本地,未推送、未发版)**:`build/libs/plugin-important-dates-1.2.5-SNAPSHOT.jar`(控制台产物 `console/main.Dfvrs8Fg.js`;SHA256 `3337E5F6…0967CB52`)+ `docs/release-notes-1.2.5-SNAPSHOT.md` / `.en.md`。
 
 ## 1.2.5 新能力(图片引用失效的降级与标记)
 
