@@ -134,13 +134,37 @@ const RULE_MOTORCYCLE =
 const RULE_NO_BASE = "缺少首次登记日期，无法自动推算，请手动填写";
 const RULE_NO_INSPECTION = "电瓶车 / 自行车通常无需年检，可按当地规定手动填写";
 
+export interface InspectionRuleOptions {
+  /** 年检节点（年）：默认 [2,4,6,10] */
+  nodes?: number[];
+  /** 从第几年起每年上线检验：默认 11 */
+  yearlyFrom?: number;
+}
+
+/** 默认年检节点（与后端 VehicleSupport.DEFAULT_INSPECTION_NODES 一致） */
+export const DEFAULT_INSPECTION_NODES = [2, 4, 6, 10];
+/** 默认「从第 N 年起每年上线检验」 */
+export const DEFAULT_INSPECTION_YEARLY_FROM = 11;
+
+/** 解析设置里的年检节点文本（形如 "2,4,6,10"）；非法或为空回退默认 */
+export function parseInspectionNodes(text?: string | null): number[] {
+  if (!text) return [...DEFAULT_INSPECTION_NODES];
+  const nodes = (text.match(/\d+/g) || [])
+    .map((n) => Number(n))
+    .filter((n) => n >= 1 && n <= 30);
+  const unique = [...new Set(nodes)].sort((a, b) => a - b);
+  return unique.length ? unique : [...DEFAULT_INSPECTION_NODES];
+}
+
 /**
- * 按「首次登记日期 + 车辆分类」推算下一个年检节点（与后端 VehicleSupport.nextInspection 一致）。
+ * 按「首次登记日期 + 车辆分类」推算下一个年检节点（与后端 VehicleSupport.nextInspection 一致）：
+ * 默认第 2、4 年免检申领，第 6、10 年上线检验，第 11 年起每年上线；节点与起始年份可在设置里改。
  */
 export function nextInspection(
   registeredDate?: string | null,
   vehicleType?: string | null,
-  today: Date = startOfToday()
+  today: Date = startOfToday(),
+  options: InspectionRuleOptions = {}
 ): InspectionNext {
   const type = vehicleType || "";
   if (type === "EBIKE" || type === "BICYCLE") {
@@ -151,7 +175,14 @@ export function nextInspection(
     return { date: null, phase: "", rule: RULE_NO_BASE, manualNeeded: true };
   }
   const motorcycle = type === "MOTORCYCLE";
-  const rule = motorcycle ? RULE_MOTORCYCLE : RULE_CAR;
+  const nodes = options.nodes?.length ? options.nodes : DEFAULT_INSPECTION_NODES;
+  const yearlyFrom =
+    options.yearlyFrom && options.yearlyFrom >= 1 && options.yearlyFrom <= 30
+      ? options.yearlyFrom
+      : DEFAULT_INSPECTION_YEARLY_FROM;
+  const rule = motorcycle
+    ? RULE_MOTORCYCLE
+    : `按非营运小微型载客汽车规则推算（第 ${nodes.join("、")} 年检验；第 ${yearlyFrom} 年起每年上线检验；可在「座驾设置 → 年检节点」中按当地规则调整）`;
   let best: Date | null = null;
   let bestPhase = "";
   for (let year = 2; year <= 30; year++) {
@@ -160,15 +191,12 @@ export function nextInspection(
     if (motorcycle) {
       node = year <= 4 ? year % 2 === 0 : true;
       phase = year <= 4 ? "免检申领" : "上线检验";
-    } else if (year === 2 || year === 4) {
-      node = true;
-      phase = "免检申领";
-    } else if (year === 6 || year === 10) {
+    } else if (year >= yearlyFrom) {
       node = true;
       phase = "上线检验";
-    } else if (year >= 11) {
+    } else if (nodes.includes(year)) {
       node = true;
-      phase = "上线检验";
+      phase = year >= 6 ? "上线检验" : "免检申领";
     } else {
       node = false;
       phase = "";

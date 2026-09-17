@@ -38,11 +38,12 @@
       .id-memo-avatar{width:34px;height:34px;border-radius:8px;background:rgba(255,255,255,.55);color:#3f3f46;display:flex;align-items:center;justify-content:center;font-weight:700;margin-right:10px;flex:none;box-shadow:inset 0 0 0 1px rgba(128,128,128,.2);}
       @media (prefers-color-scheme: dark){.id-memo{box-shadow:0 3px 10px rgba(0,0,0,.5);}}
       .id-remind{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);border-radius:12px;padding:10px 16px;margin-bottom:14px;}
-      .id-remind-item{color:#d97706;line-height:1.9;}
+      .id-remind-item{color:#d97706;line-height:1.9;display:flex;align-items:baseline;justify-content:space-between;gap:10px;}.id-remind-x{border:0;background:transparent;color:inherit;opacity:.45;cursor:pointer;font:inherit;font-size:.9rem;line-height:1.4;padding:0 2px;}.id-remind-x:hover{opacity:.9;}
       @media (prefers-color-scheme: dark){.id-remind{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.4);}.id-remind-item{color:#fbbf24;}}
 
       /* ===== 爱车（座驾） ===== */
-      .id-cars{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;}
+      .id-car-toolbar{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin:0 0 12px;font-size:.9rem;opacity:.85;}.id-car-tool{display:inline-flex;align-items:center;gap:6px;}.id-car-tool select{font:inherit;font-size:.88rem;padding:3px 8px;border-radius:8px;border:1px solid rgba(128,128,128,.35);background:transparent;color:inherit;}
+    .id-cars{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;}
       .id-car{position:relative;border-radius:16px;padding:16px;background:#f8fafc;box-shadow:0 3px 10px rgba(0,0,0,.12);border:1px solid rgba(128,128,128,.16);display:flex;flex-direction:column;gap:10px;color:#334155;}
       .id-car-head{display:flex;gap:12px;align-items:center;}
       .id-car-cover{width:92px;height:70px;border-radius:12px;flex:none;overflow:hidden;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#eef2ff,#e0e7ff);cursor:zoom-in;border:0;padding:0;}
@@ -86,7 +87,7 @@
       .id-album{position:fixed;inset:0;z-index:9998;background:rgba(15,23,42,.86);display:none;flex-direction:column;align-items:center;padding:22px 14px;}
       .id-album.open{display:flex;}
       .id-album-body{max-width:860px;width:100%;overflow:auto;display:flex;flex-direction:column;gap:12px;padding-bottom:20px;}
-      .id-album-body img{width:100%;border-radius:12px;display:block;box-shadow:0 10px 30px rgba(0,0,0,.4);}
+      .id-album-body img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:12px;display:block;box-shadow:0 10px 30px rgba(0,0,0,.4);background:rgba(148,163,184,.12);}
       .id-album-bar{width:100%;max-width:860px;display:flex;align-items:center;justify-content:space-between;color:#e5e7eb;margin-bottom:12px;font-size:.95rem;}
       .id-album-close{border:0;background:rgba(255,255,255,.14);color:#fff;border-radius:999px;width:32px;height:32px;font-size:16px;cursor:pointer;}
       body.id-album-open{overflow:hidden;}
@@ -113,21 +114,23 @@
       </div>
 
       <!-- 生活视图：即将到来的重要日期 -->
-      <div class="id-remind id-only-life" th:if="${reminders != null && !reminders.isEmpty()}">
-        <div class="id-remind-item" th:each="r : ${reminders}">
+      <div class="id-remind id-only-life" th:if="${reminders != null && !reminders.isEmpty()}" th:attr="data-allow-dismiss=${allowDismiss}">
+        <div class="id-remind-item" th:each="r : ${reminders}" th:attr="data-dismiss-key=${'date#' + r.title + '#' + (r.nextSolarDate != null ? r.nextSolarDate : r.dateText)}">
           <span th:if="${r.daysUntil <= 0}" th:text="|「${r.title}」就是今天呀 🎉|">「结婚纪念日」就是今天呀 🎉</span>
           <span th:if="${r.daysUntil == 1}" th:text="|「${r.title}」明天就到啦～|">「结婚纪念日」明天就到啦～</span>
           <span th:if="${r.daysUntil > 1}" th:text="|「${r.title}」还有 ${r.daysUntil} 天就到啦～|">「结婚纪念日」还有 3 天就到啦～</span>
+          <button type="button" class="id-remind-x" data-dismiss="1" title="本次到期周期内不再提示">✕</button>
         </div>
       </div>
 
       <!-- 爱车视图：即将到来的座驾到期事项 -->
-      <div class="id-remind id-only-car" th:if="${carEvents != null && !carEvents.isEmpty()}">
-        <div class="id-remind-item" th:each="e : ${carEvents}">
+      <div class="id-remind id-only-car" th:if="${carEvents != null && !carEvents.isEmpty()}" th:attr="data-allow-dismiss=${allowDismiss}">
+        <div class="id-remind-item" th:each="e : ${carEvents}" th:attr="data-dismiss-key=${'car#' + e.carName + '#' + e.label + '#' + e.date}">
           <span th:if="${e.daysUntil < 0}" th:text="|「${e.carName}」的${e.label}已过期 ${-e.daysUntil} 天，记得安排一下呀～|">「小白」的交强险已过期 5 天</span>
           <span th:if="${e.daysUntil == 0}" th:text="|「${e.carName}」的${e.label}就是今天到期呀 🎉|">今天到期</span>
           <span th:if="${e.daysUntil == 1}" th:text="|「${e.carName}」的${e.label}明天到期～|">明天到期</span>
           <span th:if="${e.daysUntil > 1}" th:text="|「${e.carName}」的${e.label}还有 ${e.daysUntil} 天到期，记得安排一下呀～|">还有 7 天</span>
+          <button type="button" class="id-remind-x" data-dismiss="1" title="本次到期周期内不再提示">✕</button>
         </div>
       </div>
 
@@ -136,8 +139,24 @@
         <div class="id-only-car">
           <h2 class="id-block-title">我的爱车 <span class="id-count" th:text="${#lists.size(cars)}">2</span></h2>
           <p class="id-hero-sub" th:if="${#lists.isEmpty(cars)}">还没添加爱车，先记一辆吧～</p>
+                    <div class="id-car-toolbar">
+            <label class="id-car-tool">排序
+              <select id="id-car-sort">
+                <option value="default">默认（后台拖拽顺序）</option>
+                <option value="due">按到期临近</option>
+                <option value="name">按名称</option>
+              </select>
+            </label>
+            <label class="id-car-tool">显示
+              <select id="id-car-filter">
+                <option value="in_use">在用车</option>
+                <option value="all">全部（含已出售 / 已报废）</option>
+              </select>
+            </label>
+          </div>
           <div class="id-cars" th:unless="${#lists.isEmpty(cars)}">
             <div class="id-car" th:each="c : ${cars}"
+                 th:attr="data-name=${c.displayName},data-status=${c.status},data-due=${#lists.isEmpty(c.events) ? 999999 : c.events[0].daysUntil}"
                  th:classappend="${carSkinEnabled != null and carSkinEnabled} ? 'id-car-skin-' + ${c.skin} : 'id-car-skin-neutral'">
               <div class="id-car-head">
                 <button type="button" class="id-car-cover" th:if="${c.coverUrl != null and !c.coverUrl.isBlank()}"
@@ -330,6 +349,72 @@
           if (tipTimer) { clearTimeout(tipTimer); }
           tipTimer = setTimeout(function () { tipEl.classList.remove('show'); }, 2600);
         }
+        // 爱车视图：排序 / 筛选（纯前端，不请求接口；刷新后回到默认）
+        (function () {
+          var grid = app.querySelector('.id-cars');
+          var sortSel = document.getElementById('id-car-sort');
+          var filterSel = document.getElementById('id-car-filter');
+          if (!grid || !sortSel || !filterSel) { return; }
+          var cards = Array.prototype.slice.call(grid.querySelectorAll('.id-car'));
+          if (!cards.length) { return; }
+          function apply() {
+            var mode = sortSel.value;
+            var filter = filterSel.value;
+            var list = cards.slice();
+            for (var i = 0; i < list.length; i++) {
+              var status = list[i].getAttribute('data-status') || 'IN_USE';
+              var show = filter === 'all' || status === 'IN_USE';
+              list[i].style.display = show ? '' : 'none';
+            }
+            if (mode === 'due') {
+              list.sort(function (a, b) {
+                return (parseInt(a.getAttribute('data-due'), 10) || 999999) - (parseInt(b.getAttribute('data-due'), 10) || 999999);
+              });
+            } else if (mode === 'name') {
+              list.sort(function (a, b) {
+                return (a.getAttribute('data-name') || '').localeCompare(b.getAttribute('data-name') || '', 'zh-Hans-CN');
+              });
+            }
+            for (var j = 0; j < list.length; j++) { grid.appendChild(list[j]); }
+          }
+          sortSel.addEventListener('change', apply);
+          filterSel.addEventListener('change', apply);
+          apply();
+        })();
+        // 逐条忽略提醒：点 ✕ 表示"本次到期周期内不再提示"（存访客浏览器；到期日变化后自动重新提醒）
+        (function () {
+          var banners = app.querySelectorAll('.id-remind[data-allow-dismiss]');
+          if (!banners.length) { return; }
+          var KEY = 'important-dates:hidden-reminders';
+          var store = {};
+          try { store = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { store = {}; }
+          var changed = false;
+          for (var b = 0; b < banners.length; b++) {
+            if ((banners[b].getAttribute('data-allow-dismiss') || '') === 'false') { continue; }
+            var items = banners[b].querySelectorAll('[data-dismiss-key]');
+            for (var k = 0; k < items.length; k++) {
+              (function (el) {
+                var key = el.getAttribute('data-dismiss-key') || '';
+                if (key && store[key]) { el.style.display = 'none'; return; }
+                var btn = el.querySelector('[data-dismiss]');
+                if (!btn) { return; }
+                btn.addEventListener('click', function (ev) {
+                  ev.stopPropagation();
+                  if (key) { store[key] = 1; }
+                  try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) { /* 隐私模式下忽略 */ }
+                  el.style.display = 'none';
+                });
+              })(items[k]);
+            }
+          }
+          // 只保留最近 300 条记录，避免长期累积
+          var keys = Object.keys(store);
+          if (keys.length > 300) {
+            var trimmed = {};
+            for (var s = keys.length - 300; s < keys.length; s++) { trimmed[keys[s]] = 1; }
+            try { localStorage.setItem(KEY, JSON.stringify(trimmed)); } catch (e) { /* ignore */ }
+          }
+        })();
         var emptyCovers = app.querySelectorAll('[data-no-photo]');
         for (var q = 0; q < emptyCovers.length; q++) {
           emptyCovers[q].addEventListener('click', function (ev) {

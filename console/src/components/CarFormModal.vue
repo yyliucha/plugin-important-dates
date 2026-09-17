@@ -156,6 +156,9 @@
       <div class="album-actions">
         <VButton size="sm" :loading="uploading" @click="triggerUpload">上传图片</VButton>
         <VButton size="sm" @click="openLibrary">从附件库选择</VButton>
+        <VButton v-if="brokenCount" size="sm" type="danger" @click="removeBrokenPhotos">
+          移除失效图片（{{ brokenCount }}）
+        </VButton>
         <span class="hint">
           使用「附件设置」中的存储策略与分类；勾选「展示」的照片才会出现在前台相册，未勾选的仅后台可见（适合证件类照片）。
         </span>
@@ -175,9 +178,10 @@
           <span class="drag-handle" title="拖拽排序">⠿</span>
           <img
             v-if="!isBrokenPhoto(p.url)"
-            :src="p.url"
+            :src="thumb(p.url)"
             alt=""
             class="thumb"
+            loading="lazy"
             @error="markPhotoFailed(p.url)"
           />
           <span v-else class="thumb thumb-broken" title="图片地址已失效">🚫</span>
@@ -193,7 +197,8 @@
                 <span>展示</span>
               </label>
               <span v-if="isBrokenPhoto(p.url)" class="broken-note">
-                图片已不可用（附件可能已被删除），请移除或重新选择
+                图片已不可用（附件可能已被删除）
+                <button type="button" class="link-btn" @click="openLibraryFor(idx)">重新选择</button>
               </span>
             </div>
           </div>
@@ -330,7 +335,12 @@
             <input v-model="r.enabled" type="checkbox" />
             <span>启用提醒</span>
           </label>
-          <VButton size="sm" type="danger" @click="form.reminders.splice(idx, 1)">删除此项</VButton>
+          <VSpace>
+            <VButton v-if="r.date && !dateLocked(r)" size="sm" @click="postponeReminder(r)">
+              已办，顺延一期
+            </VButton>
+            <VButton size="sm" type="danger" @click="form.reminders.splice(idx, 1)">删除此项</VButton>
+          </VSpace>
         </div>
       </div>
       <div>
@@ -398,7 +408,7 @@
               :class="{ selected: libSelected.includes(a.permalink) }"
               @click="toggleLibItem(a.permalink)"
             >
-              <img :src="a.permalink" alt="" loading="lazy" />
+              <img :src="thumb(a.permalink)" alt="" loading="lazy" />
               <span class="lib-name">{{ a.displayName }}</span>
             </div>
           </div>
@@ -428,7 +438,7 @@
 import { computed, reactive, ref, watch } from "vue";
 import { Toast, VButton, VModal, VSpace } from "@halo-dev/components";
 import { axiosInstance } from "@halo-dev/api-client";
-import { createCar, fetchPluginJsonConfig, listPersons, updateCar } from "@/api";
+import { createCar, describeError, fetchPluginJsonConfig, listPersons, updateCar } from "@/api";
 import {
   ENERGY_TYPES,
   REMINDER_PRESETS,
@@ -446,9 +456,16 @@ import {
   COMMON_INSURERS,
   REPEAT_CUSTOM,
   REPEAT_OPTIONS,
+  DEFAULT_INSPECTION_NODES,
+  DEFAULT_INSPECTION_YEARLY_FROM,
+  addMonths,
   defaultRepeatMonths,
+  formatYmd,
   insuranceKey,
   nextInspection,
+  parseInspectionNodes,
+  parseYmd,
+  startOfToday,
   syncableKey,
 } from "@/utils/vehicle";
 import {
@@ -467,6 +484,7 @@ import {
   type NamedOption,
   type ScopeResult,
 } from "@/utils/attachmentLibrary";
+import { compressImage, humanSize, preloadImage, thumbUrl } from "@/utils/image";
 
 const props = defineProps<{
   visible: boolean;
@@ -578,6 +596,11 @@ const libPolicyLabel = computed(() => policyLabelOf(libPolicyName.value, libPoli
 
 // ---------- 相册图片「引用已失效」标记（1.2.5）----------
 const livePermalinks = ref<Set<string> | null>(null);
+const compressUpload = ref(true);
+const compressMaxWidth = ref(1920);
+const thumbWidth = ref(480);
+const inspectionNodes = ref<number[]>([...DEFAULT_INSPECTION_NODES]);
+const inspectionYearlyFrom = ref(DEFAULT_INSPECTION_YEARLY_FROM);
 const failedPhotoUrls = ref<Set<string>>(new Set());
 
 /** 图片不可用：附件清单判定失效，或本次加载失败 */
@@ -632,7 +655,10 @@ const registrationBase = computed(() => form.registeredDate || form.purchaseDate
 
 /** 年检规则推算结果（展示用；最终以服务端计算为准） */
 function inspectionPreview() {
-  return nextInspection(registrationBase.value, form.vehicleType);
+  return nextInspection(registrationBase.value, form.vehicleType, startOfToday(), {
+    nodes: inspectionNodes.value,
+    yearlyFrom: inspectionYearlyFrom.value,
+  });
 }
 
 function focusRegisteredDate() {
@@ -722,6 +748,18 @@ function effectiveRepeat(r: FormReminder): number {
   return r.repeatMonths != null ? Number(r.repeatMonths) : defaultRepeatMonths(r.key);
 }
 
+/**
+ * 「已办，顺延一期」：按该项的循环间隔把到期日往后推一期（不循环时按 12 个月），
+ * 便于续保 / 年检办完后一键滚动，不用手改日期。
+ */
+function postponeReminder(r: FormReminder) {
+  const months = effectiveRepeat(r) || 12;
+  const base = parseYmd(r.date) || startOfToday();
+  const next = addMonths(base, months > 0 ? months : 12);
+  r.date = formatYmd(next);
+  Toast.success(`已顺延 ${months} 个月：${r.date}`);
+}
+
 /** 保存时写入的到期日：同期项取交强险日期；年检自动推算时留空交给服务端 */
 function saveDate(r: FormReminder): string | undefined {
   if (syncChecked(r) && compulsoryDate.value) return compulsoryDate.value;
@@ -778,6 +816,33 @@ async function loadSettings() {
     const scope = await readAttachmentScope(cfg as Record<string, unknown> | undefined, true);
     libGroupName.value = scope.groupName;
     libPolicyName.value = scope.policyName;
+    const raw = (cfg as Record<string, unknown> | undefined)?.attachment;
+    let obj: { compressUpload?: boolean; compressMaxWidth?: number; thumbWidth?: number } = {};
+    if (typeof raw === "string") {
+      try {
+        obj = raw ? JSON.parse(raw) : {};
+      } catch {
+        obj = {};
+      }
+    } else if (raw && typeof raw === "object") {
+      obj = raw as typeof obj;
+    }
+    compressUpload.value = obj.compressUpload !== false;
+    const width = Number(obj.compressMaxWidth);
+    compressMaxWidth.value = Number.isFinite(width) && width >= 640 ? width : 1920;
+    const tw = Number(obj.thumbWidth);
+    thumbWidth.value = Number.isFinite(tw) && tw >= 0 ? tw : 480;
+    // 年检规则（座驾设置 → 年检节点 / 起每年上线年份）：用于表单预览，与后端一致
+    const carCfg = (cfg as Record<string, unknown> | undefined)?.car;
+    let carObj: { inspectionNodes?: string; inspectionYearlyFrom?: number } = {};
+    if (typeof carCfg === "string") {
+      try { carObj = carCfg ? JSON.parse(carCfg) : {}; } catch { carObj = {}; }
+    } else if (carCfg && typeof carCfg === "object") {
+      carObj = carCfg as typeof carObj;
+    }
+    inspectionNodes.value = parseInspectionNodes(carObj.inspectionNodes);
+    const yf = Number(carObj.inspectionYearlyFrom);
+    inspectionYearlyFrom.value = Number.isFinite(yf) && yf >= 1 && yf <= 30 ? yf : DEFAULT_INSPECTION_YEARLY_FROM;
   } catch {
     libGroupName.value = "";
     libPolicyName.value = "";
@@ -795,6 +860,32 @@ function triggerUpload() {
   fileInput.value?.click();
 }
 
+/** 缩略图地址（设置 thumbWidth=0 时用原图） */
+function thumb(url: string): string {
+  return thumbWidth.value > 0 ? thumbUrl(url, thumbWidth.value) : url;
+}
+
+/** 失效图片数量 + 一键移除 */
+const brokenCount = computed(() => form.photos.filter((p) => isBrokenPhoto(p.url)).length);
+function removeBrokenPhotos() {
+  const before = form.photos.length;
+  form.photos = form.photos.filter((p) => !isBrokenPhoto(p.url));
+  const removed = before - form.photos.length;
+  if (removed > 0) {
+    if (!form.photos.some((p) => p.isCover) && form.photos.length) {
+      form.photos[0].isCover = true;
+    }
+    Toast.success(`已移除 ${removed} 张失效图片`);
+  }
+}
+
+/** 「重新选择」：打开附件库并把选中的第一张替换到该行 */
+const replaceIndex = ref(-1);
+function openLibraryFor(idx: number) {
+  replaceIndex.value = idx;
+  openLibrary();
+}
+
 async function uploadOne(file: File): Promise<string | null> {
   const fd = new FormData();
   fd.append("file", file);
@@ -807,7 +898,12 @@ async function uploadOne(file: File): Promise<string | null> {
     "/apis/api.console.halo.run/v1alpha1/attachments/upload",
     fd
   );
-  return data?.status?.permalink || null;
+  const url = data?.status?.permalink || null;
+  // 上传后自检：确认地址真的能打开再写进记录，避免"存进去却打不开"
+  if (url && !(await preloadImage(url))) {
+    throw new Error("上传成功但图片无法访问：可能被存储策略或其它插件拦截，请检查站点附件设置");
+  }
+  return url;
 }
 
 async function onFileChange(e: Event) {
@@ -819,12 +915,20 @@ async function onFileChange(e: Event) {
   try {
     await loadSettings();
     let added = 0;
-    for (const f of files) {
-      const url = await uploadOne(f);
+    let savedBytes = 0;
+    for (const raw of files) {
+      // 上传前按需压缩（设置里可关）
+      let file = raw;
+      if (compressUpload.value && raw.type.startsWith("image/")) {
+        const result = await compressImage(raw, { maxWidth: compressMaxWidth.value, quality: 0.86 });
+        file = result.file;
+        if (result.compressed) savedBytes += result.originalSize - result.size;
+      }
+      const url = await uploadOne(file);
       if (url) {
         form.photos.push({
           url,
-          name: f.name,
+          name: raw.name,
           isCover: form.photos.length === 0,
           sortOrder: form.photos.length,
           frontVisible: true,
@@ -832,9 +936,10 @@ async function onFileChange(e: Event) {
         added++;
       }
     }
-    Toast.success(`已上传 ${added} 张照片`);
+    const saved = savedBytes > 0 ? `，压缩节省 ${humanSize(savedBytes)}` : "";
+    Toast.success(`已上传 ${added} 张照片${saved}`);
   } catch (error) {
-    Toast.error(`上传失败：${(error as Error)?.message || "请稍后重试"}`);
+    Toast.error(`上传失败：${describeError(error, "请稍后重试")}`);
   } finally {
     uploading.value = false;
   }
@@ -876,6 +981,7 @@ function toggleShowAll() {
   applyScope();
 }
 function openLibrary() {
+  replaceIndex.value = -1;
   libVisible.value = true;
   libSelected.value = [];
   showAllLib.value = false;
@@ -892,6 +998,26 @@ function toggleLibItem(url: string) {
 }
 
 function chooseLib() {
+  // 「重新选择」模式：用选中的第一张替换目标行
+  if (replaceIndex.value >= 0 && libSelected.value.length) {
+    const idx = replaceIndex.value;
+    const url = libSelected.value[0];
+    replaceIndex.value = -1;
+    if (idx < form.photos.length) {
+      form.photos[idx] = {
+        ...form.photos[idx],
+        url,
+        name: url.split("/").pop() || "",
+      };
+      const nextFailed = new Set(failedPhotoUrls.value);
+      nextFailed.delete(url);
+      failedPhotoUrls.value = nextFailed;
+      libVisible.value = false;
+      libSelected.value = [];
+      Toast.success("已替换这张照片");
+      return;
+    }
+  }
   let added = 0;
   for (const url of libSelected.value) {
     if (form.photos.some((p) => p.url === url)) continue;
@@ -911,6 +1037,7 @@ function chooseLib() {
 function closeLib() {
   libVisible.value = false;
   libSelected.value = [];
+  replaceIndex.value = -1;
 }
 
 function close() {

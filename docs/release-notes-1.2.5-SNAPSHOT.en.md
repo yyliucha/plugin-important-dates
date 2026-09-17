@@ -1,31 +1,50 @@
 ## v1.2.5-SNAPSHOT
 
-> **This is a preview / development build** that adds graceful degradation and admin marking for image references that no longer resolve. A stable `1.2.5` will follow once testing passes.
+> **This is a preview / development build** with 14 improvements. A stable `1.2.5` will follow once testing passes.
 >
 > **Hard-refresh your browser once after installing (Ctrl+Shift+R)**: the Halo console caches plugin console bundles, so a stale bundle hides the new UI.
 
-### New: when an image reference is dead, degrade gracefully and show it in the console
+### 1. Stability — every write goes through one hardened path
 
-**Background**: the plugin stores **attachment URLs** (vehicle album `photos[].url`, person avatar `avatar`). Once that attachment is deleted in Halo, moved to another storage policy, or **blocked by another plugin's global rule** (for example a hotlink-protection plugin turning `/upload/**` into 404), the stored URL dies — and the result is a broken image on the public page and in the console, with no easy way to tell which record is at fault.
+- **Only changed fields**: single-field actions (public visibility, inspection-note acknowledgement, drag sorting, …) now use **JSON Patch** instead of “GET the latest version, then PUT the whole object”, halving the request count.
+- **Batch writes are sequential** with a fixed gap — no more bursts; full-object saves (forms) also re-fetch the version and retry once on 409.
+- **Backoff retries on 429 / 5xx** for every write.
+- **Actionable Chinese errors**: 401/403/404/409/413/429/502/503/504 each get a clear message (for example “the site's reverse proxy is temporarily unavailable (HTTP 503) — retried and still failing, please try again”), instead of a bare `code 503`.
+- **Safer imports**: JSON import submits **one record at a time** with a gap, shows **progress** (x/y, failures) and lists **per-record failure reasons** (previously only a count).
 
-**Three things changed**:
+### 2. Image experience
 
-1. **Graceful degradation on the public page (visitors never see a broken image)**
-   - a dead vehicle cover falls back to the vehicle-type icon (`🚙` and friends), keeping the card layout intact;
-   - a dead avatar falls back to the initial-character badge (same look as when no avatar is set);
-   - a dead photo in the album viewer becomes a “Image unavailable (the attachment may have been deleted)” placeholder while the rest of the album still browses normally.
-2. **The console points at it**
-   - vehicle cards show a `含失效图片 N` badge; person cards show `大头贴已失效`;
-   - the album row in the vehicle form shows a 🚫 placeholder plus “Image unavailable (the attachment may have been deleted) — remove it or pick another”, and it can be removed or replaced in one click.
-3. **Cheap detection**: the console fetches the **attachment list once** when a list loads and compares locally (no per-image requests). Only site-local `/upload/**` URLs are judged — external URLs are never marked, and when the attachment list cannot be fetched **nothing is marked at all**, so there are no false positives.
+- **Post-upload check**: after uploading, the URL is verified to be reachable before it is written into the record — no more “saved but unopenable” (blocked by a storage policy or another plugin).
+- **Optional compression before upload**: images above 1.5 MB are compressed in the browser to a configurable width (1920 by default) with a “saved X MB” note; can be switched off under Photo settings.
+- **Thumbnails everywhere (configurable)**: admin lists, album grids and public cards use Halo's `?width=` derivatives (480 px by default, site-local `/upload/` attachments only) while opening a photo still shows the original; 0 means always original.
+- **One-click repair of stale references**: vehicle/person cards flag `含失效图片 N` / `大头贴已失效`, album rows offer “choose another”, and a new **“Remove broken images (N)”** action cleans them up; the public page already degrades to icons / initials / placeholders, so visitors never see a broken image.
 
-> This is “detect after the fact plus degrade gracefully” — it does **not** stop you from deleting attachments. If an attachment really is gone, use the badge to remove or replace the reference.
+### 3. Reminders
+
+- **“Done — roll one cycle”**: a button on each due item moves its date forward by its repeat interval (12 months by default) so renewals and inspections need no manual date editing.
+- **Dismiss a single reminder**: each line in the public banner and the dashboard widget has an ✕ that means “do not show this again in the current due cycle” (stored in the browser; a new due date brings it back), with a one-click restore; the capability can be switched off in settings.
+- **Configurable inspection rules**: new “Vehicle settings → inspection nodes (default 2,4,6,10)” and “yearly on-site inspection from (default 11)” — adjust to your local vehicle-office rules; the form preview, public reminders and the rule note all follow.
+
+### 4. Public page
+
+- **Garage toolbar**: sort by default (admin drag order) / nearest due / name, and filter in-use vs. all (including sold and scrapped) — client-side only.
+- **Consistent album ratio**: album photos render in a 4:3 frame (`object-fit: cover`) so browsing no longer jumps between image sizes.
+
+### 5. Maintainability
+
+- **Admin “Self-check” panel** (top-right of the Remember page): plugin version, data counts, reminder/display settings, how many images the photo settings actually match (and whether the scope was widened), **how many image references are stale**, and how many reminders are due soon — diagnosis without digging through logs.
+- **“About” settings group**: version plus four usage notes (hard refresh, self-check entry, image degradation behaviour, zero-write promise).
 
 ### Verified (clean Halo 2.26 instance)
 
-- Regression: `halo-smoke.mjs` **50/50 passed**; browser end-to-end `browser-121-e2e.mjs` **13/13 passed**; attachment-scope suite `verify-album-scope.mjs` **5/5 passed**; drag-and-drop order suite `verify-sort-save.mjs` **6/6 passed**
-- **Dead-image suite `verify-image-fallback.mjs` 7/7 passed**: the two console badges, the album-row hint, the public cover falling back to the type icon, the public avatar falling back to the initial character, the album placeholder, and no console errors (built with a real attachment plus a deliberately missing `/upload/definitely-missing-*.png`)
-- Screenshots: `docs/manual-test/e125-front-fallback.png`, `docs/manual-test/e125-console-broken.png`
+| Suite | Result |
+|---|---|
+| Smoke `halo-smoke.mjs` | **50/50 passed** |
+| Browser end-to-end `browser-121-e2e.mjs` | **13/13 passed** |
+| Attachment scope `verify-album-scope.mjs` | **5/5 passed** |
+| Drag-and-drop order `verify-sort-save.mjs` | **6/6 passed** |
+| Dead-image degradation `verify-image-fallback.mjs` | **7/7 passed** |
+| **New: 1.2.5 capabilities `verify-features-125.mjs`** | **6/6 passed** (8 self-check rows, +12-month roll, `?width=480` thumbnails, public sort/filter, per-line dismissal, no console errors) |
 
 ### Compatibility and upgrade
 

@@ -89,6 +89,7 @@ public class ImportantDateRouter {
                                 model.put("people", people);
                                 model.put("reminders", reminders);
                                 model.put("showImportantTag", cfg.showImportantTag());
+        model.put("allowDismiss", cfg.allowDismiss());
                                 model.put("showAvatar", cfg.showAvatar());
                                 // 座驾（1.2.0）：生活/爱车双视图数据
                                 model.put("cars", cars);
@@ -170,6 +171,7 @@ public class ImportantDateRouter {
                     result.put("toastMaxPerType", cfg.toastMaxPerType());
                     result.put("dashboardPageSize", cfg.dashboardPageSize());
                     result.put("dashboardPagination", cfg.dashboardPagination());
+                    result.put("allowDismiss", cfg.allowDismiss());
                     // 页面横幅由 frontendReminder 控制；全站悬浮提醒由 toastEnabled 控制
                     if (!cfg.frontendReminder() && !cfg.toastEnabled()) {
                         result.put("reminders", java.util.Collections.emptyList());
@@ -299,6 +301,8 @@ public class ImportantDateRouter {
             boolean showAvatar = boolValue(p, "showAvatar", false);
             int dashboardPageSize = intValue(b, "dashboardPageSize", 5);
             boolean dashboardPagination = boolValue(b, "dashboardPagination", true);
+            // 是否允许逐条忽略提醒（本周期内不再提示；状态存在访客浏览器）
+            boolean allowDismiss = boolValue(r, "allowDismiss", true);
             boolean carEventsEnabled = boolValue(c, "carEventsEnabled", true);
             boolean carFrontendSection = boolValue(c, "carFrontendSection", true);
             boolean carSkinEnabled = boolValue(c, "carSkinEnabled", true);
@@ -307,7 +311,7 @@ public class ImportantDateRouter {
                 toastCloseSeconds, toastEnabled, toastPosition, toastTitle, toastTemplate,
                 toastEmptyText, toastDefaultClose, toastCloseMenu, showAvatar,
                 carEventsEnabled, carFrontendSection, carSkinEnabled, toastMaxPerType,
-                dashboardPageSize, dashboardPagination);
+                dashboardPageSize, dashboardPagination, allowDismiss);
         });
     }
 
@@ -349,7 +353,8 @@ public class ImportantDateRouter {
         String toastTemplate, String toastEmptyText, String toastDefaultClose,
         boolean toastCloseMenu, boolean showAvatar,
         boolean carEventsEnabled, boolean carFrontendSection, boolean carSkinEnabled,
-        int toastMaxPerType, int dashboardPageSize, boolean dashboardPagination) {
+        int toastMaxPerType, int dashboardPageSize, boolean dashboardPagination,
+        boolean allowDismiss) {
     }
 }
 

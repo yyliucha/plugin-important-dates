@@ -23,6 +23,11 @@ spec:
           label: 前台提醒
           value: true
           help: 在前台 /important-dates 页面顶部显示到期提醒
+        - $formkit: checkbox
+          name: allowDismiss
+          label: 允许逐条忽略提醒
+          value: true
+          help: 开启后，前台横幅与后台仪表盘小组件的每条提醒右侧会出现「✕」：点一次表示"本到期周期内不再提示"（状态存在访客/管理员的浏览器里，到期日变化后自动重新提醒）。关闭则只能整块显示。
         - $formkit: number
           name: toastCloseSeconds
           label: 悬浮提示自动关闭秒数
@@ -179,6 +184,25 @@ spec:
             - label: 默认策略
               value: ""
           help: 座驾相册专用的「存储策略」：与人员大头贴相互独立。留空使用默认策略。
+        - $formkit: checkbox
+          name: compressUpload
+          label: 上传前自动压缩
+          value: true
+          help: 开启后，超过 1.5MB 的图片（手机直出照片常见 5–10MB）会先在浏览器里压缩到下面的最大宽度再上传：省流量、上传更快，前台加载也更快。关闭则原图上传。
+        - $formkit: number
+          name: compressMaxWidth
+          label: 压缩最大宽度（像素）
+          value: 1920
+          min: 640
+          max: 4096
+          help: 压缩后的最大宽度（高度按比例），1920 适合博客正文与相册；要求原图质量时可填 2560 或更高。
+        - $formkit: number
+          name: thumbWidth
+          label: 列表缩略图宽度（像素）
+          value: 480
+          min: 120
+          max: 1600
+          help: 后台列表、相册网格与前台卡片使用带 width 参数的缩略图（仅对本站 /upload 附件生效），点开查看时仍用原图。填 0 表示始终加载原图。
     - group: car
       label: 座驾设置
       formSchema:
@@ -203,5 +227,30 @@ spec:
           label: 性别统一徽章风格
           value: true
           help: 座驾卡片与其车主/驾驶人使用统一徽章：男生「酷」、女生「可爱」、未关联则中性。
+        - $formkit: text
+          name: inspectionNodes
+          label: 年检节点（年，逗号分隔）
+          value: "2,4,6,10"
+          help: 按当地规则调整年检节点：默认「2,4,6,10」= 非营运小微型载客汽车规则（第 2、4 年免检申领；第 6、10 年上线检验）。仅对非摩托车生效；摩托车与电瓶车/自行车仍走内置规则。填错或留空会回退默认。
+        - $formkit: number
+          name: inspectionYearlyFrom
+          label: 从第几年起每年上线检验
+          value: 11
+          min: 2
+          max: 30
+          help: 默认第 11 年起每年上线检验（与上面的节点共同构成完整规则）；当地规则不同时按车管所要求调整。
+    - group: about
+      label: 关于
+      formSchema:
+        - $formkit: text
+          name: aboutInfo
+          label: 版本与使用提示
+          value: "记得 · 1.2.5"
+          disabled: true
+          help: |-
+            ① 装包 / 升级后请在浏览器里强刷一次（Ctrl+Shift+R）：控制台会缓存插件的控制台包，不强刷可能出现「侧边栏没有『记得』、仪表盘小组件消失」等现象。
+            ② 自检入口：后台「记得」页面右上角「自检」——可查看插件状态、设置读取情况、图片引用失效数量、照片设置命中张数与即将到期条数。
+            ③ 图片不可用（附件被删除或被其它插件拦截）时，前台会自动降级为图标 / 首字 / 占位卡，不会出现破图；后台会标出受影响的记录，可一键移除或重新选择。
+            ④ 本插件零系统配置写入、零主题文件写入、无联网请求；升级请先备份站点数据。
 
 

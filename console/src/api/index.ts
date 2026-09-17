@@ -6,6 +6,106 @@ const LOG_BASE = "/apis/importantdates.halo.run/v1alpha1/operationlogs";
 const PERSON_BASE = "/apis/importantdates.halo.run/v1alpha1/persons";
 const CAR_BASE = "/apis/importantdates.halo.run/v1alpha1/cars";
 
+// ---------- 统一写操作通道（1.2.5）----------
+//
+// 站点常部署在反向代理之后（nginx / CDN）。代理的 limit_req / limit_conn 默认用 502/503 拒绝，
+// 且由代理自己回复（Halo 日志里看不到），因此控制台侧统一遵守三条：
+//   ① 尽量用 JSON Patch 只改变化字段（不再「GET 最新版本 → PUT 整对象」）；
+//   ② 批量写**串行**提交并留出间隔，绝不并发打出一串请求；
+//   ③ 对 429 / 5xx / 网络中断做退避重试。
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+export interface PatchOp {
+  op: "add" | "replace" | "remove";
+  path: string;
+  value?: unknown;
+}
+
+/** 是否值得重试（限流 / 网关 / 网络中断） */
+function isRetriable(error: unknown): boolean {
+  const status = (error as { response?: { status?: number } })?.response?.status ?? 0;
+  return status === 0 || status === 429 || (status >= 500 && status <= 599);
+}
+
+/** 带退避重试执行 */
+export async function withRetry<T>(fn: () => Promise<T>, attempts = 3, baseDelay = 300): Promise<T> {
+  let lastError: unknown;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (i === attempts || !isRetriable(error)) throw error;
+      await sleep(baseDelay * i);
+    }
+  }
+  throw lastError;
+}
+
+/** 批量写：**串行**执行（带间隔），避免一次操作并发打出一串请求被代理限流 */
+export async function runSequential<T>(
+  items: T[],
+  worker: (item: T, index: number) => Promise<void>,
+  gapMs = 40
+): Promise<void> {
+  for (let i = 0; i < items.length; i++) {
+    await worker(items[i], i);
+    if (i < items.length - 1) await sleep(gapMs);
+  }
+}
+
+/** 把接口错误翻译成可操作的中文提示（避免用户只看到 "code 503"） */
+export function describeError(error: unknown, fallback = "未知错误"): string {
+  const status = (error as { response?: { status?: number } })?.response?.status;
+  const message = (error as Error)?.message || "";
+  switch (status) {
+    case 400:
+      return "提交内容不合法（400），请检查填写项后重试";
+    case 401:
+      return "登录状态已失效（401），请重新登录后再试";
+    case 403:
+      return "没有权限（403）：当前账号缺少该操作权限";
+    case 404:
+      return "对象不存在（404）：可能已被删除，请刷新页面后重试";
+    case 409:
+      return "数据已被其它页面修改（409），已自动重试一次，请再试一次";
+    case 413:
+      return "内容过大（413）：请压缩图片或附件后再试";
+    case 429:
+      return "请求过于频繁（429），已被站点限流，请稍后重试";
+    case 502:
+    case 503:
+    case 504:
+      return `站点反向代理暂时不可用（HTTP ${status}），已自动重试仍失败，请稍后再试`;
+    default:
+      return status ? `请求失败（HTTP ${status}）` : message || fallback;
+  }
+}
+
+/** 用 JSON Patch 只改指定字段（写路径的默认方式） */
+export async function patchExtension(base: string, name: string, ops: PatchOp[]): Promise<void> {
+  await withRetry(() =>
+    axiosInstance.patch(`${base}/${name}`, ops, {
+      headers: { "Content-Type": "application/json-patch+json" },
+    })
+  );
+}
+
+// ---------- 单字段写操作的便捷封装（避免整对象 PUT） ----------
+
+export async function patchImportantDate(name: string, ops: PatchOp[]): Promise<void> {
+  await patchExtension(BASE, name, ops);
+}
+
+export async function patchPerson(name: string, ops: PatchOp[]): Promise<void> {
+  await patchExtension(PERSON_BASE, name, ops);
+}
+
+export async function patchCar(name: string, ops: PatchOp[]): Promise<void> {
+  await patchExtension(CAR_BASE, name, ops);
+}
+
 export async function listImportantDates(): Promise<ImportantDate[]> {
   const { data } = await axiosInstance.get<ListResult<ImportantDate>>(BASE, {
     params: {
@@ -64,9 +164,10 @@ export async function listOperationLogs(
 }
 
 /**
- * 扩展更新通用处理：先用服务端最新 metadata.version 覆盖，再提交；
- * 若仍返回 409（并发冲突，例如列表打开后记录被其他页面/操作更新过），
- * 自动拉取最新版本重试一次，避免用户看到 "code 409" 这类难以理解的报错。
+ * 扩展更新通用处理（整对象保存场景，例如表单保存）：
+ * 先用服务端最新 metadata.version 覆盖，再提交；对 429/5xx 退避重试；
+ * 若返回 409（并发冲突）自动拉取最新版本重试一次。
+ * 说明：单字段修改请走 patchXxx（JSON Patch），不要再整对象 PUT。
  */
 async function putExtension<T extends { metadata: { name: string; version?: number } }>(
   base: string,
@@ -76,23 +177,24 @@ async function putExtension<T extends { metadata: { name: string; version?: numb
     const { data } = await axiosInstance.put<T>(`${base}/${payload.metadata.name}`, payload);
     return data;
   };
-  let payload = item;
+  const withLatestVersion = async (): Promise<T> => {
+    try {
+      const { data: latest } = await axiosInstance.get<T>(`${base}/${item.metadata.name}`);
+      return { ...item, metadata: { ...item.metadata, ...latest.metadata } };
+    } catch {
+      return item;
+    }
+  };
+  const payload = await withLatestVersion();
   try {
-    const { data: latest } = await axiosInstance.get<T>(`${base}/${item.metadata.name}`);
-    payload = { ...item, metadata: { ...item.metadata, ...latest.metadata } };
-  } catch {
-    // 取不到最新版本时按原样提交，由下面的重试兜底
-  }
-  try {
-    return await doPut(payload);
+    return await withRetry(() => doPut(payload));
   } catch (error) {
     const status = (error as { response?: { status?: number } })?.response?.status;
     if (status !== 409) {
       throw error;
     }
-    const { data: latest } = await axiosInstance.get<T>(`${base}/${item.metadata.name}`);
-    const retried = { ...item, metadata: { ...item.metadata, ...latest.metadata } };
-    return await doPut(retried);
+    const retried = await withLatestVersion();
+    return await withRetry(() => doPut(retried));
   }
 }
 export async function listPersons(): Promise<Person[]> {
@@ -131,31 +233,13 @@ const SORT_BASE: Record<SortKind, string> = {
 };
 
 /**
- * 写入单个对象的 sortOrder。
+ * 写入单个对象的 sortOrder（拖拽排序用）。
  *
- * 站点常有反向代理（nginx / CDN）限速或限制并发连接，一次拖拽若并发打出十几个请求会被直接 503
- * （此时服务端没有日志）。因此这里：① 用 PATCH 只改一个字段，不再先 GET 再 PUT；② 对 429/5xx
- * 做指数退避重试；③ 由调用方串行调用。
+ * 站点常有反向代理限速或限制并发连接，一次拖拽若并发打出十几个请求会被直接 502/503
+ * （此时服务端没有日志）。因此这里只改一个字段，并由调用方**串行**调用。
  */
 export async function patchSortOrder(kind: SortKind, name: string, sortOrder: number): Promise<void> {
-  const url = `${SORT_BASE[kind]}/${name}`;
-  const body = [{ op: "add", path: "/spec/sortOrder", value: sortOrder }];
-  const attempts = 3;
-  for (let i = 1; i <= attempts; i++) {
-    try {
-      await axiosInstance.patch(url, body, {
-        headers: { "Content-Type": "application/json-patch+json" },
-      });
-      return;
-    } catch (error) {
-      const status = (error as { response?: { status?: number } })?.response?.status ?? 0;
-      const retriable = status === 0 || status === 429 || (status >= 500 && status <= 599);
-      if (!retriable || i === attempts) {
-        throw error;
-      }
-      await new Promise((r) => setTimeout(r, 300 * i));
-    }
-  }
+  await patchExtension(SORT_BASE[kind], name, [{ op: "add", path: "/spec/sortOrder", value: sortOrder }]);
 }
 
 export async function listCars(): Promise<Car[]> {

@@ -59,6 +59,33 @@
 
 **实测对比**:写请求 6 PUT(+6 GET)→ **5 PATCH(0 GET)**;最大并发 **6 → 1**;全部 2xx 且顺序正确落库。
 
+## 1.2.5 完善批次(用户确认「全做」的 14 项)
+
+按用户要求:**只本地开发 + 本地测试实例验证,不推送 GitHub、不生成发布包**,待确认后统一发版。
+
+| # | 内容 | 落地位置 | 状态 |
+|---|---|---|---|
+| 1 | 写操作统一:只 PATCH 变化字段 + 串行 + 429/5xx 退避重试(含 409 重取版本) | `console/src/api/index.ts`(`patchExtension` / `withRetry` / `runSequential` / `patchCar·patchPerson·patchImportantDate`);视图里的前台开关、E 提示确认、拖拽排序改用 PATCH | ✅ |
+| 2 | 导入节流 + 进度 + 失败明细 | `ImportantDatesView.vue#doImport`(逐条 40ms、`importProgress`、`importFailures`) | ✅ |
+| 3 | 统一中文错误提示 | `describeError()`(401/403/404/409/413/429/502/503/504),视图 9 处 Toast 全部替换 | ✅ |
+| 4 | 上传后自检可访问 | `utils/image.ts#preloadImage`;车辆/人员上传流程写入前校验 | ✅ |
+| 5 | 一键移除失效图片 + 相册行「重新选择」 | `CarFormModal.vue`(`removeBrokenPhotos` / `openLibraryFor` 替换模式)、人员弹窗失效提示与「移除」 | ✅ |
+| 6 | 缩略图 `?width=`(可配,0=原图) | `utils/image.ts#thumbUrl` + 设置 `attachment.thumbWidth`(默认 480);列表/相册网格/前台卡片 | ✅ |
+| 7 | 上传前压缩(可配) | `utils/image.ts#compressImage` + 设置 `attachment.compressUpload` / `compressMaxWidth`(默认 1920,>1.5MB 才压) | ✅ |
+| 8 | 「已办,顺延一期」 | `CarFormModal.vue#postponeReminder`(按循环间隔顺延,默认 12 个月) | ✅ |
+| 9 | 提醒逐条忽略(本周期) | 前台模板横幅 + `ReminderWidget.vue`:localStorage `important-dates:hidden-reminders`,设置 `reminder.allowDismiss`(默认开) | ✅ |
+| 10 | 年检规则可配置 | 设置 `car.inspectionNodes`(默认 2,4,6,10)/ `inspectionYearlyFrom`(默认 11);`VehicleSupport.nextInspection(...)` 新重载 + finder 读取设置;前端 `utils/vehicle.ts` 同步 | ✅ |
+| 11 | 爱车视图排序/筛选 | 前台模板工具栏(`#id-car-sort` / `#id-car-filter`)+ 卡片 `data-name/data-status/data-due` + 纯前端 JS | ✅ |
+| 12 | 相册统一比例与空态 | 前台相册 `aspect-ratio:4/3;object-fit:cover`;封面/头像/相册失效占位(1.2.5 前半部分已做) | ✅ |
+| 13 | 后台「自检」面板 | `utils/selfCheck.ts` + 页面右上角「自检」按钮(8 项检查:版本/数据量/设置/照片设置命中/附件库/失效引用/即将到期) | ✅ |
+| 14 | 设置「关于」分组 | `settings.yaml` 新增 `about` 组(版本 + 强刷/自检/降级/零写入四条提示) | ✅ |
+
+**踩坑记录**:改前台模板时用 `th:attr="data-dismiss-key=|date|${r.title}|..."` 里的 `|` 作分隔符,Thymeleaf 把 `|` 当字面量替换语法解析 → 前台 500(日志:`Could not parse as assignation sequence`)。已改为字符串拼接 `${'date#' + r.title + '#' + ...}`。
+
+**验证(全新 Halo 2.26 实例,均针对最终包)**:冒烟 **50/50**、浏览器端到端 **13/13**、附件库来源范围 **5/5**、拖拽排序 **6/6**、图片失效降级 **7/7**、**新增 1.2.5 新能力 `verify-features-125.mjs` 6/6**(自检 8 项 / 顺延 12 个月 / 缩略图 `?width=480` / 前台排序筛选 / 横幅逐条忽略 / 零脚本错误)。截图:`docs/manual-test/e125-selfcheck.png`。
+
+**交付(本地,未推送、未发版)**:`build/libs/plugin-important-dates-1.2.5-SNAPSHOT.jar`(控制台产物 `console/main.Dfvrs8Fg.js`;SHA256 `3322CF78…B2F1FFD5`)+ `docs/release-notes-1.2.5-SNAPSHOT.md` / `.en.md`。
+
 ## 1.2.5 新能力(图片引用失效的降级与标记)
 
 **背景**:插件存的是附件的访问地址(相册 `photos[].url`、大头贴 `avatar`)。附件被删除、存储策略变化,或被**其它插件的全局规则拦截**(如防直链类插件把 `/upload/**` 变 404)后,这些地址失效 → 前台/后台裂图,且不知是哪条记录在引用。用户认可方案:**不受其它插件影响 = 即使被影响也不裂图,并能定位**。

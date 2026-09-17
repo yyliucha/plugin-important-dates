@@ -2,6 +2,7 @@
   <VPageHeader title="记得">
     <template #actions>
       <VButton :loading="logLoading" @click="openLogs">操作日志</VButton>
+      <VButton :loading="selfChecking" @click="openSelfCheck">自检</VButton>
       <VButton @click="exportData">导出</VButton>
       <VButton @click="triggerImport">导入</VButton>
       <VButton type="secondary" @click="onPrimaryAction">
@@ -184,7 +185,7 @@
         >
           <div class="person-head">
             <div class="person-name">
-              <img v-if="p.spec.avatar && !avatarBrokenOf(p)" class="person-avatar" :src="p.spec.avatar" alt=""
+              <img v-if="p.spec.avatar && !avatarBrokenOf(p)" class="person-avatar" :src="listThumb(p.spec.avatar)" alt=""
                onerror="this.style.display='none';var s=document.createElement('span');s.className='person-avatar person-avatar-char';s.style.display='inline-flex';s.textContent=this.closest('.person-name')?.querySelector('span')?.textContent?.slice(0,1)||'?';this.parentNode.insertBefore(s,this);" />
               <span v-else-if="p.spec.avatar" class="person-avatar person-avatar-char">{{ (p.spec.displayName || "?").slice(0, 1) }}</span>
               <span>{{ p.spec.displayName }}</span>
@@ -278,7 +279,7 @@
             <div class="car-cover" :class="`car-cover-${skinOf(c)}`">
               <img
                 v-if="carCover(c) && !useCoverFallback(c)"
-                :src="carCover(c) || ''"
+                :src="listThumb(carCover(c))"
                 alt=""
                 @error="markImageFailed(`car:${c.metadata.name}`)"
               />
@@ -502,6 +503,29 @@
       </div>
     </VModal>
 
+    <!-- ================= 自检 ================= -->
+    <VModal :visible="selfCheckVisible" title="记得 · 自检" width="640" @close="selfCheckVisible = false">
+      <div class="form">
+        <div v-if="selfChecking" class="hint">正在自检…</div>
+        <template v-else>
+          <div v-for="(item, idx) in selfCheckItems" :key="idx" class="check-row">
+            <span class="check-level" :class="`check-${item.level}`">{{ item.level === "ok" ? "✓" : item.level === "warn" ? "!" : "✕" }}</span>
+            <div class="check-body">
+              <div class="check-label">{{ item.label }}</div>
+              <div class="check-value">{{ item.value }}</div>
+              <div v-if="item.hint" class="hint">{{ item.hint }}</div>
+            </div>
+          </div>
+          <div class="hint">检查时间：{{ selfCheckedAt }}（只读检查，不修改任何数据）</div>
+        </template>
+      </div>
+      <template #footer>
+        <VSpace>
+          <VButton @click="selfCheckVisible = false">关闭</VButton>
+          <VButton type="secondary" :loading="selfChecking" @click="openSelfCheck">重新自检</VButton>
+        </VSpace>
+      </template>
+    </VModal>
     <!-- ================= 导入 ================= -->
     <VModal :visible="importModalVisible" title="导入数据" width="560" @close="closeImportModal">
       <div v-if="!importResult" class="form">
@@ -518,6 +542,11 @@
           </span>
         </div>
         <div class="hint">导入不会覆盖已有数据（按记录标识判重，已存在的自动跳过）。</div>
+        <div v-if="importing" class="hint">
+          正在导入… <b>{{ importProgress.done }}</b> / {{ importProgress.total }}
+          <span v-if="importProgress.failed">（失败 {{ importProgress.failed }}）</span>
+          <br />为避开站点反向代理的限流，导入按固定间隔**逐条**提交，请勿关闭页面。
+        </div>
       </div>
       <div v-else class="form">
         <div class="import-row">
@@ -526,6 +555,15 @@
             人员：新增 <b>{{ importResult.personsImported }}</b>，跳过 <b>{{ importResult.personsSkipped }}</b>，失败 <b>{{ importResult.personsFailed }}</b>；
             重要日期：新增 <b>{{ importResult.imported }}</b>，跳过 <b>{{ importResult.skipped }}</b>，失败 <b>{{ importResult.failed }}</b>；
             座驾：新增 <b>{{ importResult.carsImported }}</b>，跳过 <b>{{ importResult.carsSkipped }}</b>，失败 <b>{{ importResult.carsFailed }}</b>。
+          </span>
+        </div>
+        <div v-if="importFailures.length" class="import-row">
+          <span class="label">失败明细</span>
+          <span class="hint">
+            <template v-for="(f, i) in importFailures.slice(0, 8)" :key="i">
+              {{ f }}<br />
+            </template>
+            <template v-if="importFailures.length > 8">… 其余 {{ importFailures.length - 8 }} 条同类失败已省略</template>
           </span>
         </div>
       </div>
@@ -570,11 +608,15 @@ import {
   deleteCar,
   deleteImportantDate,
   deletePerson,
+  describeError,
   fetchPluginJsonConfig,
   listCars,
   listImportantDates,
   listOperationLogs,
   listPersons,
+  patchCar,
+  patchImportantDate,
+  patchPerson,
   patchSortOrder,
   updateCar,
   updateImportantDate,
@@ -589,6 +631,8 @@ import { VEHICLE_TYPES } from "@/types";
 import { lunarMonthDayText, nextSolarDate } from "@/utils/lunar";
 import { type InspectionNotice, inspectionNotice, resolveDueDate, startOfToday } from "@/utils/vehicle";
 import { fetchLivePermalinks, isBrokenLocalImage } from "@/utils/attachmentLibrary";
+import { thumbUrl } from "@/utils/image";
+import { type CheckItem, runSelfCheck } from "@/utils/selfCheck";
 
 const loading = ref(true);
 const saving = ref(false);
@@ -626,6 +670,8 @@ const carImportItems = ref<Array<{ name: string; spec: Car["spec"] }>>([]);
 const carImportValidCount = ref(0);
 const carImportDuplicateCount = ref(0);
 const carImportInvalidCount = ref(0);
+const importProgress = ref({ done: 0, total: 0, failed: 0 });
+const importFailures = ref<string[]>([]);
 const personImportDuplicateCount = ref(0);
 const personImportInvalidCount = ref(0);
 const personImportItems = ref<Array<{ name: string; spec: Person["spec"] }>>([]);
@@ -804,6 +850,12 @@ function skinOf(c: Car): "cool" | "cute" | "neutral" {
 // ---------- 图片引用已失效（附件被删除 / 被其它插件拦截）----------
 /** 仍存在的附件地址集合；null = 未取到（此时不做任何标记，避免误报） */
 const livePermalinks = ref<Set<string> | null>(null);
+/** 列表缩略图宽度（0 = 原图），来自插件设置 thumbWidth */
+const listThumbWidth = ref(480);
+function listThumb(url?: string): string {
+  const raw = url || "";
+  return listThumbWidth.value > 0 ? thumbUrl(raw, listThumbWidth.value) : raw;
+}
 
 async function loadAttachmentIndex() {
   livePermalinks.value = await fetchLivePermalinks();
@@ -903,11 +955,7 @@ const inspectionNotices = computed(() => {
 
 async function dismissInspectionNotice(item: { car: Car; notice: InspectionNotice }) {
   try {
-    const next: Car = {
-      ...item.car,
-      spec: { ...item.car.spec, inspectionNoticeAck: item.notice.key },
-    };
-    await updateCar(next);
+    await patchCar(item.car.metadata.name, [{ op: "add", path: "/spec/inspectionNoticeAck", value: item.notice.key }]);
     item.car.spec.inspectionNoticeAck = item.notice.key;
     Toast.success("已确认，不再提示");
     await appendLog(
@@ -918,7 +966,7 @@ async function dismissInspectionNotice(item: { car: Car; notice: InspectionNotic
       "CAR"
     );
   } catch (error) {
-    Toast.error(`操作失败：${(error as Error)?.message || "未知错误"}`);
+    Toast.error(`操作失败：${describeError(error)}`);
   }
 }
 
@@ -1013,12 +1061,8 @@ async function persistOrder(kind: "date" | "person" | "car", orderedNames: strin
     Toast.success("已保存排序");
     await load();
   } catch (error) {
-    const status = (error as { response?: { status?: number } })?.response?.status;
-    const hint =
-      status === 503 || status === 502 || status === 504
-        ? "站点反向代理暂时不可用（HTTP " + status + "），已自动重试仍失败，请稍后再拖一次"
-        : (error as Error)?.message || "未知错误";
-    Toast.error(`保存排序失败：${hint}`);
+    // describeError 已覆盖 429/502/503/504（反向代理限流）的中文提示
+    Toast.error(`保存排序失败：${describeError(error)}`);
     await load();
   }
 }
@@ -1069,7 +1113,7 @@ function removeCar(c: Car) {
         await appendLog("DELETE", c.spec.displayName, c.metadata.name, "删除座驾", "CAR");
         await load();
       } catch (error) {
-        Toast.error(`删除失败：${(error as Error)?.message || "未知错误"}`);
+        Toast.error(`删除失败：${describeError(error)}`);
       }
     },
   });
@@ -1077,8 +1121,7 @@ function removeCar(c: Car) {
 
 async function toggleCarVisible(c: Car, visibleValue: boolean) {
   try {
-    const next: Car = { ...c, spec: { ...c.spec, visible: visibleValue } };
-    await updateCar(next);
+    await patchCar(c.metadata.name, [{ op: "add", path: "/spec/visible", value: visibleValue }]);
     c.spec.visible = visibleValue;
     Toast.success(visibleValue ? "已在前台展示（车牌自动脱敏）" : "已取消前台展示");
     await appendLog(
@@ -1089,7 +1132,7 @@ async function toggleCarVisible(c: Car, visibleValue: boolean) {
       "CAR"
     );
   } catch (error) {
-    Toast.error(`操作失败：${(error as Error)?.message || "未知错误"}`);
+    Toast.error(`操作失败：${describeError(error)}`);
     await load();
   }
 }
@@ -1135,7 +1178,7 @@ function removePerson(p: Person) {
         await appendLog("DELETE", p.spec.displayName, p.metadata.name, "删除人员", "PERSON");
         await load();
       } catch (error) {
-        Toast.error(`删除失败：${(error as Error)?.message || "未知错误"}`);
+        Toast.error(`删除失败：${describeError(error)}`);
       }
     },
   });
@@ -1215,6 +1258,20 @@ async function loadRemindConfig() {
       remindDays: Number.isFinite(days) ? Math.max(0, Math.min(30, days)) : 3,
       backendReminder: config["backendReminder"] !== "false",
     };
+    // 列表缩略图宽度（照片设置 → thumbWidth；0 表示始终用原图）
+    const rawAttach = (config as Record<string, unknown>)["attachment"];
+    let attach: { thumbWidth?: number } = {};
+    if (typeof rawAttach === "string") {
+      try {
+        attach = rawAttach ? JSON.parse(rawAttach) : {};
+      } catch {
+        attach = {};
+      }
+    } else if (rawAttach && typeof rawAttach === "object") {
+      attach = rawAttach as typeof attach;
+    }
+    const tw = Number(attach.thumbWidth);
+    listThumbWidth.value = Number.isFinite(tw) && tw >= 0 ? tw : 480;
   } catch {
     remindConfig.value = { remindDays: 3, backendReminder: true };
   }
@@ -1267,11 +1324,7 @@ function remindText(item: ImportantDate): string {
 
 async function toggleDateVisible(item: ImportantDate, visibleValue: boolean) {
   try {
-    const next: ImportantDate = {
-      ...item,
-      spec: { ...item.spec, visible: visibleValue },
-    };
-    await updateImportantDate(next);
+    await patchImportantDate(item.metadata.name, [{ op: "add", path: "/spec/visible", value: visibleValue }]);
     await appendLog(
       "UPDATE",
       item.spec.title,
@@ -1280,18 +1333,14 @@ async function toggleDateVisible(item: ImportantDate, visibleValue: boolean) {
     );
     await load();
   } catch (error) {
-    Toast.error(`切换失败：${(error as Error)?.message || "未知错误"}`);
+    Toast.error(`切换失败：${describeError(error)}`);
     await load();
   }
 }
 
 async function togglePersonVisible(p: Person, visibleValue: boolean) {
   try {
-    const next: Person = {
-      ...p,
-      spec: { ...p.spec, visible: visibleValue },
-    };
-    await updatePerson(next);
+    await patchPerson(p.metadata.name, [{ op: "add", path: "/spec/visible", value: visibleValue }]);
     await appendLog(
       "UPDATE",
       p.spec.displayName,
@@ -1300,7 +1349,7 @@ async function togglePersonVisible(p: Person, visibleValue: boolean) {
     );
     await load();
   } catch (error) {
-    Toast.error(`切换失败：${(error as Error)?.message || "未知错误"}`);
+    Toast.error(`切换失败：${describeError(error)}`);
     await load();
   }
 }
@@ -1412,7 +1461,7 @@ async function save() {
     closeModal();
     await load();
   } catch (error) {
-    Toast.error(`保存失败：${(error as Error)?.message || "未知错误"}`);
+    Toast.error(`保存失败：${describeError(error)}`);
   } finally {
     saving.value = false;
   }
@@ -1433,7 +1482,7 @@ function remove(item: ImportantDate) {
         await appendLog("DELETE", item.spec.title, item.metadata.name, summaryOf(item.spec));
         await load();
       } catch (error) {
-        Toast.error(`删除失败：${(error as Error)?.message || "未知错误"}`);
+        Toast.error(`删除失败：${describeError(error)}`);
       }
     },
   });
@@ -1623,6 +1672,22 @@ async function doImport() {
   let personsFailed = 0;
   let carsImported = 0;
   let carsFailed = 0;
+  // 导入节流：逐条提交 + 固定间隔，避免一次导入打出一串请求被反向代理限流；
+  // 失败原因逐条记录，便于排查（原来只累加失败条数）。
+  const failures: string[] = [];
+  importFailures.value = [];
+  const total = carImportItems.value.length + personImportItems.value.length + importItems.value.length;
+  importProgress.value = { done: 0, total, failed: 0 };
+  const step = async () => {
+    importProgress.value = { ...importProgress.value, done: importProgress.value.done + 1 };
+    if (importProgress.value.done < total) {
+      await new Promise((r) => setTimeout(r, 40));
+    }
+  };
+  const fail = (kind: string, item: { name: string; spec: { displayName?: string; title?: string } }, error: unknown) => {
+    importProgress.value = { ...importProgress.value, failed: importProgress.value.failed + 1 };
+    failures.push(`${kind}「${item.spec.displayName || item.spec.title || item.name}」：${describeError(error, "导入失败")}`);
+  };
   try {
     for (const item of carImportItems.value) {
       try {
@@ -1634,8 +1699,11 @@ async function doImport() {
         });
         carsImported++;
         await appendLog("CREATE", created.spec.displayName, created.metadata.name, "导入：新增座驾", "CAR");
-      } catch {
+      } catch (error) {
         carsFailed++;
+        fail("座驾", item, error);
+      } finally {
+        await step();
       }
     }
     for (const item of personImportItems.value) {
@@ -1648,8 +1716,11 @@ async function doImport() {
         });
         personsImported++;
         await appendLog("CREATE", created.spec.displayName, created.metadata.name, "导入：新增人员");
-      } catch {
+      } catch (error) {
         personsFailed++;
+        fail("人员", item, error);
+      } finally {
+        await step();
       }
     }
     for (const item of importItems.value) {
@@ -1662,12 +1733,16 @@ async function doImport() {
         });
         imported++;
         await appendLog("CREATE", created.spec.title, created.metadata.name, `导入：${summaryOf(created.spec)}`);
-      } catch {
+      } catch (error) {
         failed++;
+        fail("重要日期", item, error);
+      } finally {
+        await step();
       }
     }
   } finally {
     importing.value = false;
+    importFailures.value = failures;
     importResult.value = {
       imported,
       skipped: importDuplicateCount.value,
@@ -1694,6 +1769,31 @@ function closeImportModal() {
   carImportItems.value = [];
 }
 
+// ---------- 自检（1.2.5） ----------
+const selfCheckVisible = ref(false);
+const selfChecking = ref(false);
+const selfCheckItems = ref<CheckItem[]>([]);
+const selfCheckedAt = ref("");
+
+async function openSelfCheck() {
+  selfCheckVisible.value = true;
+  selfChecking.value = true;
+  try {
+    const result = await runSelfCheck({
+      dates: dates.value,
+      persons: persons.value,
+      cars: cars.value,
+      remindDays: remindConfig.value.remindDays,
+      backendReminder: remindConfig.value.backendReminder,
+    });
+    selfCheckItems.value = result.items;
+    selfCheckedAt.value = result.checkedAt;
+  } catch (error) {
+    selfCheckItems.value = [{ label: "自检失败", value: describeError(error), level: "error" }];
+  } finally {
+    selfChecking.value = false;
+  }
+}
 // ---------- 日志弹窗（分页） ----------
 const LOG_PAGE_SIZE = 20;
 const logsPage = ref(1);
@@ -2251,6 +2351,50 @@ function formatTime(iso?: string): string {
 .broken-tag {
   margin-left: 6px;
 }
-</style>
+
+/* 自检面板（1.2.5） */
+.check-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.check-level {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.check-ok {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.check-warn {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.check-error {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.check-label {
+  font-weight: 600;
+}
+
+.check-value {
+  font-size: 13px;
+  color: #475569;
+}</style>
 
 

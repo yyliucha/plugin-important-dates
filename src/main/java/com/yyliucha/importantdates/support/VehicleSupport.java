@@ -118,12 +118,49 @@ public final class VehicleSupport {
     }
 
     /**
-     * 按「首次登记日期 + 车辆分类」推算下一个年检节点（非营运小微型载客汽车规则）：
+     * 按「首次登记日期 + 车辆分类」推算下一个年检节点（默认：非营运小微型载客汽车规则）：
      * 第 2、4 年 → 免检申领标志；第 6、10 年 → 上线检验；第 11 年起 → 每年上线检验。
      * 摩托车：前 4 年每 2 年申领，之后每年上线（各地可能不同，界面提示可手动覆盖）。
      * 电瓶车 / 自行车：免年检，返回 manualNeeded=true。
      */
     public static InspectionNext nextInspection(String registeredDate, String vehicleType, java.time.LocalDate today) {
+        return nextInspection(registeredDate, vehicleType, today, DEFAULT_INSPECTION_NODES,
+            DEFAULT_INSPECTION_YEARLY_FROM);
+    }
+
+    /** 默认年检节点（年）：第 2、4 年免检申领，第 6、10 年上线检验 */
+    public static final java.util.List<Integer> DEFAULT_INSPECTION_NODES = java.util.List.of(2, 4, 6, 10);
+    /** 默认从第 11 年起每年上线检验 */
+    public static final int DEFAULT_INSPECTION_YEARLY_FROM = 11;
+
+    /** 解析「年检节点」设置（形如 "2,4,6,10"）；非法或为空时回退默认 */
+    public static java.util.List<Integer> parseInspectionNodes(String text) {
+        if (text == null || text.isBlank()) {
+            return DEFAULT_INSPECTION_NODES;
+        }
+        java.util.List<Integer> nodes = new java.util.ArrayList<>();
+        for (String part : text.split("[,，\\s]+")) {
+            if (part.isBlank()) {
+                continue;
+            }
+            try {
+                int year = Integer.parseInt(part.trim());
+                if (year >= 1 && year <= 30 && !nodes.contains(year)) {
+                    nodes.add(year);
+                }
+            } catch (NumberFormatException ignored) {
+                // 忽略非法片段
+            }
+        }
+        return nodes.isEmpty() ? DEFAULT_INSPECTION_NODES : nodes.stream().sorted().toList();
+    }
+
+    /**
+     * 年检推算（规则可配置）：节点年 + 「从第 N 年起每年上线检验」。
+     * 阶段判定：≥6 年（或 ≥ yearlyFrom）为上线检验，其余为免检申领；摩托车仍走内置规则。
+     */
+    public static InspectionNext nextInspection(String registeredDate, String vehicleType,
+        java.time.LocalDate today, java.util.List<Integer> nodes, int yearlyFrom) {
         java.time.LocalDate base = null;
         if (registeredDate != null && !registeredDate.isBlank()) {
             try {
@@ -140,9 +177,13 @@ public final class VehicleSupport {
             return new InspectionNext(null, "", "缺少首次登记日期，无法自动推算，请手动填写", true);
         }
         boolean motorcycle = "MOTORCYCLE".equals(type);
+        int yearly = yearlyFrom >= 1 && yearlyFrom <= 30 ? yearlyFrom : DEFAULT_INSPECTION_YEARLY_FROM;
+        java.util.List<Integer> nodeYears = nodes == null || nodes.isEmpty() ? DEFAULT_INSPECTION_NODES : nodes;
+        String nodeText = nodeYears.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining("、"));
         String rule = motorcycle
             ? "按摩托车规则推算（前 4 年每 2 年申领免检标志，之后每年上线检验；以当地车管所为准）"
-            : "按非营运小微型载客汽车规则推算（第 2、4 年申领免检标志；第 6、10 年上线检验；第 11 年起每年上线检验）";
+            : "按非营运小微型载客汽车规则推算（第 " + nodeText + " 年检验；第 " + yearly + " 年起每年上线检验；"
+                + "可在「座驾设置 → 年检节点」中按当地规则调整）";
 
         java.time.LocalDate best = null;
         String bestPhase = "";
@@ -153,15 +194,14 @@ public final class VehicleSupport {
                 node = year <= 4 ? year % 2 == 0 : true;
                 phase = year <= 4 ? "免检申领" : "上线检验";
             } else {
-                if (year == 2 || year == 4) {
-                    node = true;
-                    phase = "免检申领";
-                } else if (year == 6 || year == 10) {
+                if (year >= yearly) {
+                    // 从第 N 年起每年上线检验
                     node = true;
                     phase = "上线检验";
-                } else if (year >= 11) {
+                } else if (nodeYears.contains(year)) {
+                    // 配置的检验节点（默认第 2、4 年免检申领；第 6、10 年上线检验）
                     node = true;
-                    phase = "上线检验";
+                    phase = year >= 6 ? "上线检验" : "免检申领";
                 } else {
                     node = false;
                     phase = "";

@@ -103,16 +103,19 @@
         <span class="label">大头贴（选填，仅一张）</span>
         <div class="avatar-row">
           <div class="avatar-preview" :class="{ 'avatar-empty': !form.avatar || avatarBroken }">
-            <img v-if="form.avatar && !avatarBroken" :src="form.avatar" alt="大头贴预览" @error="avatarBroken = true" />
+            <img v-if="form.avatar && !avatarBroken" :src="thumb(form.avatar)" alt="大头贴预览" @error="avatarBroken = true" />
             <span v-else class="avatar-char">{{ (form.displayName || "?").slice(0, 1) }}</span>
           </div>
           <div class="avatar-inputs">
             <div class="avatar-btns">
               <VButton size="sm" :loading="uploading" @click="triggerUpload">上传图片</VButton>
               <VButton size="sm" @click="openLibrary">从附件库选择</VButton>
-              <VButton v-if="form.avatar" size="sm" type="danger" @click="form.avatar = ''">移除</VButton>
+              <VButton v-if="form.avatar" size="sm" type="danger" @click="clearAvatar">移除</VButton>
             </div>
             <input ref="fileInput" type="file" accept="image/*" class="hidden-file" @change="onFileChange" />
+            <div v-if="avatarBroken" class="hint broken-note">
+              当前大头贴地址已失效（附件可能已被删除，或被其它插件拦截）：可「上传图片」或「从附件库选择」换一张，保存后即生效。
+            </div>
             <div class="hint">
               仅允许一张。上传使用默认存储策略，并存入「设置 → 附件设置 → 大头贴附件分组」指定的分组（留空则不入分组）；后台管理端始终显示，前台是否展示由「设置 → 隐私 → 前台展示大头贴」统一控制（默认关闭）。
             </div>
@@ -145,7 +148,7 @@
                 :class="{ selected: libSelected?.name === a.name }"
                 @click="libSelected = a"
               >
-                <img :src="a.permalink" alt="" loading="lazy" />
+                <img :src="thumb(a.permalink)" alt="" loading="lazy" />
                 <span class="lib-name">{{ a.displayName }}</span>
               </div>
             </div>
@@ -184,7 +187,7 @@ import { computed, reactive, ref, watch } from "vue";
 import { Toast, VButton, VModal, VSpace } from "@halo-dev/components";
 import { axiosInstance } from "@halo-dev/api-client";
 import SunLunarPicker from "@/components/SunLunarPicker.vue";
-import { createPerson, fetchPluginJsonConfig, updatePerson } from "@/api";
+import { createPerson, describeError, fetchPluginJsonConfig, updatePerson } from "@/api";
 import type { DateType, Person } from "@/types";
 import {
   UNGROUPED,
@@ -199,6 +202,7 @@ import {
   type AttachmentItem,
   type ScopeResult,
 } from "@/utils/attachmentLibrary";
+import { compressImage, humanSize, preloadImage, thumbUrl } from "@/utils/image";
 
 const props = defineProps<{
   visible: boolean;
@@ -222,6 +226,9 @@ const libError = ref("");
 const libItems = ref<AttachmentItem[]>([]);
 const libSelected = ref<AttachmentItem | null>(null);
 const avatarGroupName = ref("");
+const compressUpload = ref(true);
+const compressMaxWidth = ref(1920);
+const thumbWidth = ref(480);
 const avatarPolicyName = ref("");
 const avatarGroupLabel = ref("");
 const avatarPolicyLabel = ref("");
@@ -240,6 +247,16 @@ const libGroupHint = computed(() =>
   scopeHint(libScope.value, { group: libGroupLabel.value, policy: libPolicyLabel.value })
 );
 
+/** 缩略图地址（设置 thumbWidth=0 时用原图） */
+function thumb(url: string): string {
+  return thumbWidth.value > 0 ? thumbUrl(url, thumbWidth.value) : url;
+}
+
+function clearAvatar() {
+  form.avatar = "";
+  avatarBroken.value = false;
+}
+
 /** 实际展示的图片（按设置范围，命中为空时自动放宽；不再要求分类与策略同时命中） */
 const scopedLibItems = computed(() => libScope.value.items);
 
@@ -250,6 +267,18 @@ async function loadGroups() {
     const scope = await readAttachmentScope(cfg as Record<string, unknown> | undefined, false);
     avatarGroupName.value = scope.groupName;
     avatarPolicyName.value = scope.policyName;
+    const rawCfg = (cfg as Record<string, unknown> | undefined)?.attachment;
+    let attach: { compressUpload?: boolean; compressMaxWidth?: number; thumbWidth?: number } = {};
+    if (typeof rawCfg === "string") {
+      try { attach = rawCfg ? JSON.parse(rawCfg) : {}; } catch { attach = {}; }
+    } else if (rawCfg && typeof rawCfg === "object") {
+      attach = rawCfg as typeof attach;
+    }
+    compressUpload.value = attach.compressUpload !== false;
+    const maxW = Number(attach.compressMaxWidth);
+    compressMaxWidth.value = Number.isFinite(maxW) && maxW >= 640 ? maxW : 1920;
+    const tw = Number(attach.thumbWidth);
+    thumbWidth.value = Number.isFinite(tw) && tw >= 0 ? tw : 480;
   } catch {
     avatarGroupName.value = "";
     avatarPolicyName.value = "";
@@ -272,13 +301,21 @@ async function resolvePolicyName(): Promise<string> {
 
 async function onFileChange(e: Event) {
   const input = e.target as HTMLInputElement;
-  const file = input.files?.[0];
+  const raw = input.files?.[0];
   input.value = "";
-  if (!file) return;
+  if (!raw) return;
   uploading.value = true;
-  // 上传前重读插件设置（用户可能在弹窗打开后修改过默认 分类/策略）
+  // 上传前重读插件设置（用户可能在弹窗打开后修改过默认 分类/策略、压缩选项）
   await loadGroups();
   try {
+    // 上传前按需压缩（设置里可关）
+    let file = raw;
+    let savedBytes = 0;
+    if (compressUpload.value && raw.type.startsWith("image/")) {
+      const result = await compressImage(raw, { maxWidth: compressMaxWidth.value, quality: 0.86 });
+      file = result.file;
+      if (result.compressed) savedBytes = result.originalSize - result.size;
+    }
     const fd = new FormData();
     fd.append("file", file);
     fd.append("policyName", await resolvePolicyName());
@@ -291,10 +328,16 @@ async function onFileChange(e: Event) {
     );
     const url = data?.status?.permalink;
     if (!url) throw new Error("上传未返回图片地址");
+    // 上传后自检：确认地址真的能打开再写入记录
+    if (!(await preloadImage(url))) {
+      throw new Error("上传成功但图片无法访问：可能被存储策略或其它插件拦截，请检查站点附件设置");
+    }
     form.avatar = url;
-    Toast.success("已上传并设置为大头贴");
+    avatarBroken.value = false;
+    const saved = savedBytes > 0 ? `，压缩节省 ${humanSize(savedBytes)}` : "";
+    Toast.success(`已上传并设置为大头贴${saved}`);
   } catch (error) {
-    Toast.error(`上传失败：${(error as Error)?.message || "请稍后重试"}`);
+    Toast.error(`上传失败：${describeError(error, "请稍后重试")}`);
   } finally {
     uploading.value = false;
   }

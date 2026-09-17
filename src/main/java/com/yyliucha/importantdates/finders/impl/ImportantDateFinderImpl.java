@@ -111,7 +111,8 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
     @Override
     public Flux<CarVo> listAllCars() {
         LocalDate today = LocalDate.now();
-        return client.listAll(Person.class, ListOptions.builder().build(), Sort.unsorted())
+        return carInspectionRule().flatMapMany(rule ->
+            client.listAll(Person.class, ListOptions.builder().build(), Sort.unsorted())
             .collectList()
             .flatMapMany(people -> {
                 Map<String, Person> byName = new HashMap<>();
@@ -119,12 +120,28 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
                     byName.put(p.getMetadata().getName(), p);
                 }
                 return client.listAll(Car.class, ListOptions.builder().build(), Sort.unsorted())
-                    .map(car -> toCarVo(car, byName, today))
+                    .map(car -> toCarVo(car, byName, today, rule))
                     .filter(CarVo::isFrontendVisible)
                     .sort(Comparator.comparingInt(CarVo::getSortOrder)
                         .thenComparing(Comparator.comparing(CarVo::getCreatedAt,
                             Comparator.nullsLast(Comparator.reverseOrder()))));
-            });
+            }));
+    }
+
+    /** 年检规则（设置「座驾设置 → 年检节点 / 起每年上线年份」）：默认第 2、4 年免检申领，第 6、10 年上线，第 11 年起每年 */
+    private record InspectionRule(java.util.List<Integer> nodes, int yearlyFrom) {
+    }
+
+    private Mono<InspectionRule> carInspectionRule() {
+        return settingFetcher.get("car")
+            .map(node -> new InspectionRule(
+                com.yyliucha.importantdates.support.VehicleSupport
+                    .parseInspectionNodes(node.path("inspectionNodes").asText(null)),
+                node.path("inspectionYearlyFrom")
+                    .asInt(com.yyliucha.importantdates.support.VehicleSupport.DEFAULT_INSPECTION_YEARLY_FROM)))
+            .defaultIfEmpty(new InspectionRule(
+                com.yyliucha.importantdates.support.VehicleSupport.DEFAULT_INSPECTION_NODES,
+                com.yyliucha.importantdates.support.VehicleSupport.DEFAULT_INSPECTION_YEARLY_FROM));
     }
 
     @Override
@@ -151,7 +168,7 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
             .defaultIfEmpty(15);
     }
 
-    private CarVo toCarVo(Car car, Map<String, Person> people, LocalDate today) {
+    private CarVo toCarVo(Car car, Map<String, Person> people, LocalDate today, InspectionRule rule) {
         var spec = car.getSpec();
         CarVo vo = new CarVo();
         vo.setName(car.getMetadata().getName());
@@ -242,7 +259,9 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
                     // 年检：未手填日期时按「首次登记日期 + 车型规则」自动推算
                     String baseDate = spec.getRegisteredDate() != null && !spec.getRegisteredDate().isBlank()
                         ? spec.getRegisteredDate() : spec.getPurchaseDate();
-                    var next = VehicleSupport.nextInspection(baseDate, spec.getVehicleType(), today);
+                    var next = VehicleSupport.nextInspection(baseDate, spec.getVehicleType(), today,
+                        rule == null ? null : rule.nodes(),
+                        rule == null ? VehicleSupport.DEFAULT_INSPECTION_YEARLY_FROM : rule.yearlyFrom());
                     if (next.date() == null) {
                         continue;
                     }
