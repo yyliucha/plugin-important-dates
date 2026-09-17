@@ -86,6 +86,10 @@
 
 **交付(本地,未推送、未发版)**:`build/libs/plugin-important-dates-1.2.5-SNAPSHOT.jar`(控制台产物 `console/main.Dfvrs8Fg.js`;SHA256 `3337E5F6…0967CB52`)+ `docs/release-notes-1.2.5-SNAPSHOT.md` / `.en.md`。
 
+**交付前核对(实例上跑 `verify-settings-125.mjs`)**:8 个设置分组(含新增 `about`)、7 个新设置项(`allowDismiss` / `compressUpload` / `compressMaxWidth` / `thumbWidth` / `inspectionNodes` / `inspectionYearlyFrom` / `aboutInfo`)与提醒接口下发的 4 个字段(`allowDismiss` / `dashboardPageSize` / `dashboardPagination` / `allReminders`)全部就绪 —— **19/19 通过**。
+
+**约束核对**:冒烟用例已覆盖「主题目录零残留」(插件从不写主题文件)与「不写系统配置(System ConfigMap 零写入)」;本批次未改动 `ImportantDatesPlugin` 的迁移逻辑,老数据迁移仍是 1.2.1 验证过的幂等实现。
+
 ## 1.2.5 新能力(图片引用失效的降级与标记)
 
 **背景**:插件存的是附件的访问地址(相册 `photos[].url`、大头贴 `avatar`)。附件被删除、存储策略变化,或被**其它插件的全局规则拦截**(如防直链类插件把 `/upload/**` 变 404)后,这些地址失效 → 前台/后台裂图,且不知是哪条记录在引用。用户认可方案:**不受其它插件影响 = 即使被影响也不裂图,并能定位**。
