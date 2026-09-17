@@ -37,6 +37,13 @@ A Halo 2.x plugin that remembers things for you: anniversaries, birthdays and th
 - **17 categories** (sedan / SUV / MPV / sports / off-road / pickup / wagon / hatchback / crossover / van / RV / truck / bus / motorcycle / **e-bike / bicycle** / other), energy type (fuel / EV / PHEV / HEV / human), brand & model, colour, VIN, engine no., registration & purchase dates, mileage, status (in use / sold / scrapped)
 - **Photo album**: upload or multi-select from the attachment library, drag to reorder, set cover; **each photo can be toggled visible/hidden** (hidden ones stay admin-only — handy for licence and insurance papers)
 - **Attachment library scope**: under Settings → Photo settings you can point the **person avatar** and the **vehicle album** at a category (group) and a storage policy; when nothing matches, the scope **widens automatically** and the dialog explains what is in effect and how many images match (no more empty lists), with a one-click "show all images"
+- **Dead images degrade gracefully**: when an attachment is deleted (or blocked by another plugin's global rule), a public cover falls back to the vehicle icon, an avatar to the initial character and an album photo to a placeholder — **visitors never see a broken image**; the console flags `含失效图片 N` / `大头贴已失效` and offers one-click removal or per-photo replacement
+- **Bandwidth-friendly images**: lists, album grids and public cards use `?width=` derivatives (480 px by default, configurable, 0 = original) while opening a photo still shows the original; uploads above 1.5 MB are **compressed in the browser** first (1920 px by default, switchable off)
+- **"Done — roll one cycle"**: renewals and inspections move a due date forward by its repeat interval in one click
+- **Dismiss a single reminder**: the ✕ on each line of the public banner and the dashboard widget means "not again this due cycle" (stored in the browser, restored automatically when the due date changes), with one-click restore and a setting to switch the capability off
+- **Configurable inspection rule**: "Vehicle settings → inspection nodes (2,4,6,10 by default)" and "yearly on-site inspection from (11 by default)" adapt to your local vehicle-office rules, and the form preview and reminders follow
+- **Public garage toolbar**: sort by admin drag order / nearest due / name, filter in-use vs. all (including sold and scrapped)
+- **Admin "Self-check" panel**: one click for plugin version, data counts, reminder and display settings, how many images the photo settings match, stale image references and how many reminders are due soon
 - **Due reminders**: compulsory & commercial insurance, inspection, maintenance (computed from last service + interval), road tax, licence renewal, custom items; per-item lead days, on/off and **repeat interval** (every year / two years / three years / one-off / custom months); sold/scrapped vehicles stop reminding
 - **One insurer per vehicle**: a vehicle-level insurer shared by every policy item (with quick picks for common companies); a single item can still override it, and existing data is migrated idempotently at startup
 - **Inspection derived from the rules**: the next inspection is derived from the first registration date plus the vehicle category (sticker in years 2/4, on-site in years 6/10, yearly from year 11) with the stage and its basis shown; a manual date can override it, and the default lead time is 30 days
@@ -74,7 +81,7 @@ A Halo 2.x plugin that remembers things for you: anniversaries, birthdays and th
 
 ## Compatibility
 
-- **Halo 2.26+** (built against the official 2.26 docs and extension points; Java 17 bytecode; full regression on a clean 2.26 instance: 50/50 passed)
+- **Halo 2.26+** (built against the official 2.26 docs and extension points; Java 17 bytecode; full regression on a clean 2.26 instance: 50/50 passed; 1.2.5 additionally verified with 13/13 browser end-to-end checks and 18 targeted checks)
 - Administrators get all permissions after installation; no role setup needed
 
 ## Install & upgrade
@@ -119,7 +126,7 @@ cd plugin-important-dates
 ./gradlew build
 ```
 
-The artifact is written to `build/libs/plugin-important-dates-<version>.jar` (current version: `1.2.4`; previous stable: `1.2.3`). Hard-refresh your browser once after installing a new build.
+The artifact is written to `build/libs/plugin-important-dates-<version>.jar` (current version: `1.2.5`; previous stable: `1.2.4`). Hard-refresh your browser once after installing a new build.
 
 ## License
 
