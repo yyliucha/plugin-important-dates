@@ -7,7 +7,7 @@
 
 > **更名说明**：原名「重要日期」，1.2.0 起更名「**记得**」——功能已从"记日期"扩展到"记日子、记人、记爱车"，旧名装不下。插件 ID（`plugin-important-dates`）不变，**数据、设置、前台地址（`/important-dates`）与升级路径均不受影响**。
 
-[English README](README.en.md) ｜ [Releases](https://github.com/yyliucha/plugin-important-dates/releases) ｜ [问题反馈](https://github.com/yyliucha/plugin-important-dates/issues) ｜ 作者：[yyliucha](https://github.com/yyliucha)
+[English README](https://github.com/yyliucha/plugin-important-dates/blob/main/README.en.md) ｜ [Releases](https://github.com/yyliucha/plugin-important-dates/releases) ｜ [问题反馈](https://github.com/yyliucha/plugin-important-dates/issues) ｜ 作者：[yyliucha](https://github.com/yyliucha)
 
 ## 截图
 
@@ -132,4 +132,4 @@ cd plugin-important-dates
 
 ## License
 
-[MIT](LICENSE)
+[MIT](https://github.com/yyliucha/plugin-important-dates/blob/main/LICENSE)

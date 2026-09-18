@@ -41,6 +41,9 @@ This file records how releases are prepared, so every release looks consistent.
 
 1. Set the version in `gradle.properties` and `src/main/resources/plugin.yaml`.
 2. Update `README.md` + regenerate `README.store.md`; refresh screenshots if the UI changed.
+   - When regenerating `README.store.md`, turn **every** link into an absolute GitHub URL: the store renders this field on its own domain, so relative paths (`README.en.md`, `LICENSE`, `docs/...`) resolve against the store site and 404.
+     - images: `docs/screenshots/x.png` → `https://raw.githubusercontent.com/yyliucha/plugin-important-dates/main/docs/screenshots/x.png`
+     - docs: `README.en.md` → `https://github.com/yyliucha/plugin-important-dates/blob/main/README.en.md`; `LICENSE` → `.../blob/main/LICENSE`
 3. Write the release notes: `docs/release-notes-<version>.md` (Chinese, for the store) and `docs/release-notes-<version>.en.md` (English).
 4. `./gradlew clean build` → verify the jar metadata (`plugin.yaml` inside the jar shows the new version).
 5. Verify on a clean Halo 2.26 instance: `halo-smoke.mjs` (50/50, includes the 1.2.1 car checks) plus the browser end-to-end script (`browser-121-e2e.mjs`, 13/13) and the migration script (`migrate-check.mjs`).
