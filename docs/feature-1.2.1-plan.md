@@ -74,6 +74,9 @@
 | 只在本页面弹(方案 C) | `ReminderHeadProcessor` 只在模板变量 `idToastPayload` 存在时输出脚本 |
 | 状态写库 | `Car.Reminder` 新增 `ackState`/`lastDoneAt`/`lastDoneFrom`/`skippedForDate`/`notifiedStages`/`notifiedForDate`;`ImportantDate` 新增 `notifiedStages`/`notifiedForDate`;老数据缺失 = 待办,无需迁移脚本 |
 
+**测试反馈补充(第二轮,已包含在 1.2.6-SNAPSHOT 内)**:①「已办」不再无限顺延 —— 一次性项=标记完成(此前被错误按 12 个月顺延,根因:表单把"不循环"当默认 12 个月)、循环项一期只能办一次;②新增「撤销办理」(按 `lastDoneFrom` 还原到期日并清空痕迹);③编辑弹窗与卡片显示「下次提醒:到期日 − 提前天数」;④悬浮提醒显示范围可配(`toast.toastScope` = PAGE 默认 / SITE);⑤提醒数据改为**每次实时取数**(`toastItems`,带时间戳绕缓存)+ 弹出后客户端回报写库(`POST /important-dates-reminder-seen` + `ReminderStageMarker.markSeen`),修掉"后台已改、前台还弹旧提醒";⑥修掉座驾表单保存时丢失提醒状态字段的问题。
+
+**第二轮验证(全新 Halo 2.26 实例)**:冒烟 **50/50**、提醒状态机 **7/7**、**新增补充专项 `verify-reminder-fix.mjs` 7/7**(一次性项不被顺延 / 两次顺延后撤销还原 / 接口下发 nextNoticeDate / 实时取数弹出后写库且改期不再弹 / PAGE 与 SITE 作用域切换 / 表单显示下次提醒与撤销按钮)、图片失效 **7/7**、浏览器端到端 **13/13**、附件库 **5/5**、拖拽 **6/6**、1.2.5 新能力 **6/6**、设置核对 **19/19**。
 **顺手修掉的老 Bug**:`ReminderHeadProcessor` 注入脚本用自闭合写法(`<script ... />`),HTML 解析器会把后续整段文档吞进脚本文本 —— **开启全站悬浮提醒后「记得」页面内容整块消失**。1.2.6 改为成对 `<script ...></script>`。
 
 **验证(全新 Halo 2.26)**:冒烟 **50/50**、**新增提醒状态机专项 `verify-reminder-flow.mjs` 7/7**、图片失效 **7/7**(并借它暴露了上述脚本标签 Bug)、浏览器端到端 **13/13**、附件库 **5/5**、拖拽 **6/6**、1.2.5 新能力 **6/6**、设置核对 **19/19**。

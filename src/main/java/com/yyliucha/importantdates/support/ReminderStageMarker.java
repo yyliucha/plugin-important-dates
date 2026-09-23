@@ -88,6 +88,56 @@ public class ReminderStageMarker {
     }
 
     /**
+     * 客户端上报「本次已弹出」的节点（1.2.6）：
+     * 悬浮提示的数据改为**每次实时从接口取**（避免页面缓存导致"后台已改、前台还弹"），
+     * 因此"弹过了"也由客户端回报，服务端写库 —— 与浏览器无关，换设备一样只弹一次。
+     *
+     * @param items 形如 [{"type":"car","carId":"...","reminderIndex":0,"stageCode":"D3","date":"2026-09-26"}]
+     */
+    public Mono<Void> markSeen(java.util.List<java.util.Map<String, Object>> items) {
+        if (items == null || items.isEmpty()) {
+            return Mono.empty();
+        }
+        java.util.List<CarVo.CarEventVo> carItems = new java.util.ArrayList<>();
+        java.util.List<ImportantDateVo> dateItems = new java.util.ArrayList<>();
+        for (java.util.Map<String, Object> item : items) {
+            if (item == null) {
+                continue;
+            }
+            String stage = item.get("stageCode") == null ? null : String.valueOf(item.get("stageCode"));
+            if (stage == null || stage.isBlank() || "null".equals(stage)) {
+                continue;
+            }
+            if ("car".equals(String.valueOf(item.get("type")))) {
+                Object carId = item.get("carId");
+                Object idx = item.get("reminderIndex");
+                Object date = item.get("date");
+                if (carId == null || idx == null || date == null) {
+                    continue;
+                }
+                CarVo.CarEventVo vo = new CarVo.CarEventVo();
+                vo.setCarId(String.valueOf(carId));
+                vo.setReminderIndex(Integer.parseInt(String.valueOf(idx)));
+                vo.setStageCode(stage);
+                vo.setDate(String.valueOf(date));
+                carItems.add(vo);
+            } else if ("date".equals(String.valueOf(item.get("type")))) {
+                Object name = item.get("name");
+                if (name == null) {
+                    continue;
+                }
+                ImportantDateVo vo = new ImportantDateVo();
+                vo.setName(String.valueOf(name));
+                vo.setStageCode(stage);
+                vo.setNextSolarDate(item.get("nextSolarDate") == null ? null
+                    : String.valueOf(item.get("nextSolarDate")));
+                dateItems.add(vo);
+            }
+        }
+        return markCarEvents(carItems).then(markDateEvents(dateItems));
+    }
+
+    /**
      * 标记重要日期（纪念日/生日）的节点。
      */
     public Mono<Void> markDateEvents(List<ImportantDateVo> items) {

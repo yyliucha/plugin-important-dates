@@ -54,7 +54,9 @@ export async function markReminderDone(car: Car, reminderIndex: number, displayL
     const nextText = formatYmd(next);
     ops.push({ op: "add", path: "/date", value: nextText });
     ops.push({ op: "add", path: "/ackState", value: "PENDING" });
-    detail = `已办并顺延 ${months} 个月：${from || "—"} → ${nextText}`;
+    // 记录"顺延到哪天"：本期已办过 → 按钮改为「撤销顺延」，防止同一期被反复点击滚到很远的年份
+    ops.push({ op: "add", path: "/lastDoneTo", value: nextText });
+    detail = `已办并顺延 ${months} 个月：${from || "—"} → ${nextText}（可撤销）`;
   } else {
     // 一次性项：办完即完成
     ops.push({ op: "add", path: "/ackState", value: "DONE" });
@@ -120,4 +122,50 @@ export async function restoreDateReminder(name: string, title: string): Promise<
     { op: "add", path: "/spec/notifiedStages", value: [] },
   ]);
   await writeOperationLog("UPDATE", title, name, "恢复提醒", "DATE");
+}
+
+/**
+ * 撤销「已办」：把到期日还原到办理前那一天（lastDoneFrom），并清空办理痕迹。
+ * 用于误操作——例如连续点了多次「已办，顺延一期」，把日期滚到了很远的年份。
+ */
+export async function undoReminderDone(car: Car, reminderIndex: number, displayLabel: string): Promise<string> {
+  const r = car.spec.reminders?.[reminderIndex];
+  if (!r) throw new Error("到期项不存在");
+  const restore = r.lastDoneFrom || "";
+  if (!restore) throw new Error("没有可撤销的办理记录");
+  await patchCar(
+    car.metadata.name,
+    basePatch(reminderIndex, [
+      { op: "add", path: "/date", value: restore },
+      { op: "add", path: "/ackState", value: "PENDING" },
+      { op: "add", path: "/lastDoneAt", value: "" },
+      { op: "add", path: "/lastDoneFrom", value: "" },
+      { op: "add", path: "/lastDoneTo", value: "" },
+      { op: "add", path: "/notifiedStages", value: [] },
+      { op: "add", path: "/notifiedForDate", value: "" },
+      { op: "add", path: "/skippedForDate", value: "" },
+    ])
+  );
+  await writeOperationLog(
+    "UPDATE",
+    `${car.spec.displayName} · ${displayLabel}`,
+    car.metadata.name,
+    `撤销办理：到期日还原为 ${restore}（原记录 ${from2Text(r.lastDoneTo)}）`,
+    "CAR"
+  );
+  return `已撤销：到期日还原为 ${restore}`;
+}
+
+function from2Text(value?: string): string {
+  return value && value.trim() ? value : "—";
+}
+
+/** 本期是否已经办过（顺延后的日期就是当前生效的到期日） */
+export function isDoneThisCycle(car: Car, reminderIndex: number): boolean {
+  const r = car.spec.reminders?.[reminderIndex];
+  if (!r) return false;
+  if (r.ackState === "DONE") return true;
+  const to = (r.lastDoneTo || "").trim();
+  if (!to) return false;
+  return to === (resolvedDateOf(car, reminderIndex) || "");
 }

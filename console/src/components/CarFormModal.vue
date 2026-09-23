@@ -336,9 +336,17 @@
             <span>启用提醒</span>
           </label>
           <VSpace>
-            <VButton v-if="r.date && !dateLocked(r)" size="sm" @click="postponeReminder(r)">
-              已办，顺延一期
+            <span v-if="r.date && nextNoticeOf(r)" class="next-notice">
+              下次提醒：{{ nextNoticeOf(r) }}
+            </span>
+            <VButton
+              v-if="r.date && !dateLocked(r) && !isDone(r)"
+              size="sm"
+              @click="postponeReminder(r)"
+            >
+              {{ effectiveRepeat(r) > 0 ? "已办，顺延一期" : "已办（一次性，完成后不再提醒）" }}
             </VButton>
+            <VButton v-if="isDone(r)" size="sm" @click="undoReminder(r)">撤销办理</VButton>
             <VButton size="sm" type="danger" @click="form.reminders.splice(idx, 1)">删除此项</VButton>
           </VSpace>
         </div>
@@ -748,16 +756,70 @@ function effectiveRepeat(r: FormReminder): number {
   return r.repeatMonths != null ? Number(r.repeatMonths) : defaultRepeatMonths(r.key);
 }
 
+/** 本期是否已经办过（顺延后的日期就是当前到期日） */
+function isDone(r: FormReminder): boolean {
+  if (r.ackState === "DONE") return true;
+  const to = (r.lastDoneTo || "").trim();
+  return !!to && to === (r.date || "");
+}
+
+/** 下次提醒日期 = 到期日 − 提前天数 */
+function nextNoticeOf(r: FormReminder): string {
+  const days = r.remindDays != null ? Number(r.remindDays) : defaultHeadDays();
+  const base = parseYmd(r.date);
+  if (!base) return "";
+  const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() - (Number.isFinite(days) ? days : 15));
+  return formatYmd(d);
+}
+
+function defaultHeadDays(): number {
+  return 15;
+}
+
 /**
- * 「已办，顺延一期」：按该项的循环间隔把到期日往后推一期（不循环时按 12 个月），
- * 便于续保 / 年检办完后一键滚动，不用手改日期。
+ * 「已办」：循环项 → 按循环间隔顺延一期；不循环（一次性）→ 标记完成，不再提醒。
+ * 同一期只能办一次：办过之后按钮变为「撤销」，避免误点多次把日期滚到很远的年份。
  */
 function postponeReminder(r: FormReminder) {
-  const months = effectiveRepeat(r) || 12;
-  const base = parseYmd(r.date) || startOfToday();
-  const next = addMonths(base, months > 0 ? months : 12);
-  r.date = formatYmd(next);
-  Toast.success(`已顺延 ${months} 个月：${r.date}`);
+  const months = effectiveRepeat(r);
+  const now = new Date();
+  const stamp = `${formatYmd(now)}T${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+  const from = r.date || "";
+  r.lastDoneAt = stamp;
+  r.lastDoneFrom = from;
+  r.skippedForDate = "";
+  r.notifiedStages = [];
+  r.notifiedForDate = "";
+  if (months > 0) {
+    const base = parseYmd(from) || startOfToday();
+    const next = addMonths(base, months);
+    r.date = formatYmd(next);
+    r.lastDoneTo = r.date;
+    r.ackState = "PENDING";
+    Toast.success(`已办并顺延 ${months} 个月：${from || "—"} → ${r.date}（可撤销）`);
+  } else {
+    // 一次性事项：办完即完成
+    r.ackState = "DONE";
+    r.lastDoneTo = "";
+    Toast.success(`已办：一次性事项已完成，不再提醒（原到期日 ${from || "—"}）`);
+  }
+}
+
+/** 撤销办理：到期日还原到办理前，清空办理痕迹 */
+function undoReminder(r: FormReminder) {
+  const restore = r.lastDoneFrom || "";
+  if (!restore) {
+    Toast.error("没有可撤销的办理记录");
+    return;
+  }
+  r.date = restore;
+  r.ackState = "PENDING";
+  r.lastDoneAt = undefined;
+  r.lastDoneFrom = undefined;
+  r.lastDoneTo = undefined;
+  r.notifiedStages = [];
+  r.notifiedForDate = undefined;
+  Toast.success(`已撤销：到期日还原为 ${restore}`);
 }
 
 /** 保存时写入的到期日：同期项取交强险日期；年检自动推算时留空交给服务端 */
@@ -1106,6 +1168,14 @@ async function save() {
           intervalKm: r.intervalKm ?? undefined,
           lastServiceDate: r.lastServiceDate || undefined,
           lastServiceKm: r.lastServiceKm ?? undefined,
+          // 提醒状态（1.2.6）：保存时必须原样带回，否则已办/忽略/节点记录会被清掉
+          ackState: r.ackState || "PENDING",
+          lastDoneAt: r.lastDoneAt || undefined,
+          lastDoneFrom: r.lastDoneFrom || undefined,
+          lastDoneTo: r.lastDoneTo || undefined,
+          skippedForDate: r.skippedForDate || undefined,
+          notifiedStages: r.notifiedStages || [],
+          notifiedForDate: r.notifiedForDate || undefined,
         })),
       },
     };
@@ -1590,6 +1660,11 @@ watch(
   border: 1px dashed #fca5a5;
   color: #b91c1c;
   flex: none;
+}
+
+.next-notice {
+  font-size: 12px;
+  color: #64748b;
 }
 
 .broken-note {

@@ -225,19 +225,63 @@
     }
   }
 
+  /** 读取 Cookie（Halo 的 CSRF 令牌） */
+  function cookie(name) {
+    var m = document.cookie.match(new RegExp("(^|;\\s*)" + name + "=([^;]*)"));
+    return m ? decodeURIComponent(m[2]) : "";
+  }
+
+  /** 回报"这个节点已经弹过了"（服务端写库，跨浏览器/设备一致） */
+  function markSeen(items) {
+    var payload = [];
+    items.forEach(function (i) {
+      if (i.type === "car" && i.carId && i.reminderIndex != null && i.stageCode) {
+        payload.push({
+          type: "car",
+          carId: i.carId,
+          reminderIndex: i.reminderIndex,
+          stageCode: i.stageCode,
+          date: i.date
+        });
+      } else if (i.type === "date" && i.name && i.stageCode) {
+        payload.push({ type: "date", name: i.name, stageCode: i.stageCode, nextSolarDate: i.date });
+      }
+    });
+    if (!payload.length) return;
+    var headers = { "Content-Type": "application/json" };
+    var xsrf = cookie("XSRF-TOKEN");
+    if (xsrf) headers["X-XSRF-TOKEN"] = xsrf;
+    fetch("/important-dates-reminder-seen", {
+      method: "POST",
+      headers: headers,
+      credentials: "same-origin",
+      body: JSON.stringify({ items: payload })
+    }).catch(function () {});
+  }
+
   function load() {
     var run = function () {
-      // 「记得」页面由服务端直接下发本次该弹的节点（window.__ID_TOAST__）；
-      // 其它页面/主题覆盖模板时回退到公开接口（接口不做节点过滤，仅作兜底展示）。
-      if (window.__ID_TOAST__) {
-        show(window.__ID_TOAST__);
-        return;
-      }
-      fetch("/important-dates-reminders")
+      // 每次实时取数（带时间戳绕开缓存），避免"后台已改、前台还弹旧提醒"
+      fetch("/important-dates-reminders?ts=" + Date.now(), { credentials: "same-origin" })
         .then(function (r) {
           return r.json();
         })
-        .then(show)
+        .then(function (d) {
+          if (!d || d.toastEnabled === false) return;
+          var items = d.toastItems || [];
+          if (!items.length) return;
+          show({
+            toastPosition: d.toastPosition,
+            toastTitle: d.toastTitle,
+            toastTemplate: d.toastTemplate,
+            toastEmptyText: d.toastEmptyText,
+            toastCloseSeconds: d.toastCloseSeconds,
+            toastDefaultClose: d.toastDefaultClose,
+            toastCloseMenu: d.toastCloseMenu,
+            reminders: items
+          });
+          markSeen(items);
+        })
         .catch(function () {});
     };
     if (document.readyState === "loading") {

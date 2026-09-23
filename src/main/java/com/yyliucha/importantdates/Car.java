@@ -321,10 +321,17 @@ public class Car extends AbstractExtension {
         private String lastDoneAt;
 
         /**
-         * 「已办」之前的到期日 yyyy-MM-dd（用于回顾"从哪天滚到哪天"）。
+         * 「已办」之前的到期日 yyyy-MM-dd（用于回顾"从哪天滚到哪天"，也是撤销的还原点）。
          */
         @Schema(description = "办理前的到期日")
         private String lastDoneFrom;
+
+        /**
+         * 「已办」顺延后的到期日 yyyy-MM-dd：等于当前到期日表示"本期已办过"，
+         * 此时按钮变为「撤销顺延」——防止同一期被反复点击顺延到很远的年份。
+         */
+        @Schema(description = "顺延后的到期日")
+        private String lastDoneTo;
 
         /**
          * 忽略（SKIPPED）时对应的到期日：日期一变（进入下一期）自动恢复提醒。

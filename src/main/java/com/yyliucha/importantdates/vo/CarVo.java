@@ -150,6 +150,15 @@ public class CarVo {
         /** 办理前的到期日。 */
         private String lastDoneFrom;
 
+        /** 顺延后的到期日（等于当前到期日 = 本期已办过）。 */
+        private String lastDoneTo;
+
+        /** 下次提醒日期（到期日 − 提前天数），便于用户预判"什么时候会再提醒"。 */
+        private String nextNoticeDate;
+
+        /** 下次提醒日期对应的提前天数。 */
+        private Integer nextNoticeDays;
+
         /** 所属座驾记录标识（metadata.name）。 */
         private String carId;
 

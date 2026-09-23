@@ -166,7 +166,7 @@ public class ImportantDateRouter {
                                 toast.put("toastDefaultClose", cfg.toastDefaultClose());
                                 toast.put("toastCloseMenu", cfg.toastCloseMenu());
                                 toast.put("reminders", toastItems);
-                                model.put("idToastPayload", toast);
+                                model.put("idToastPage", Boolean.TRUE);
                                 model.put("showAvatar", cfg.showAvatar());
                                 // 座驾（1.2.0）：生活/爱车双视图数据
                                 model.put("cars", cars);
@@ -243,6 +243,7 @@ public class ImportantDateRouter {
                     result.put("remindDays", cfg.remindDays());
                     result.put("toastCloseSeconds", cfg.toastCloseSeconds());
                     result.put("toastEnabled", cfg.toastEnabled());
+                    result.put("toastScope", cfg.toastScope());
                     result.put("toastPosition", cfg.toastPosition());
                     result.put("toastTitle", cfg.toastTitle());
                     result.put("toastTemplate", cfg.toastTemplate());
@@ -278,6 +279,10 @@ public class ImportantDateRouter {
                             item.put("nextSolarDate", r.getNextSolarDate());
                             item.put("name", r.getName());
                             item.put("stageText", r.getStageText());
+                            item.put("date", r.getNextSolarDate());
+                            item.put("stageCode", r.getStageCode());
+                            item.put("stageNotified", r.isStageNotified());
+                            item.put("text", r.getStageText());
                             merged.add(item);
                         }
                         for (CarVo.CarEventVo e : tuple.getT2()) {
@@ -298,6 +303,11 @@ public class ImportantDateRouter {
                             item.put("carId", e.getCarId());
                             item.put("reminderIndex", e.getReminderIndex());
                             item.put("key", e.getKey());
+                            item.put("date", e.getDate());
+                            item.put("stageCode", e.getStageCode());
+                            item.put("stageNotified", e.isStageNotified());
+                            item.put("text", e.getStageText());
+                            item.put("nextNoticeDate", e.getNextNoticeDate());
                             merged.add(item);
                         }
                         // 同一辆车、同一天到期的多个事项合并为一条（交强险 / 商业险 / 车船税 / 年检 同日时不再各占一行）
@@ -345,6 +355,23 @@ public class ImportantDateRouter {
                         }
                         result.put("reminders", limited);
                         result.put("overflowCount", overflow);
+                        // 悬浮提示数据：每次实时计算（不写进页面，避免页面缓存导致"后台已改、前台还弹"）。
+                        // 只给"待办 + 未逾期 + 正好在节点上 + 该节点尚未提醒过"的项。
+                        java.util.List<Map<String, Object>> toastItems = new java.util.ArrayList<>();
+                        for (Map<String, Object> m : merged) {
+                            if (!"PENDING".equals(m.get("status"))) {
+                                continue;
+                            }
+                            Object daysObj = m.get("daysUntil");
+                            if (!(daysObj instanceof Number num) || num.longValue() < 0) {
+                                continue;
+                            }
+                            if (m.get("stageCode") == null || Boolean.TRUE.equals(m.get("stageNotified"))) {
+                                continue;
+                            }
+                            toastItems.add(m);
+                        }
+                        result.put("toastItems", toastItems);
                         // 待处理（逾期超过窗口）：不再主动提醒，但计入总览，永远不会静默消失
                         long todoCount = merged.stream()
                             .filter(m -> "TODO".equals(m.get("status")))
@@ -363,6 +390,33 @@ public class ImportantDateRouter {
                             .bodyValue(map));
                 })
             );
+    }
+
+    /**
+     * 悬浮提示"已弹过"上报：数据实时取自 /important-dates-reminders，弹完由页面回报，服务端写库。
+     */
+    @Bean
+    RouterFunction<ServerResponse> reminderSeenRouter() {
+        return org.springframework.web.reactive.function.server.RouterFunctions.route(
+            org.springframework.web.reactive.function.server.RequestPredicates
+                .POST("/important-dates-reminder-seen"),
+            request -> request.bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {
+            })
+                .flatMap(body -> {
+                    Object raw = body.get("items");
+                    java.util.List<Map<String, Object>> items = new java.util.ArrayList<>();
+                    if (raw instanceof java.util.List<?> list) {
+                        for (Object o : list) {
+                            if (o instanceof Map<?, ?> map) {
+                                Map<String, Object> item = new LinkedHashMap<>();
+                                map.forEach((k, v) -> item.put(String.valueOf(k), v));
+                                items.add(item);
+                            }
+                        }
+                    }
+                    return stageMarker.markSeen(items).onErrorResume(e -> Mono.empty());
+                })
+                .then(ServerResponse.noContent().build()));
     }
 
     /**
@@ -392,6 +446,8 @@ public class ImportantDateRouter {
             boolean showImportantTag = boolValue(b, "showImportantTag", true);
             boolean toastEnabled = boolValue(t, "toastEnabled", false);
             String toastPosition = textValue(t, "toastPosition", "bottom-right");
+            // 悬浮提示作用域：PAGE = 仅「记得」页面（默认）；SITE = 全站所有页面
+            String toastScope = textValue(t, "toastScope", "PAGE");
             String toastTitle = textValue(t, "toastTitle", "📅 重要日期提醒");
             String toastTemplate = textValue(t, "toastTemplate",
                 "「{title}」{whenText}（{dateText}）");
@@ -417,7 +473,7 @@ public class ImportantDateRouter {
                 toastEmptyText, toastDefaultClose, toastCloseMenu, showAvatar,
                 carEventsEnabled, carFrontendSection, carSkinEnabled, toastMaxPerType,
                 dashboardPageSize, dashboardPagination, allowDismiss, overdueRemindDays,
-                frontendShowOverdue);
+                frontendShowOverdue, toastScope);
         });
     }
 
@@ -460,7 +516,8 @@ public class ImportantDateRouter {
         boolean toastCloseMenu, boolean showAvatar,
         boolean carEventsEnabled, boolean carFrontendSection, boolean carSkinEnabled,
         int toastMaxPerType, int dashboardPageSize, boolean dashboardPagination,
-        boolean allowDismiss, int overdueRemindDays, boolean frontendShowOverdue) {
+        boolean allowDismiss, int overdueRemindDays, boolean frontendShowOverdue,
+        String toastScope) {
     }
 }
 

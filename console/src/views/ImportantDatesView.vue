@@ -317,7 +317,7 @@
                 todo: e.status === 'TODO',
                 done: e.status === 'DONE' || e.status === 'SKIPPED',
               }"
-              :title="e.text"
+              :title="`${e.text}｜下次提醒：${e.nextNoticeDate}`"
             >
               {{ e.label }} ·
               <template v-if="e.status === 'DONE'">已办</template>
@@ -327,13 +327,22 @@
               <template v-else-if="e.daysUntil === 0">今天到期</template>
               <template v-else>{{ e.daysUntil }} 天后</template>
               <button
-                v-if="e.status === 'PENDING' || e.status === 'TODO'"
+                v-if="(e.status === 'PENDING' || e.status === 'TODO') && !e.doneThisCycle"
                 type="button"
                 class="event-act"
                 title="已办：循环项顺延一期，一次性项标记完成"
                 @click.stop="onMarkDone(c, e)"
               >
                 ✓
+              </button>
+              <button
+                v-if="e.doneThisCycle"
+                type="button"
+                class="event-act"
+                title="撤销办理：把到期日还原到办理前（修复误点多次顺延）"
+                @click.stop="onUndoDone(c, e)"
+              >
+                ↺
               </button>
               <button
                 v-if="e.status === 'PENDING' || e.status === 'TODO'"
@@ -673,7 +682,7 @@ import { fetchLivePermalinks, isBrokenLocalImage } from "@/utils/attachmentLibra
 import { thumbUrl } from "@/utils/image";
 import { type CheckItem, runSelfCheck } from "@/utils/selfCheck";
 import { type ReminderStatus, stageTextOf, statusOf } from "@/utils/reminderState";
-import { markReminderDone, restoreReminder, skipReminder } from "@/utils/reminderActions";
+import { isDoneThisCycle, markReminderDone, restoreReminder, skipReminder, undoReminderDone } from "@/utils/reminderActions";
 
 const loading = ref(true);
 const saving = ref(false);
@@ -964,6 +973,8 @@ function carEventsOf(c: Car): {
   status: ReminderStatus;
   overdueDays: number;
   text: string;
+  doneThisCycle: boolean;
+  nextNoticeDate: string;
 }[] {
   const list: {
     label: string;
@@ -973,6 +984,8 @@ function carEventsOf(c: Car): {
     status: ReminderStatus;
     overdueDays: number;
     text: string;
+    doneThisCycle: boolean;
+    nextNoticeDate: string;
   }[] = [];
   const today = startOfToday();
   const registrationBase = c.spec.registeredDate || c.spec.purchaseDate || "";
@@ -1000,9 +1013,36 @@ function carEventsOf(c: Car): {
       status,
       overdueDays: days < 0 ? -days : 0,
       text: stageTextOf(c.spec.displayName, label, days, overdueRemindDays.value),
+      doneThisCycle: isDoneThisCycle(c, idx),
+      nextNoticeDate: noticeDateOf(resolved.date, r.remindDays),
     });
   }
   return list.sort((a, b) => a.daysUntil - b.daysUntil);
+}
+
+/** 下次提醒日期 = 到期日 − 提前天数（未设置时按座驾默认 15 天） */
+function noticeDateOf(due: string, remindDays?: number | null): string {
+  const days = remindDays != null ? Number(remindDays) : 15;
+  const base = new Date(`${due}T00:00:00`);
+  if (Number.isNaN(base.getTime())) return "";
+  base.setDate(base.getDate() - (Number.isFinite(days) ? days : 15));
+  return `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, "0")}-${String(base.getDate()).padStart(2, "0")}`;
+}
+
+/** 撤销「已办」（还原到期日，修掉误点多次顺延的情况） */
+async function onUndoDone(c: Car, e: { index: number; label: string }) {
+  const key = `${c.metadata.name}#${e.index}`;
+  if (reminderBusy.value) return;
+  reminderBusy.value = key;
+  try {
+    const detail = await undoReminderDone(c, e.index, e.label);
+    Toast.success(detail);
+    await load();
+  } catch (error) {
+    Toast.error(`撤销失败：${describeError(error)}`);
+  } finally {
+    reminderBusy.value = "";
+  }
 }
 
 // ---------- 到期项动作：已办 / 忽略 / 恢复（1.2.6，全部由用户指令触发） ----------

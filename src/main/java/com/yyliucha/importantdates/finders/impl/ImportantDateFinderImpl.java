@@ -328,7 +328,11 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
                 ev.setStatus(ReminderSupport.status(ack, daysUntil, overdueDays));
                 ev.setLastDoneAt(r.getLastDoneAt());
                 ev.setLastDoneFrom(r.getLastDoneFrom());
-                String stage = ReminderSupport.stageCode(daysUntil, windowOf(r, defaultRemindDays), overdueDays);
+                ev.setLastDoneTo(r.getLastDoneTo());
+                int window = windowOf(r, defaultRemindDays);
+                ev.setNextNoticeDays(window);
+                ev.setNextNoticeDate(due.minusDays(window).toString());
+                String stage = ReminderSupport.stageCode(daysUntil, window, overdueDays);
                 ev.setStageCode(stage);
                 ev.setStageNotified(stage != null && r.getNotifiedStages() != null
                     && due.toString().equals(r.getNotifiedForDate()) && r.getNotifiedStages().contains(stage));
