@@ -8,6 +8,18 @@ import { patchCar, patchImportantDate, type PatchOp, writeOperationLog } from "@
 import type { Car } from "@/types";
 import { addMonths, defaultRepeatMonths, formatYmd, parseYmd, resolveDueDate, startOfToday } from "@/utils/vehicle";
 
+/**
+ * 软提示：动作结果的年份不是当前年份时，附一句提醒（不阻断操作）。
+ * 用于防误操作 —— 例如连点多次顺延后日期滚到几年以后。
+ */
+function yearHint(date?: string | null): string {
+  const text = (date || "").trim();
+  if (!text || text.length < 4) return "";
+  const year = Number(text.slice(0, 4));
+  const now = new Date().getFullYear();
+  if (!Number.isFinite(year) || year === now) return "";
+  return `（${year} 年，不是今年 ${now} 年，请确认无误）`;
+}
 /** 由到期项算出"当前生效的到期日" */
 export function resolvedDateOf(car: Car, reminderIndex: number): string | undefined {
   const r = car.spec.reminders?.[reminderIndex];
@@ -60,7 +72,7 @@ export async function markReminderDone(car: Car, reminderIndex: number, displayL
     ops.push({ op: "add", path: "/lastDoneTo", value: formatYmd(next) });
     ops.push({ op: "add", path: "/ackState", value: "PENDING" });
     await patchCar(car.metadata.name, basePatch(reminderIndex, ops));
-    const detailText = `已办：下次保养 ${formatYmd(next)}`;
+    const detailText = `已办：下次保养 ${formatYmd(next)}${yearHint(formatYmd(next))}`;
     const logText = `已办（刚保养完）：上次保养日期 ${r.lastServiceDate || "—"} → ${formatYmd(today)}，下次保养 ${formatYmd(next)}（间隔 ${interval} 个月）`;
     await writeOperationLog("UPDATE", `${car.spec.displayName} · ${displayLabel}`, car.metadata.name, logText, "CAR");
     return detailText;
@@ -73,7 +85,7 @@ export async function markReminderDone(car: Car, reminderIndex: number, displayL
     ops.push({ op: "add", path: "/ackState", value: "PENDING" });
     // 记录"顺延到哪天"：本期已办过 → 按钮改为「撤销顺延」，防止同一期被反复点击滚到很远的年份
     ops.push({ op: "add", path: "/lastDoneTo", value: nextText });
-    detail = `已办：下次到期 ${nextText}`;
+    detail = `已办：下次到期 ${nextText}${yearHint(nextText)}`;
     logDetail = `已办并顺延 ${months} 个月：${from || "—"} → ${nextText}`;
   } else {
     // 一次性项：办完即完成
@@ -174,7 +186,7 @@ export async function undoReminderDone(car: Car, reminderIndex: number, displayL
     `撤销办理：到期日恢复为 ${restore}（原记录 ${from2Text(r.lastDoneTo)}）`,
     "CAR"
   );
-  return `已撤销办理，到期日恢复为 ${restore}`;
+  return `已撤销办理，到期日恢复为 ${restore}${yearHint(restore)}`;
 }
 
 function from2Text(value?: string): string {
