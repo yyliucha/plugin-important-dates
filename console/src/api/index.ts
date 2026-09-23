@@ -61,25 +61,25 @@ export function describeError(error: unknown, fallback = "未知错误"): string
   const message = (error as Error)?.message || "";
   switch (status) {
     case 400:
-      return "提交内容不合法（400），请检查填写项后重试";
+      return "填写内容有误，请检查后重试";
     case 401:
-      return "登录状态已失效（401），请重新登录后再试";
+      return "登录已过期，请重新登录后再试";
     case 403:
-      return "没有权限（403）：当前账号缺少该操作权限";
+      return "当前账号没有这个操作权限";
     case 404:
-      return "对象不存在（404）：可能已被删除，请刷新页面后重试";
+      return "这条记录可能已被删除，请刷新后重试";
     case 409:
-      return "数据已被其它页面修改（409），已自动重试一次，请再试一次";
+      return "这条记录刚在别处被改过，请再试一次";
     case 413:
-      return "内容过大（413）：请压缩图片或附件后再试";
+      return "图片或附件太大了，请压缩后再试";
     case 429:
-      return "请求过于频繁（429），已被站点限流，请稍后重试";
+      return "操作太频繁了，请稍等片刻再试";
     case 502:
     case 503:
     case 504:
-      return `站点反向代理暂时不可用（HTTP ${status}），已自动重试仍失败，请稍后再试`;
+      return "站点暂时不可用（已自动重试过），请稍后再试";
     default:
-      return status ? `请求失败（HTTP ${status}）` : message || fallback;
+      return status ? "操作没有成功，请稍后再试" : message || fallback;
   }
 }
 

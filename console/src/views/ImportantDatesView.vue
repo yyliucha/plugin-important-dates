@@ -1069,7 +1069,7 @@ async function onSkip(c: Car, e: { index: number; label: string }) {
   reminderBusy.value = key;
   try {
     await skipReminder(c, e.index, e.label);
-    Toast.success("本周期不再提醒（到期日变化后会自动恢复）");
+    Toast.success("这次先不提醒了，下次到期前会重新提醒你");
     await load();
   } catch (error) {
     Toast.error(`操作失败：${describeError(error)}`);
@@ -1277,7 +1277,7 @@ async function toggleCarVisible(c: Car, visibleValue: boolean) {
   try {
     await patchCar(c.metadata.name, [{ op: "add", path: "/spec/visible", value: visibleValue }]);
     c.spec.visible = visibleValue;
-    Toast.success(visibleValue ? "已在前台展示（车牌自动脱敏）" : "已取消前台展示");
+    Toast.success(visibleValue ? "已在前台展示（车牌会自动打码）" : "已取消前台展示");
     await appendLog(
       "UPDATE",
       c.spec.displayName,
@@ -1828,7 +1828,7 @@ async function onImportFile(e: Event) {
       Toast.warning("文件中没有可导入的记录");
     }
   } catch {
-    Toast.error("导入失败：不是有效的导出文件（JSON）");
+    Toast.error("导入失败：请选择本插件「导出」生成的备份文件");
   } finally {
     input.value = "";
   }

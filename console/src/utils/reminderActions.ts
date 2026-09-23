@@ -47,7 +47,8 @@ export async function markReminderDone(car: Car, reminderIndex: number, displayL
     { op: "add", path: "/notifiedForDate", value: "" },
     { op: "add", path: "/skippedForDate", value: "" },
   ];
-  let detail = `已办（原到期日 ${from || "—"}）`;
+  let detail = "已办";
+  let logDetail = detail;
   // 保养类：语义是"我刚保养完" —— 更新上次保养日期，并按保养间隔推算下次到期
   const interval = r.intervalMonths != null ? Number(r.intervalMonths) : 0;
   if (r.key === "MAINTENANCE" && interval > 0) {
@@ -59,8 +60,9 @@ export async function markReminderDone(car: Car, reminderIndex: number, displayL
     ops.push({ op: "add", path: "/lastDoneTo", value: formatYmd(next) });
     ops.push({ op: "add", path: "/ackState", value: "PENDING" });
     await patchCar(car.metadata.name, basePatch(reminderIndex, ops));
-    const detailText = `已办：上次保养日期更新为 ${formatYmd(today)}，下次保养 ${formatYmd(next)}（间隔 ${interval} 个月）`;
-    await writeOperationLog("UPDATE", `${car.spec.displayName} · ${displayLabel}`, car.metadata.name, detailText, "CAR");
+    const detailText = `已办：下次保养 ${formatYmd(next)}`;
+    const logText = `已办（刚保养完）：上次保养日期 ${r.lastServiceDate || "—"} → ${formatYmd(today)}，下次保养 ${formatYmd(next)}（间隔 ${interval} 个月）`;
+    await writeOperationLog("UPDATE", `${car.spec.displayName} · ${displayLabel}`, car.metadata.name, logText, "CAR");
     return detailText;
   }
   if (months > 0) {
@@ -71,11 +73,13 @@ export async function markReminderDone(car: Car, reminderIndex: number, displayL
     ops.push({ op: "add", path: "/ackState", value: "PENDING" });
     // 记录"顺延到哪天"：本期已办过 → 按钮改为「撤销顺延」，防止同一期被反复点击滚到很远的年份
     ops.push({ op: "add", path: "/lastDoneTo", value: nextText });
-    detail = `已办并顺延 ${months} 个月：${from || "—"} → ${nextText}（可撤销）`;
+    detail = `已办：下次到期 ${nextText}`;
+    logDetail = `已办并顺延 ${months} 个月：${from || "—"} → ${nextText}`;
   } else {
     // 一次性项：办完即完成
     ops.push({ op: "add", path: "/ackState", value: "DONE" });
-    detail = `已办（一次性事项已完成，不再提醒；原到期日 ${from || "—"}）`;
+    detail = "已办：这项以后不会再提醒了";
+    logDetail = `已办（一次性事项已完成，不再提醒；原到期日 ${from || "—"}）`;
   }
   await patchCar(car.metadata.name, basePatch(reminderIndex, ops));
   await writeOperationLog(
@@ -167,10 +171,10 @@ export async function undoReminderDone(car: Car, reminderIndex: number, displayL
     "UPDATE",
     `${car.spec.displayName} · ${displayLabel}`,
     car.metadata.name,
-    `撤销办理：到期日还原为 ${restore}（原记录 ${from2Text(r.lastDoneTo)}）`,
+    `撤销办理：到期日恢复为 ${restore}（原记录 ${from2Text(r.lastDoneTo)}）`,
     "CAR"
   );
-  return `已撤销：到期日还原为 ${restore}`;
+  return `已撤销办理，到期日恢复为 ${restore}`;
 }
 
 function from2Text(value?: string): string {
