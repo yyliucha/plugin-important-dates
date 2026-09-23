@@ -474,6 +474,7 @@ import {
   nextInspection,
   parseInspectionNodes,
   parseYmd,
+  resolveDueDate,
   startOfToday,
   syncableKey,
 } from "@/utils/vehicle";
@@ -770,7 +771,8 @@ function isDone(r: FormReminder): boolean {
  * 手填日期优先。已完成（一次性办完）时返回空字符串。
  */
 function nextNoticeOf(r: FormReminder): string {
-  if (isDone(r)) return "";
+  // 注意：本期已办过（isDone）仍然要显示"下次提醒"——循环项/保养项办完还有下一期；
+  // 只有一次性办完（ackState=DONE）才由 noNextNotice 判定为"没有下次"。
   const days = r.remindDays != null ? Number(r.remindDays) : defaultHeadDays();
   const resolved = resolveDueDate(r, {
     registeredDate: form.registeredDate || form.purchaseDate,
@@ -783,9 +785,12 @@ function nextNoticeOf(r: FormReminder): string {
   return formatYmd(d);
 }
 
-/** 该到期项是否"没有下次"（一次性且已办完） */
+/**
+ * 该到期项是否"没有下次"：只有**一次性事项已办完**（ackState=DONE）才是。
+ * 循环项与保养项办完后依然有下一期，必须继续显示"下次提醒"。
+ */
 function noNextNotice(r: FormReminder): boolean {
-  return isDone(r);
+  return r.ackState === "DONE";
 }
 
 function defaultHeadDays(): number {
@@ -802,11 +807,13 @@ function postponeReminder(r: FormReminder) {
   if (r.key === "MAINTENANCE" && r.intervalMonths != null && Number(r.intervalMonths) > 0) {
     const today = startOfToday();
     const interval = Number(r.intervalMonths);
+    const previousDate = r.date || "";
     r.lastDoneFromService = r.lastServiceDate || undefined;
     r.lastServiceDate = formatYmd(today);
     r.date = formatYmd(addMonths(today, interval));
+    // 记录办理前的到期日，撤销时才能还原
+    r.lastDoneFrom = previousDate;
     r.lastDoneAt = `${formatYmd(now)}T${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
-    r.lastDoneFrom = r.lastDoneFrom || "";
     r.lastDoneTo = r.date;
     r.ackState = "PENDING";
     r.skippedForDate = undefined;
