@@ -70,7 +70,6 @@ A Halo 2.x plugin that remembers things for you: anniversaries, birthdays and th
 - `importantDateFinder` is exposed: `listAll()` / `listAllPeople()` / `listAllCars()` / `listUpcoming(days)` / `listUpcomingCarEvents(days)`
 
 **📊 More**
-- **Operation log**: every create/update/delete for dates, people and vehicles, with paging and automatic cleanup (default: keep 30 days)
 - **Export / import**: JSON (v3, including people and vehicles); duplicates are skipped, never overwritten; older export files remain importable
 
 ## Data & compliance
