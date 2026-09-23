@@ -327,6 +327,12 @@ public class Car extends AbstractExtension {
         private String lastDoneFrom;
 
         /**
+         * 保养类「已办」之前的上次保养日期 yyyy-MM-dd（撤销时一并还原）。
+         */
+        @Schema(description = "办理前的上次保养日期")
+        private String lastDoneFromService;
+
+        /**
          * 「已办」顺延后的到期日 yyyy-MM-dd：等于当前到期日表示"本期已办过"，
          * 此时按钮变为「撤销顺延」——防止同一期被反复点击顺延到很远的年份。
          */

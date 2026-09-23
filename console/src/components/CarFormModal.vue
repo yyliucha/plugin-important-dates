@@ -336,7 +336,8 @@
             <span>启用提醒</span>
           </label>
           <VSpace>
-            <span v-if="r.date && nextNoticeOf(r)" class="next-notice">
+            <span v-if="noNextNotice(r)" class="next-notice">已完成，不再提醒</span>
+            <span v-else-if="nextNoticeOf(r)" class="next-notice">
               下次提醒：{{ nextNoticeOf(r) }}
             </span>
             <VButton
@@ -763,13 +764,28 @@ function isDone(r: FormReminder): boolean {
   return !!to && to === (r.date || "");
 }
 
-/** 下次提醒日期 = 到期日 − 提前天数 */
+/**
+ * 下次提醒日期 = **生效的到期日** − 提前天数。
+ * 生效到期日与插件同一口径：保养按「上次保养 + 间隔月数」、年检按登记日期与车型规则推算，
+ * 手填日期优先。已完成（一次性办完）时返回空字符串。
+ */
 function nextNoticeOf(r: FormReminder): string {
+  if (isDone(r)) return "";
   const days = r.remindDays != null ? Number(r.remindDays) : defaultHeadDays();
-  const base = parseYmd(r.date);
+  const resolved = resolveDueDate(r, {
+    registeredDate: form.registeredDate || form.purchaseDate,
+    vehicleType: form.vehicleType,
+    today: startOfToday(),
+  });
+  const base = parseYmd(resolved?.date || r.date);
   if (!base) return "";
   const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() - (Number.isFinite(days) ? days : 15));
   return formatYmd(d);
+}
+
+/** 该到期项是否"没有下次"（一次性且已办完） */
+function noNextNotice(r: FormReminder): boolean {
+  return isDone(r);
 }
 
 function defaultHeadDays(): number {
@@ -781,8 +797,25 @@ function defaultHeadDays(): number {
  * 同一期只能办一次：办过之后按钮变为「撤销」，避免误点多次把日期滚到很远的年份。
  */
 function postponeReminder(r: FormReminder) {
-  const months = effectiveRepeat(r);
   const now = new Date();
+  // 保养类：语义是"我刚保养完" —— 更新上次保养日期，并按保养间隔推到下次
+  if (r.key === "MAINTENANCE" && r.intervalMonths != null && Number(r.intervalMonths) > 0) {
+    const today = startOfToday();
+    const interval = Number(r.intervalMonths);
+    r.lastDoneFromService = r.lastServiceDate || undefined;
+    r.lastServiceDate = formatYmd(today);
+    r.date = formatYmd(addMonths(today, interval));
+    r.lastDoneAt = `${formatYmd(now)}T${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+    r.lastDoneFrom = r.lastDoneFrom || "";
+    r.lastDoneTo = r.date;
+    r.ackState = "PENDING";
+    r.skippedForDate = undefined;
+    r.notifiedStages = [];
+    r.notifiedForDate = undefined;
+    Toast.success(`已办：上次保养日期更新为 ${formatYmd(today)}，下次保养 ${r.date}（间隔 ${interval} 个月）`);
+    return;
+  }
+  const months = effectiveRepeat(r);
   const stamp = `${formatYmd(now)}T${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
   const from = r.date || "";
   r.lastDoneAt = stamp;
@@ -813,8 +846,12 @@ function undoReminder(r: FormReminder) {
     return;
   }
   r.date = restore;
+  if (r.lastDoneFromService !== undefined && r.lastDoneFromService !== null) {
+    r.lastServiceDate = r.lastDoneFromService || undefined;
+  }
   r.ackState = "PENDING";
   r.lastDoneAt = undefined;
+  r.lastDoneFromService = undefined;
   r.lastDoneFrom = undefined;
   r.lastDoneTo = undefined;
   r.notifiedStages = [];
@@ -1173,6 +1210,7 @@ async function save() {
           lastDoneAt: r.lastDoneAt || undefined,
           lastDoneFrom: r.lastDoneFrom || undefined,
           lastDoneTo: r.lastDoneTo || undefined,
+          lastDoneFromService: r.lastDoneFromService || undefined,
           skippedForDate: r.skippedForDate || undefined,
           notifiedStages: r.notifiedStages || [],
           notifiedForDate: r.notifiedForDate || undefined,

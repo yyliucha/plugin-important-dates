@@ -196,6 +196,8 @@ export interface CarReminder {
   lastDoneFrom?: string;
   /** 顺延后的到期日（等于当前到期日 = 本期已办过，可撤销） */
   lastDoneTo?: string;
+  /** 保养类：办理前的上次保养日期（撤销时还原） */
+  lastDoneFromService?: string;
   /** 忽略时对应的到期日（日期变化后自动恢复提醒） */
   skippedForDate?: string;
   /** 已主动提醒过的节点（节点式：每个节点只弹一次，写库跨设备一致） */

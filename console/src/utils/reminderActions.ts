@@ -6,7 +6,7 @@
  */
 import { patchCar, patchImportantDate, type PatchOp, writeOperationLog } from "@/api";
 import type { Car } from "@/types";
-import { defaultRepeatMonths, formatYmd, parseYmd, resolveDueDate, startOfToday } from "@/utils/vehicle";
+import { addMonths, defaultRepeatMonths, formatYmd, parseYmd, resolveDueDate, startOfToday } from "@/utils/vehicle";
 
 /** 由到期项算出"当前生效的到期日" */
 export function resolvedDateOf(car: Car, reminderIndex: number): string | undefined {
@@ -48,6 +48,21 @@ export async function markReminderDone(car: Car, reminderIndex: number, displayL
     { op: "add", path: "/skippedForDate", value: "" },
   ];
   let detail = `已办（原到期日 ${from || "—"}）`;
+  // 保养类：语义是"我刚保养完" —— 更新上次保养日期，并按保养间隔推算下次到期
+  const interval = r.intervalMonths != null ? Number(r.intervalMonths) : 0;
+  if (r.key === "MAINTENANCE" && interval > 0) {
+    const today = startOfToday();
+    const next = addMonths(today, interval);
+    ops.push({ op: "add", path: "/lastServiceDate", value: formatYmd(today) });
+    ops.push({ op: "add", path: "/date", value: formatYmd(next) });
+    ops.push({ op: "add", path: "/lastDoneFromService", value: r.lastServiceDate || "" });
+    ops.push({ op: "add", path: "/lastDoneTo", value: formatYmd(next) });
+    ops.push({ op: "add", path: "/ackState", value: "PENDING" });
+    await patchCar(car.metadata.name, basePatch(reminderIndex, ops));
+    const detailText = `已办：上次保养日期更新为 ${formatYmd(today)}，下次保养 ${formatYmd(next)}（间隔 ${interval} 个月）`;
+    await writeOperationLog("UPDATE", `${car.spec.displayName} · ${displayLabel}`, car.metadata.name, detailText, "CAR");
+    return detailText;
+  }
   if (months > 0) {
     const base = parseYmd(from) || startOfToday();
     const next = new Date(base.getFullYear(), base.getMonth() + months, base.getDate());
@@ -141,6 +156,8 @@ export async function undoReminderDone(car: Car, reminderIndex: number, displayL
       { op: "add", path: "/lastDoneAt", value: "" },
       { op: "add", path: "/lastDoneFrom", value: "" },
       { op: "add", path: "/lastDoneTo", value: "" },
+      { op: "add", path: "/lastServiceDate", value: r.lastDoneFromService || r.lastServiceDate || "" },
+      { op: "add", path: "/lastDoneFromService", value: "" },
       { op: "add", path: "/notifiedStages", value: [] },
       { op: "add", path: "/notifiedForDate", value: "" },
       { op: "add", path: "/skippedForDate", value: "" },
