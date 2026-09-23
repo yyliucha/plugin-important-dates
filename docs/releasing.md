@@ -64,3 +64,26 @@ This file records how releases are prepared, so every release looks consistent.
   keep it running as a detached process (`Start-Process -RedirectStandardOutput ...`), not inside a job that can be killed.
 - After installing a new build, **hard-refresh the browser**: the Halo console caches plugin console bundles, and a
   stale bundle shows up as a missing "记得" menu, missing settings tabs or a missing dashboard widget.
+## 版本号规则（Halo 强校验，踩过的坑）
+
+Halo 只接受**标准语义化版本**，且**同一个版本号无法再安装/升级第二次**（会返回 HTTP 500），所以每次给用户测试的包都必须换号：
+
+| 场景 | 正确写法 | 说明 |
+|---|---|---|
+| 正式版 | `1.2.6` | `major.minor.patch` |
+| 开发/测试包 | `1.2.6-rc.1`、`1.2.6-rc.2`、`1.2.6-rc.3`… | 预发布后缀，**每次构建递增**；排序上 `< 1.2.6`，所以正式版能顺利盖上去 |
+| 备选 | `1.2.6-beta.1`、`1.2.6-alpha.2` | 同上 |
+
+**不能用的写法**（Halo 直接 400 拒绝，正则见下）：
+
+- `1.2.6.01` —— 四段版本号，不合法；
+- `1.2.6-rc.01` —— 预发布段**不允许前导零**（只能是 `0`、`[1-9]\d*`，或含字母/连字符的标识）；
+- 重复使用 `1.2.6-SNAPSHOT` —— 版本号没变，Halo 拒绝安装。
+
+Halo 的校验正则：
+
+```text
+^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$
+```
+
+发布时同步改两处：`gradle.properties` 与 `src/main/resources/plugin.yaml`。
