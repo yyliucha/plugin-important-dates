@@ -447,7 +447,7 @@
 import { computed, reactive, ref, watch } from "vue";
 import { Toast, VButton, VModal, VSpace } from "@halo-dev/components";
 import { axiosInstance } from "@halo-dev/api-client";
-import { createCar, describeError, fetchPluginJsonConfig, listPersons, updateCar } from "@/api";
+import { createCar, describeError, fetchPluginJsonConfig, listCars, listPersons, updateCar } from "@/api";
 import { markReminderDone, undoReminderDone } from "@/utils/reminderActions";
 import {
   ENERGY_TYPES,
@@ -509,6 +509,8 @@ const emit = defineEmits<{
 
 /** 表单内的到期项：在存储字段之外附带若干界面状态（保存时不写入） */
 interface FormReminder extends CarReminder {
+  /** 载入时的原始到期日（用于在已保存数据里定位这一项） */
+  originalDate?: string;
   /** 载入时的原始到期日（用于在已保存数据里定位这一项，动作立即生效时用） */
   originalDate?: string;
   /** 年检：手动指定日期（关闭时按登记日期 + 车型规则自动推算） */
@@ -1317,6 +1319,85 @@ watch(
     }
   }
 );
+/** 在已保存的数据里定位这个到期项（弹窗内可能新增/删除过，按"项目 + 原到期日"匹配） */
+function storedIndex(r: FormReminder): number {
+  const car = props.car;
+  if (!car?.spec.reminders) return -1;
+  const list = car.spec.reminders;
+  const wantDate = r.originalDate || r.date || "";
+  const byKeyAndDate = list.findIndex((x) => x.key === r.key && (x.date || "") === wantDate);
+  if (byKeyAndDate >= 0) return byKeyAndDate;
+  return list.findIndex((x) => x.key === r.key);
+}
+
+/**
+ * 「已办」立即生效：直接按列表卡片同一套动作写库（不再依赖"先改表单再点保存"），
+ * 完成后关闭弹窗并让列表刷新。
+ */
+async function applyDoneNow(r: FormReminder) {
+  const car = props.car;
+  if (!car) {
+    Toast.warning("请先保存这辆车，再使用「已办」");
+    return;
+  }
+  const idx = storedIndex(r);
+  if (idx < 0) {
+    Toast.warning("这项还没保存过，请先保存车辆后再点「已办」");
+    return;
+  }
+  try {
+    const label = r.label || "这项";
+    const detail = await markReminderDone(car, idx, label);
+    Toast.success(detail);
+    emit("saved");
+    // 原地生效：回读最新状态刷新本行，不关闭弹窗
+    await refreshReminderRow(r, idx);
+  } catch (error) {
+    Toast.error(`操作失败：${describeError(error)}`);
+  }
+}
+
+/** 「撤销办理」立即生效 */
+async function applyUndoNow(r: FormReminder) {
+  const car = props.car;
+  if (!car) return;
+  const idx = storedIndex(r);
+  if (idx < 0) return;
+  try {
+    const label = r.label || "这项";
+    const detail = await undoReminderDone(car, idx, label);
+    Toast.success(detail);
+    emit("saved");
+    await refreshReminderRow(r, idx);
+  } catch (error) {
+    Toast.error(`撤销失败：${describeError(error)}`);
+  }
+}
+/**
+ * 动作后回读这一项的最新状态（不关闭弹窗）：
+ * 只刷新"状态类"字段，不影响你在其它行未保存的编辑。
+ */
+async function refreshReminderRow(r: FormReminder, index: number) {
+  try {
+    const cars = await listCars();
+    const fresh = cars.find((c) => c.metadata.name === props.car?.metadata.name);
+    const src = fresh?.spec.reminders?.[index];
+    if (!src) return;
+    r.date = src.date;
+    r.lastServiceDate = src.lastServiceDate;
+    r.ackState = src.ackState;
+    r.lastDoneAt = src.lastDoneAt;
+    r.lastDoneFrom = src.lastDoneFrom;
+    r.lastDoneTo = src.lastDoneTo;
+    r.lastDoneFromService = src.lastDoneFromService;
+    r.skippedForDate = src.skippedForDate;
+    r.notifiedStages = src.notifiedStages;
+    r.notifiedForDate = src.notifiedForDate;
+    r.originalDate = src.date;
+  } catch {
+    // 回读失败不影响已完成的写入
+  }
+}
 </script>
 
 <style scoped>
@@ -1719,57 +1800,3 @@ watch(
   font-size: 12px;
   color: #b91c1c;
 }</style>
-
-/** 在已保存的数据里定位这个到期项（弹窗内可能新增/删除过，按"项目 + 原到期日"匹配） */
-function storedIndex(r: FormReminder): number {
-  const car = props.car;
-  if (!car?.spec.reminders) return -1;
-  const list = car.spec.reminders;
-  const wantDate = r.originalDate || r.date || "";
-  const byKeyAndDate = list.findIndex((x) => x.key === r.key && (x.date || "") === wantDate);
-  if (byKeyAndDate >= 0) return byKeyAndDate;
-  return list.findIndex((x) => x.key === r.key);
-}
-
-/**
- * 「已办」立即生效：直接按列表卡片同一套动作写库（不再依赖"先改表单再点保存"），
- * 完成后关闭弹窗并让列表刷新。
- */
-async function applyDoneNow(r: FormReminder) {
-  const car = props.car;
-  if (!car) {
-    Toast.warning("请先保存这辆车，再使用「已办」");
-    return;
-  }
-  const idx = storedIndex(r);
-  if (idx < 0) {
-    Toast.warning("这项还没保存过，请先保存车辆后再点「已办」");
-    return;
-  }
-  try {
-    const label = r.label || reminderLabelOf(r.key);
-    const detail = await markReminderDone(car, idx, label);
-    Toast.success(detail);
-    emit("saved");
-    close();
-  } catch (error) {
-    Toast.error(`操作失败：${describeError(error)}`);
-  }
-}
-
-/** 「撤销办理」立即生效 */
-async function applyUndoNow(r: FormReminder) {
-  const car = props.car;
-  if (!car) return;
-  const idx = storedIndex(r);
-  if (idx < 0) return;
-  try {
-    const label = r.label || reminderLabelOf(r.key);
-    const detail = await undoReminderDone(car, idx, label);
-    Toast.success(detail);
-    emit("saved");
-    close();
-  } catch (error) {
-    Toast.error(`撤销失败：${describeError(error)}`);
-  }
-}
