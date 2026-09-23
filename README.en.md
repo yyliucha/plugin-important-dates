@@ -39,11 +39,11 @@ A Halo 2.x plugin that remembers things for you: anniversaries, birthdays and th
 - **Attachment library scope**: under Settings → Photo settings you can point the **person avatar** and the **vehicle album** at a category (group) and a storage policy; when nothing matches, the scope **widens automatically** and the dialog explains what is in effect and how many images match (no more empty lists), with a one-click "show all images"
 - **Dead images degrade gracefully**: when an attachment is deleted (or blocked by another plugin's global rule), a public cover falls back to the vehicle icon, an avatar to the initial character and an album photo to a placeholder — **visitors never see a broken image**; the console flags `含失效图片 N` / `大头贴已失效` and offers one-click removal or per-photo replacement
 - **Bandwidth-friendly images**: lists, album grids and public cards use `?width=` derivatives (480 px by default, configurable, 0 = original) while opening a photo still shows the original; uploads above 1.5 MB are **compressed in the browser** first (1920 px by default, switchable off)
-- **"Done — roll one cycle"**: renewals and inspections move a due date forward by its repeat interval in one click
+- **Reminder state machine (1.2.6)**: a past due date now means *overdue* (no silent roll-over) - reminders run day by day, then the item moves to a to-do state that is never dropped; only pressing Done rolls it forward: repeating items by their cycle, **maintenance items record "just serviced"**, one-off items completed, and all of it can be **undone in one click**
+- **Cadence**: a reminder node every 7 days inside the window, the 15/7/3/1/0 ladder near the end, overdue days 1/2/3 - each node pops once and is stored in the database
+- **In-place actions**: Done / Undo inside the vehicle dialog persist immediately, refresh just that row and keep the dialog open
 - **Dismiss a single reminder**: the ✕ on each line of the public banner and the dashboard widget means "not again this due cycle" (stored in the browser, restored automatically when the due date changes), with one-click restore and a setting to switch the capability off
 - **Configurable inspection rule**: "Vehicle settings → inspection nodes (2,4,6,10 by default)" and "yearly on-site inspection from (11 by default)" adapt to your local vehicle-office rules, and the form preview and reminders follow
-- **Public garage toolbar**: sort by admin drag order / nearest due / name, filter in-use vs. all (including sold and scrapped)
-- **Admin "Self-check" panel**: one click for plugin version, data counts, reminder and display settings, how many images the photo settings match, stale image references and how many reminders are due soon
 - **Due reminders**: compulsory & commercial insurance, inspection, maintenance (computed from last service + interval), road tax, licence renewal, custom items; per-item lead days, on/off and **repeat interval** (every year / two years / three years / one-off / custom months); sold/scrapped vehicles stop reminding
 - **One insurer per vehicle**: a vehicle-level insurer shared by every policy item (with quick picks for common companies); a single item can still override it, and existing data is migrated idempotently at startup
 - **Inspection derived from the rules**: the next inspection is derived from the first registration date plus the vehicle category (sticker in years 2/4, on-site in years 6/10, yearly from year 11) with the stage and its basis shown; a manual date can override it, and the default lead time is 30 days
@@ -126,7 +126,7 @@ cd plugin-important-dates
 ./gradlew build
 ```
 
-The artifact is written to `build/libs/plugin-important-dates-<version>.jar` (current version: `1.2.5`; previous stable: `1.2.4`). Hard-refresh your browser once after installing a new build.
+The artifact is written to `build/libs/plugin-important-dates-<version>.jar` (current version: `1.2.6`; previous stable: `1.2.5`). Hard-refresh your browser once after installing a new build.
 
 ## License
 
