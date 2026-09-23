@@ -139,16 +139,13 @@ export async function writeOperationLog(
   detail: string,
   targetType: LogTargetType = "DATE"
 ): Promise<void> {
-  await axiosInstance.post<OperationLog>(LOG_BASE, {
-    apiVersion: "importantdates.halo.run/v1alpha1",
-    kind: "OperationLog",
-    metadata: {
-      name: `operation-log-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    },
-    spec: { action, targetTitle, targetName, targetType, detail },
-  });
+  // 1.2.6：操作日志功能已移除（界面无入口），这里保持空实现，避免继续写入无用数据。
+  void action;
+  void targetTitle;
+  void targetName;
+  void detail;
+  void targetType;
 }
-
 export async function listOperationLogs(
   page = 1,
   size = 20

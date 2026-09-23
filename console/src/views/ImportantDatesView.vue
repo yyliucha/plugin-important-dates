@@ -1,8 +1,6 @@
 <template>
   <VPageHeader title="记得">
     <template #actions>
-      <VButton :loading="logLoading" @click="openLogs">操作日志</VButton>
-      <VButton :loading="selfChecking" @click="openSelfCheck">自检</VButton>
       <VButton @click="exportData">导出</VButton>
       <VButton @click="triggerImport">导入</VButton>
       <VButton type="secondary" @click="onPrimaryAction">
@@ -391,10 +389,6 @@
         </VCard>
       </div>
     </template>
-
-    <div class="storage-note">
-      数据存储于 Halo 扩展存储（与站点数据库一致：H2 / MySQL / PostgreSQL）；操作日志会记录每一次新增、编辑与删除。
-    </div>
 
     <!-- ================= 日期新增/编辑弹窗 ================= -->
     <VModal
