@@ -9,6 +9,8 @@
  *   - 「本次关闭」只收起当前弹窗；按时长/永久记录在 localStorage，到期自动恢复
  */
 (function () {
+  // 便于排查：浏览器控制台执行 window.__ID_TOAST_VERSION 即可确认当前跑的是哪一版脚本
+  window.__ID_TOAST_VERSION = "1.2.6";
   var KEY_UNTIL = "id-toast-until";
   var KEY_FOREVER = "id-toast-forever";
   var MENU_ITEMS = [

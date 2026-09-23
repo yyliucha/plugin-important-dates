@@ -45,7 +45,8 @@ This file records how releases are prepared, so every release looks consistent.
      - images: `docs/screenshots/x.png` → `https://raw.githubusercontent.com/yyliucha/plugin-important-dates/main/docs/screenshots/x.png`
      - docs: `README.en.md` → `https://github.com/yyliucha/plugin-important-dates/blob/main/README.en.md`; `LICENSE` → `.../blob/main/LICENSE`
 3. Write the release notes: `docs/release-notes-<version>.md` (Chinese, for the store) and `docs/release-notes-<version>.en.md` (English).
-4. `./gradlew clean build` → verify the jar metadata (`plugin.yaml` inside the jar shows the new version).
+4. If `reminder-toast.js` changed, bump `TOAST_SCRIPT_VERSION` in `ReminderHeadProcessor` so browsers do not keep the cached old script.
+5. `./gradlew clean build` → verify the jar metadata (`plugin.yaml` inside the jar shows the new version).
 5. Verify on a clean Halo 2.26 instance: `halo-smoke.mjs` (50/50, includes the 1.2.1 car checks) plus the browser end-to-end script (`browser-121-e2e.mjs`, 13/13) and the migration script (`migrate-check.mjs`).
 6. Commit and push (English message), wait for CI to pass.
 7. Create the release: title = `<tag>`, notes = Chinese section + English section (see above), one jar asset, `--latest` for stable or `--prerelease` for previews.

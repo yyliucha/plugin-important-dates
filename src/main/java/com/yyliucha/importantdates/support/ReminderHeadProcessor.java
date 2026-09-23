@@ -33,8 +33,15 @@ import run.halo.app.theme.dialect.TemplateHeadProcessor;
 @Component
 public class ReminderHeadProcessor implements TemplateHeadProcessor {
 
+    /**
+     * 提醒脚本版本号：**每次改动 reminder-toast.js 都要递增**。
+     * 浏览器对插件静态资源是强缓存的（升级插件后仍可能沿用旧脚本，表现为"提示文案还是老样子"），
+     * 因此在 URL 上带版本参数，让升级后自动取到新脚本。
+     */
+    private static final String TOAST_SCRIPT_VERSION = "126";
+
     private static final String TOAST_SCRIPT_URL =
-        "/plugins/plugin-important-dates/assets/static/reminder-toast.js";
+        "/plugins/plugin-important-dates/assets/static/reminder-toast.js?v=" + TOAST_SCRIPT_VERSION;
 
     private final ReactiveSettingFetcher settingFetcher;
 
