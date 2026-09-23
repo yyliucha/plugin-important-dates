@@ -78,9 +78,6 @@
           <button type="button" class="link-btn" @click="restoreDismissed">恢复显示</button>
         </div>
 
-        <div class="text-xs text-gray-500">
-          来自「记得」插件；提前天数与开关可在 插件 → 记得 → 设置 中调整
-        </div>
       </div>
       <div v-else-if="items.length">
         <div class="text-gray-500">提醒都已忽略（本浏览器）</div>
