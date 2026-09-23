@@ -1499,7 +1499,7 @@ async function toggleDateVisible(item: ImportantDate, visibleValue: boolean) {
       "UPDATE",
       item.spec.title,
       item.metadata.name,
-      `前台展示：${item.spec.visible !== false ? "是" : "否"} → ${visibleValue ? "是" : "否"}`
+      visibleValue ? "开启前台展示" : "关闭前台展示"
     );
     await load();
   } catch (error) {
@@ -1515,7 +1515,7 @@ async function togglePersonVisible(p: Person, visibleValue: boolean) {
       "UPDATE",
       p.spec.displayName,
       p.metadata.name,
-      `前台展示：${p.spec.visible !== false ? "是" : "否"} → ${visibleValue ? "是" : "否"}`
+      visibleValue ? "开启前台展示" : "关闭前台展示"
     );
     await load();
   } catch (error) {

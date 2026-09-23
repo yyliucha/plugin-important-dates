@@ -102,7 +102,15 @@ export function stageTextOf(
   return `${prefix}已逾期 ${overdue} 天 · 待处理`;
 }
 
-/** 状态说明（已办时间 / 待处理天数） */
+/** 2026-09-23 → 9 月 23 日（今年则省略年份） */
+function shortCnDate(date?: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec((date || "").trim());
+  if (!m) return (date || "").trim();
+  const sameYear = Number(m[1]) === new Date().getFullYear();
+  return sameYear ? `${Number(m[2])} 月 ${Number(m[3])} 日` : `${m[1]} 年 ${Number(m[2])} 月 ${Number(m[3])} 日`;
+}
+
+/** 状态说明（列表上给人的一句话） */
 export function stateTextOf(
   status: ReminderStatus,
   lastDoneAt?: string,
@@ -110,12 +118,13 @@ export function stateTextOf(
   overdueDays?: number
 ): string {
   if (status === STATUS_DONE) {
-    const when = lastDoneAt ? lastDoneAt.replace("T", " ").slice(0, 16) : "";
-    const from = lastDoneFrom ? `（原到期日 ${lastDoneFrom}）` : "";
-    return when ? `已办 · ${when}${from}` : "已办";
+    const when = lastDoneAt ? shortCnDate(lastDoneAt.slice(0, 10)) : "";
+    if (!when) return "已办好";
+    const from = lastDoneFrom ? `，原来到期日是 ${shortCnDate(lastDoneFrom)}` : "";
+    return `${when}办的${from}`;
   }
-  if (status === STATUS_SKIPPED) return "本周期已忽略";
-  if (status === STATUS_TODO) return `已逾期 ${overdueDays ?? 0} 天 · 待处理`;
+  if (status === STATUS_SKIPPED) return "这次先不提醒了";
+  if (status === STATUS_TODO) return `已经逾期 ${overdueDays ?? 0} 天，还等着你处理`;
   return "";
 }
 

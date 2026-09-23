@@ -171,19 +171,36 @@ public final class ReminderSupport {
         return "「" + name + "」还有 " + daysUntil + " 天就到啦～";
     }
 
-    /** 已办 / 已忽略的状态说明（后台列表展示用） */
+    /** 已办 / 已忽略的状态说明（列表上给人的一句话） */
     public static String stateText(String status, String lastDoneAt, String lastDoneFrom, long overdueDays) {
         if (STATUS_DONE.equals(status)) {
-            String when = lastDoneAt == null ? "" : lastDoneAt.replace('T', ' ').substring(0, Math.min(16, lastDoneAt.length()));
-            String from = (lastDoneFrom == null || lastDoneFrom.isBlank()) ? "" : "（原到期日 " + lastDoneFrom + "）";
-            return when.isEmpty() ? "已办" : "已办 · " + when + from;
+            String when = cnDate(lastDoneAt == null ? null : lastDoneAt.substring(0, Math.min(10, lastDoneAt.length())));
+            if (when.isBlank()) {
+                return "已办好";
+            }
+            String from = (lastDoneFrom == null || lastDoneFrom.isBlank()) ? "" : "，原来到期日是 " + cnDate(lastDoneFrom);
+            return when + "办的" + from;
         }
         if (STATUS_SKIPPED.equals(status)) {
-            return "本周期已忽略";
+            return "这次先不提醒了";
         }
         if (STATUS_TODO.equals(status)) {
-            return "已逾期 " + overdueDays + " 天 · 待处理";
+            return "已经逾期 " + overdueDays + " 天，还等着你处理";
         }
         return "";
+    }
+
+    /** 2026-09-23 → 9 月 23 日（今年省略年份） */
+    private static String cnDate(String date) {
+        if (date == null || date.length() < 10) {
+            return date == null ? "" : date;
+        }
+        try {
+            java.time.LocalDate d = java.time.LocalDate.parse(date.substring(0, 10));
+            String base = d.getMonthValue() + " 月 " + d.getDayOfMonth() + " 日";
+            return d.getYear() == java.time.LocalDate.now().getYear() ? base : d.getYear() + " 年 " + base;
+        } catch (Exception e) {
+            return date;
+        }
     }
 }
