@@ -116,9 +116,8 @@
       <!-- 生活视图：即将到来的重要日期 -->
       <div class="id-remind id-only-life" th:if="${reminders != null && !reminders.isEmpty()}" th:attr="data-allow-dismiss=${allowDismiss}">
         <div class="id-remind-item" th:each="r : ${reminders}" th:attr="data-dismiss-key=${'date#' + r.title + '#' + (r.nextSolarDate != null ? r.nextSolarDate : r.dateText)}">
-          <span th:if="${r.daysUntil <= 0}" th:text="|「${r.title}」就是今天呀 🎉|">「结婚纪念日」就是今天呀 🎉</span>
-          <span th:if="${r.daysUntil == 1}" th:text="|「${r.title}」明天就到啦～|">「结婚纪念日」明天就到啦～</span>
-          <span th:if="${r.daysUntil > 1}" th:text="|「${r.title}」还有 ${r.daysUntil} 天就到啦～|">「结婚纪念日」还有 3 天就到啦～</span>
+          <span th:if="${r.stageText != null and !r.stageText.isBlank()}" th:text="${r.stageText}">「结婚纪念日」还有 3 天就到啦～</span>
+          <span th:unless="${r.stageText != null and !r.stageText.isBlank()}" th:text="|「${r.title}」还有 ${r.daysUntil} 天就到啦～|">「结婚纪念日」还有 3 天就到啦～</span>
           <button type="button" class="id-remind-x" data-dismiss="1" title="本次到期周期内不再提示">✕</button>
         </div>
       </div>
@@ -126,10 +125,8 @@
       <!-- 爱车视图：即将到来的座驾到期事项 -->
       <div class="id-remind id-only-car" th:if="${carEvents != null && !carEvents.isEmpty()}" th:attr="data-allow-dismiss=${allowDismiss}">
         <div class="id-remind-item" th:each="e : ${carEvents}" th:attr="data-dismiss-key=${'car#' + e.carName + '#' + e.label + '#' + e.date}">
-          <span th:if="${e.daysUntil < 0}" th:text="|「${e.carName}」的${e.label}已过期 ${-e.daysUntil} 天，记得安排一下呀～|">「小白」的交强险已过期 5 天</span>
-          <span th:if="${e.daysUntil == 0}" th:text="|「${e.carName}」的${e.label}就是今天到期呀 🎉|">今天到期</span>
-          <span th:if="${e.daysUntil == 1}" th:text="|「${e.carName}」的${e.label}明天到期～|">明天到期</span>
-          <span th:if="${e.daysUntil > 1}" th:text="|「${e.carName}」的${e.label}还有 ${e.daysUntil} 天到期，记得安排一下呀～|">还有 7 天</span>
+          <span th:if="${e.stageText != null and !e.stageText.isBlank()}" th:text="${e.stageText}">「小白」的交强险还有 7 天到期</span>
+          <span th:unless="${e.stageText != null and !e.stageText.isBlank()}" th:text="|「${e.carName}」的${e.label}还有 ${e.daysUntil} 天到期，记得安排一下呀～|">还有 7 天</span>
           <button type="button" class="id-remind-x" data-dismiss="1" title="本次到期周期内不再提示">✕</button>
         </div>
       </div>

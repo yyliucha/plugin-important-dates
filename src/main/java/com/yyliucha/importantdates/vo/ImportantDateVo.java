@@ -71,4 +71,19 @@ public class ImportantDateVo {
      * 创建时间（排序平级时的次级排序依据）。
      */
     private String createdAt;
+
+    /**
+     * 当前阶段编码（D3/D1/D0；不在节点日为空）——节点式提醒，1.2.6。
+     */
+    private String stageCode;
+
+    /**
+     * 该阶段的节点是否已经提醒过（写库，跨浏览器/设备一致）。
+     */
+    private boolean stageNotified;
+
+    /**
+     * 阶段文案（人性化，逐日不同）。
+     */
+    private String stageText;
 }

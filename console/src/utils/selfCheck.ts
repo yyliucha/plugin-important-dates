@@ -188,6 +188,28 @@ export async function runSelfCheck(input: {
       if (days <= window && days >= -30) dueSoon++;
     }
   }
+  const todoItems = input.cars.reduce((sum, c) => {
+    if (c.spec.status && c.spec.status !== "IN_USE") return sum;
+    return sum + (c.spec.reminders || []).filter((r) => {
+      if (r.enabled === false || r.ackState === "DONE" || r.ackState === "SKIPPED") return false;
+      const resolved = resolveDueDate(r, {
+        registeredDate: c.spec.registeredDate || c.spec.purchaseDate,
+        vehicleType: c.spec.vehicleType,
+        today,
+      });
+      if (!resolved) return false;
+      const days = Math.round((new Date(`${resolved.date}T00:00:00`).getTime() - today.getTime()) / 86400000);
+      return days < 0;
+    }).length;
+  }, 0);
+  items.push({
+    label: "待处理（已逾期且仍在清单）",
+    value: todoItems ? `${todoItems} 项` : "无",
+    level: todoItems ? "warn" : "ok",
+    hint: todoItems
+      ? "在「座驾」页签点该项的「✓」表示已办：循环项顺延一期、一次性项标记完成；点「✕」表示本周期不再提醒"
+      : undefined,
+  });
   items.push({
     label: `即将到期（${input.remindDays} 天内）`,
     value: `${dueSoon} 条`,

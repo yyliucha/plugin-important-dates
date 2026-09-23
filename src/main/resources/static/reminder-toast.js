@@ -147,8 +147,9 @@
     var items = d.reminders || [];
     var body;
     if (items.length) {
+      // 服务端已给出人性化文案（节点式，逐日不同）时直接用；否则回退到模板
       body = items.map(function (r) {
-        return '<div>' + applyTemplate(d.toastTemplate, r) + "</div>";
+        return '<div>' + (r.text ? esc(r.text) : applyTemplate(d.toastTemplate, r)) + "</div>";
       }).join("");
     } else {
       var emptyText = d.toastEmptyText == null ? "" : String(d.toastEmptyText);
@@ -226,6 +227,12 @@
 
   function load() {
     var run = function () {
+      // 「记得」页面由服务端直接下发本次该弹的节点（window.__ID_TOAST__）；
+      // 其它页面/主题覆盖模板时回退到公开接口（接口不做节点过滤，仅作兜底展示）。
+      if (window.__ID_TOAST__) {
+        show(window.__ID_TOAST__);
+        return;
+      }
       fetch("/important-dates-reminders")
         .then(function (r) {
           return r.json();

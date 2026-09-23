@@ -18,6 +18,13 @@ import com.yyliucha.importantdates.vo.PersonVo;
 public interface ImportantDateFinder {
 
     /**
+     * 渲染前注入"提前提醒天数"（纪念日/生日的节点计算与前台口径保持一致）。
+     *
+     * @param days 提前提醒天数
+     */
+    void cacheRemindDays(int days);
+
+    /**
      * 全部重要日期（按剩余天数升序，仅前台可见项）。
      */
     Flux<ImportantDateVo> listAll();

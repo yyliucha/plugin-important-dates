@@ -304,6 +304,46 @@ public class Car extends AbstractExtension {
          */
         @Schema(description = "上次保养里程")
         private Integer lastServiceKm;
+
+        // ---------- 提醒状态（1.2.6）：一切状态变化都由用户操作触发 ----------
+
+        /**
+         * 办理状态：PENDING（待办，默认）/ DONE（已办）/ SKIPPED（本次忽略）。
+         * 循环项「已办」= 到期日按循环间隔顺延一期；一次性项「已办」= 标记完成、不再提醒。
+         */
+        @Schema(description = "办理状态")
+        private String ackState = "PENDING";
+
+        /**
+         * 最近一次「已办」的时间（ISO-8601，例如 2026-01-08T10:20:30）。
+         */
+        @Schema(description = "最近办理时间")
+        private String lastDoneAt;
+
+        /**
+         * 「已办」之前的到期日 yyyy-MM-dd（用于回顾"从哪天滚到哪天"）。
+         */
+        @Schema(description = "办理前的到期日")
+        private String lastDoneFrom;
+
+        /**
+         * 忽略（SKIPPED）时对应的到期日：日期一变（进入下一期）自动恢复提醒。
+         */
+        @Schema(description = "忽略对应的到期日")
+        private String skippedForDate;
+
+        /**
+         * 已主动提醒过的节点（节点式：每个节点只弹一次，例如 D15 / D7 / D3 / D1 / D0 / O1 / O2）。
+         * 记录在库中，关浏览器、换设备都不会重置。
+         */
+        @Schema(description = "已提醒过的节点")
+        private List<String> notifiedStages = new ArrayList<>();
+
+        /**
+         * 上面这批节点记录对应的到期日；到期日变化（顺延/手改）后自动清空重新开始。
+         */
+        @Schema(description = "节点记录对应的到期日")
+        private String notifiedForDate;
     }
 }
 

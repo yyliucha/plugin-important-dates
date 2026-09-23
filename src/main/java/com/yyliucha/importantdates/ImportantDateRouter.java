@@ -45,13 +45,18 @@ public class ImportantDateRouter {
     private final ImportantDateFinder importantDateFinder;
     private final ReactiveSettingFetcher settingFetcher;
     private final TemplateNameResolver templateNameResolver;
+    private final com.yyliucha.importantdates.support.ReminderStageMarker stageMarker;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper =
+        new com.fasterxml.jackson.databind.ObjectMapper();
 
     public ImportantDateRouter(ImportantDateFinder importantDateFinder,
         ReactiveSettingFetcher settingFetcher,
-        TemplateNameResolver templateNameResolver) {
+        TemplateNameResolver templateNameResolver,
+        com.yyliucha.importantdates.support.ReminderStageMarker stageMarker) {
         this.importantDateFinder = importantDateFinder;
         this.settingFetcher = settingFetcher;
         this.templateNameResolver = templateNameResolver;
+        this.stageMarker = stageMarker;
     }
 
     /**
@@ -68,11 +73,21 @@ public class ImportantDateRouter {
                         .zipWith(importantDateFinder.listAllCars().collectList()))
                     .flatMap(zip -> {
                         ReminderConfig cfg = zip.getT1();
+                        importantDateFinder.cacheRemindDays(cfg.remindDays());
                         List<ImportantDateVo> dates = zip.getT2().getT1().getT1();
                         List<PersonVo> people = zip.getT2().getT1().getT2();
                         List<CarVo> cars = cfg.carFrontendSection()
                             ? zip.getT2().getT2()
                             : java.util.Collections.emptyList();
+                        // 卡片上的到期徽章与横幅同一口径：只显示"待办且未逾期"，
+                        // 已办 / 已忽略 / 逾期（需开关）都不出现在访客可见面。
+                        for (CarVo car : cars) {
+                            List<CarVo.CarEventVo> visibleEvents = car.getEvents().stream()
+                                .filter(e -> "PENDING".equals(e.getStatus()))
+                                .filter(e -> cfg.frontendShowOverdue() || e.getDaysUntil() >= 0)
+                                .toList();
+                            car.setEvents(visibleEvents);
+                        }
                         Mono<List<ImportantDateVo>> dateEvents =
                             importantDateFinder.listUpcoming(cfg.remindDays()).collectList();
                         Mono<List<CarVo.CarEventVo>> carEvents =
@@ -81,15 +96,77 @@ public class ImportantDateRouter {
                                 : Mono.just(java.util.Collections.<CarVo.CarEventVo>emptyList());
                         return dateEvents.zipWith(carEvents)
                             .flatMap(tuple -> {
-                                List<ImportantDateVo> reminders = tuple.getT1();
-                                List<CarVo.CarEventVo> events = tuple.getT2();
+                                List<ImportantDateVo> allDates = tuple.getT1();
+                                List<CarVo.CarEventVo> allEvents = tuple.getT2();
+                                // 前台只展示"待办且未逾期"的座驾到期项：已办 / 已忽略 / 逾期 / 待处理都不出现在访客可见面
+                                // （需要让家人也看到逾期项时，可在「提醒设置 → 前台显示逾期项」打开）
+                                List<CarVo.CarEventVo> events = allEvents.stream()
+                                    .filter(e -> "PENDING".equals(e.getStatus()))
+                                    .filter(e -> cfg.frontendShowOverdue() || e.getDaysUntil() >= 0)
+                                    .toList();
+                                List<ImportantDateVo> reminders = allDates;
                                 Map<String, Object> model = new LinkedHashMap<>();
                                 model.put("title", "记得");
                                 model.put("dates", dates);
                                 model.put("people", people);
                                 model.put("reminders", reminders);
                                 model.put("showImportantTag", cfg.showImportantTag());
-        model.put("allowDismiss", cfg.allowDismiss());
+                                model.put("allowDismiss", cfg.allowDismiss());
+                                model.put("frontendShowOverdue", cfg.frontendShowOverdue());
+                                // 悬浮提示（选项 C：只在本页面弹出）：只弹"当前节点且尚未提醒过"的项
+                                java.util.List<Map<String, Object>> toastItems = new java.util.ArrayList<>();
+                                List<CarVo.CarEventVo> carToNotify = new java.util.ArrayList<>();
+                                for (CarVo.CarEventVo e : allEvents) {
+                                    if (!"PENDING".equals(e.getStatus()) || e.getStageCode() == null
+                                        || e.isStageNotified()) {
+                                        continue;
+                                    }
+                                    // 悬浮提示属于前台可见面：逾期项同样不出现（除非显式打开开关）
+                                    if (!cfg.frontendShowOverdue() && e.getDaysUntil() < 0) {
+                                        continue;
+                                    }
+                                    Map<String, Object> item = new LinkedHashMap<>();
+                                    item.put("type", "car");
+                                    item.put("carName", e.getCarName());
+                                    item.put("carIcon", e.getCarIcon());
+                                    item.put("title", e.getCarName() == null || e.getCarName().isBlank()
+                                        ? e.getLabel() : e.getCarName() + " · " + e.getLabel());
+                                    item.put("label", e.getLabel());
+                                    item.put("daysUntil", e.getDaysUntil());
+                                    item.put("dateText", e.getDateText());
+                                    item.put("overdue", e.isOverdue());
+                                    item.put("stageCode", e.getStageCode());
+                                    item.put("text", e.getStageText());
+                                    toastItems.add(item);
+                                    carToNotify.add(e);
+                                }
+                                List<ImportantDateVo> dateToNotify = new java.util.ArrayList<>();
+                                for (ImportantDateVo d : allDates) {
+                                    if (d.getStageCode() == null || d.isStageNotified()) {
+                                        continue;
+                                    }
+                                    Map<String, Object> item = new LinkedHashMap<>();
+                                    item.put("type", "date");
+                                    item.put("title", d.getTitle());
+                                    item.put("daysUntil", d.getDaysUntil());
+                                    item.put("dateText", d.getDateText());
+                                    item.put("nextSolarDate", d.getNextSolarDate());
+                                    item.put("stageCode", d.getStageCode());
+                                    item.put("text", d.getStageText());
+                                    toastItems.add(item);
+                                    dateToNotify.add(d);
+                                }
+                                Map<String, Object> toast = new LinkedHashMap<>();
+                                toast.put("toastEnabled", cfg.toastEnabled());
+                                toast.put("toastPosition", cfg.toastPosition());
+                                toast.put("toastTitle", cfg.toastTitle());
+                                toast.put("toastTemplate", cfg.toastTemplate());
+                                toast.put("toastEmptyText", cfg.toastEmptyText());
+                                toast.put("toastCloseSeconds", cfg.toastCloseSeconds());
+                                toast.put("toastDefaultClose", cfg.toastDefaultClose());
+                                toast.put("toastCloseMenu", cfg.toastCloseMenu());
+                                toast.put("reminders", toastItems);
+                                model.put("idToastPayload", toast);
                                 model.put("showAvatar", cfg.showAvatar());
                                 // 座驾（1.2.0）：生活/爱车双视图数据
                                 model.put("cars", cars);
@@ -144,11 +221,15 @@ public class ImportantDateRouter {
                                 model.put("carPeople", carPeople);
                                 model.put("otherPeople", otherPeople);
                                 model.put(ModelConst.TEMPLATE_ID, TEMPLATE_ID);
-                                return templateNameResolver
+                                // 节点写库：先记录"本次弹过了"，再渲染页面（写失败不影响渲染，只是下次可能再弹一次）
+                                return stageMarker.markCarEvents(carToNotify)
+                                    .then(stageMarker.markDateEvents(dateToNotify))
+                                    .onErrorResume(e -> Mono.empty())
+                                    .then(templateNameResolver
                                     .resolveTemplateNameOrDefault(request.exchange(), THEME_TEMPLATE)
                                     .defaultIfEmpty(THEME_TEMPLATE)
                                     .flatMap(templateName -> ServerResponse.ok()
-                                        .render(templateName, model));
+                                        .render(templateName, model)));
                             });
                     })
             )
@@ -172,6 +253,8 @@ public class ImportantDateRouter {
                     result.put("dashboardPageSize", cfg.dashboardPageSize());
                     result.put("dashboardPagination", cfg.dashboardPagination());
                     result.put("allowDismiss", cfg.allowDismiss());
+                    result.put("overdueRemindDays", cfg.overdueRemindDays());
+                    result.put("frontendShowOverdue", cfg.frontendShowOverdue());
                     // 页面横幅由 frontendReminder 控制；全站悬浮提醒由 toastEnabled 控制
                     if (!cfg.frontendReminder() && !cfg.toastEnabled()) {
                         result.put("reminders", java.util.Collections.emptyList());
@@ -193,6 +276,8 @@ public class ImportantDateRouter {
                             item.put("daysUntil", r.getDaysUntil());
                             item.put("dateText", r.getDateText());
                             item.put("nextSolarDate", r.getNextSolarDate());
+                            item.put("name", r.getName());
+                            item.put("stageText", r.getStageText());
                             merged.add(item);
                         }
                         for (CarVo.CarEventVo e : tuple.getT2()) {
@@ -206,6 +291,13 @@ public class ImportantDateRouter {
                             item.put("daysUntil", e.getDaysUntil());
                             item.put("dateText", e.getDateText());
                             item.put("overdue", e.isOverdue());
+                            item.put("status", e.getStatus());
+                            item.put("stageText", e.getStageText());
+                            item.put("overdueDays", e.getOverdueDays());
+                            // 控制台「已办 / 忽略」需要定位到具体到期项
+                            item.put("carId", e.getCarId());
+                            item.put("reminderIndex", e.getReminderIndex());
+                            item.put("key", e.getKey());
                             merged.add(item);
                         }
                         // 同一辆车、同一天到期的多个事项合并为一条（交强险 / 商业险 / 车船税 / 年检 同日时不再各占一行）
@@ -253,6 +345,14 @@ public class ImportantDateRouter {
                         }
                         result.put("reminders", limited);
                         result.put("overflowCount", overflow);
+                        // 待处理（逾期超过窗口）：不再主动提醒，但计入总览，永远不会静默消失
+                        long todoCount = merged.stream()
+                            .filter(m -> "TODO".equals(m.get("status")))
+                            .count();
+                        result.put("todoCount", todoCount);
+                        result.put("pendingCount", merged.stream()
+                            .filter(m -> !"TODO".equals(m.get("status")))
+                            .count());
                         // 完整列表（不做"每类最多 N 条"降噪）：供控制台仪表盘小组件分页展示，
                         // 口径与前台一致，仅页数由 dashboardPageSize 决定。
                         result.put("allReminders", merged);
@@ -303,6 +403,11 @@ public class ImportantDateRouter {
             boolean dashboardPagination = boolValue(b, "dashboardPagination", true);
             // 是否允许逐条忽略提醒（本周期内不再提示；状态存在访客浏览器）
             boolean allowDismiss = boolValue(r, "allowDismiss", true);
+            // 逾期后继续主动提醒的天数（超过转"待处理"）与前台是否显示逾期项（1.2.6）
+            int overdueRemindDays = com.yyliucha.importantdates.support.ReminderSupport
+                .clampOverdueDays(intValue(r, "overdueRemindDays",
+                    com.yyliucha.importantdates.support.ReminderSupport.DEFAULT_OVERDUE_DAYS));
+            boolean frontendShowOverdue = boolValue(r, "frontendShowOverdue", false);
             boolean carEventsEnabled = boolValue(c, "carEventsEnabled", true);
             boolean carFrontendSection = boolValue(c, "carFrontendSection", true);
             boolean carSkinEnabled = boolValue(c, "carSkinEnabled", true);
@@ -311,7 +416,8 @@ public class ImportantDateRouter {
                 toastCloseSeconds, toastEnabled, toastPosition, toastTitle, toastTemplate,
                 toastEmptyText, toastDefaultClose, toastCloseMenu, showAvatar,
                 carEventsEnabled, carFrontendSection, carSkinEnabled, toastMaxPerType,
-                dashboardPageSize, dashboardPagination, allowDismiss);
+                dashboardPageSize, dashboardPagination, allowDismiss, overdueRemindDays,
+                frontendShowOverdue);
         });
     }
 
@@ -354,7 +460,7 @@ public class ImportantDateRouter {
         boolean toastCloseMenu, boolean showAvatar,
         boolean carEventsEnabled, boolean carFrontendSection, boolean carSkinEnabled,
         int toastMaxPerType, int dashboardPageSize, boolean dashboardPagination,
-        boolean allowDismiss) {
+        boolean allowDismiss, int overdueRemindDays, boolean frontendShowOverdue) {
     }
 }
 

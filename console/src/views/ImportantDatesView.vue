@@ -311,9 +311,48 @@
               v-for="e in carEventsOf(c).slice(0, 3)"
               :key="e.label + e.date"
               class="car-event"
-              :class="{ overdue: e.daysUntil < 0, soon: e.daysUntil >= 0 && e.daysUntil <= 15 }"
+              :class="{
+                overdue: e.daysUntil < 0 && e.status === 'PENDING',
+                soon: e.daysUntil >= 0 && e.daysUntil <= 15 && e.status === 'PENDING',
+                todo: e.status === 'TODO',
+                done: e.status === 'DONE' || e.status === 'SKIPPED',
+              }"
+              :title="e.text"
             >
-              {{ e.label }} · {{ e.daysUntil < 0 ? `已过期 ${-e.daysUntil} 天` : e.daysUntil === 0 ? "今天到期" : `${e.daysUntil} 天后` }}
+              {{ e.label }} ·
+              <template v-if="e.status === 'DONE'">已办</template>
+              <template v-else-if="e.status === 'SKIPPED'">已忽略</template>
+              <template v-else-if="e.status === 'TODO'">已逾期 {{ e.overdueDays }} 天 · 待处理</template>
+              <template v-else-if="e.daysUntil < 0">已逾期 {{ -e.daysUntil }} 天</template>
+              <template v-else-if="e.daysUntil === 0">今天到期</template>
+              <template v-else>{{ e.daysUntil }} 天后</template>
+              <button
+                v-if="e.status === 'PENDING' || e.status === 'TODO'"
+                type="button"
+                class="event-act"
+                title="已办：循环项顺延一期，一次性项标记完成"
+                @click.stop="onMarkDone(c, e)"
+              >
+                ✓
+              </button>
+              <button
+                v-if="e.status === 'PENDING' || e.status === 'TODO'"
+                type="button"
+                class="event-act"
+                title="本周期不再提醒（到期日变化后自动恢复）"
+                @click.stop="onSkip(c, e)"
+              >
+                ✕
+              </button>
+              <button
+                v-else
+                type="button"
+                class="event-act"
+                title="恢复提醒"
+                @click.stop="onRestore(c, e)"
+              >
+                ↺
+              </button>
             </span>
             <span v-if="carEventsOf(c).length > 3" class="car-event more">+{{ carEventsOf(c).length - 3 }}</span>
           </div>
@@ -633,6 +672,8 @@ import { type InspectionNotice, inspectionNotice, resolveDueDate, startOfToday }
 import { fetchLivePermalinks, isBrokenLocalImage } from "@/utils/attachmentLibrary";
 import { thumbUrl } from "@/utils/image";
 import { type CheckItem, runSelfCheck } from "@/utils/selfCheck";
+import { type ReminderStatus, stageTextOf, statusOf } from "@/utils/reminderState";
+import { markReminderDone, restoreReminder, skipReminder } from "@/utils/reminderActions";
 
 const loading = ref(true);
 const saving = ref(false);
@@ -915,11 +956,29 @@ function daysUntil(dateText: string): number | null {
 }
 
 /** 后台列表用：计算启用的到期项（含循环间隔、保养推算与年检自动推算），按剩余天数升序 */
-function carEventsOf(c: Car): { label: string; date: string; daysUntil: number }[] {
-  const list: { label: string; date: string; daysUntil: number }[] = [];
+function carEventsOf(c: Car): {
+  label: string;
+  date: string;
+  daysUntil: number;
+  index: number;
+  status: ReminderStatus;
+  overdueDays: number;
+  text: string;
+}[] {
+  const list: {
+    label: string;
+    date: string;
+    daysUntil: number;
+    index: number;
+    status: ReminderStatus;
+    overdueDays: number;
+    text: string;
+  }[] = [];
   const today = startOfToday();
   const registrationBase = c.spec.registeredDate || c.spec.purchaseDate || "";
-  for (const r of c.spec.reminders || []) {
+  const reminders = c.spec.reminders || [];
+  for (let idx = 0; idx < reminders.length; idx++) {
+    const r = reminders[idx];
     if (r.enabled === false) continue;
     // 与后端 ImportantDateFinderImpl.resolveDueDate 同一口径：循环间隔 0 = 不滚动，年检按规则推算
     const resolved = resolveDueDate(r, {
@@ -930,13 +989,68 @@ function carEventsOf(c: Car): { label: string; date: string; daysUntil: number }
     if (!resolved) continue;
     const days = daysUntil(resolved.date);
     if (days === null) continue;
+    const label = resolved.phase ? `${reminderLabelOf(r)}·${resolved.phase}` : reminderLabelOf(r);
+    // 状态与文案（1.2.6）：一切状态变化都由用户点击触发
+    const status = statusOf(r.ackState, r.skippedForDate, resolved.date, days, overdueRemindDays.value);
     list.push({
-      label: resolved.phase ? `${reminderLabelOf(r)}·${resolved.phase}` : reminderLabelOf(r),
+      label,
       date: resolved.date,
       daysUntil: days,
+      index: idx,
+      status,
+      overdueDays: days < 0 ? -days : 0,
+      text: stageTextOf(c.spec.displayName, label, days, overdueRemindDays.value),
     });
   }
   return list.sort((a, b) => a.daysUntil - b.daysUntil);
+}
+
+// ---------- 到期项动作：已办 / 忽略 / 恢复（1.2.6，全部由用户指令触发） ----------
+const reminderBusy = ref("");
+
+async function onMarkDone(c: Car, e: { index: number; label: string }) {
+  const key = `${c.metadata.name}#${e.index}`;
+  if (reminderBusy.value) return;
+  reminderBusy.value = key;
+  try {
+    const detail = await markReminderDone(c, e.index, e.label);
+    Toast.success(detail);
+    await load();
+  } catch (error) {
+    Toast.error(`操作失败：${describeError(error)}`);
+  } finally {
+    reminderBusy.value = "";
+  }
+}
+
+async function onSkip(c: Car, e: { index: number; label: string }) {
+  const key = `${c.metadata.name}#${e.index}`;
+  if (reminderBusy.value) return;
+  reminderBusy.value = key;
+  try {
+    await skipReminder(c, e.index, e.label);
+    Toast.success("本周期不再提醒（到期日变化后会自动恢复）");
+    await load();
+  } catch (error) {
+    Toast.error(`操作失败：${describeError(error)}`);
+  } finally {
+    reminderBusy.value = "";
+  }
+}
+
+async function onRestore(c: Car, e: { index: number; label: string }) {
+  const key = `${c.metadata.name}#${e.index}`;
+  if (reminderBusy.value) return;
+  reminderBusy.value = key;
+  try {
+    await restoreReminder(c, e.index, e.label);
+    Toast.success("已恢复提醒");
+    await load();
+  } catch (error) {
+    Toast.error(`操作失败：${describeError(error)}`);
+  } finally {
+    reminderBusy.value = "";
+  }
 }
 
 // ---------- E：年检规则一次性提示（第 6 年起上线检验期 / 第 11 年起每年一次） ----------
@@ -1249,6 +1363,8 @@ function yearlySolar(solarDate?: string) {
 
 // ---------- 到期提醒 ----------
 const remindConfig = ref({ remindDays: 3, backendReminder: true });
+/** 逾期后继续提醒的天数（设置「提醒设置 → 逾期后继续提醒天数」，默认 3） */
+const overdueRemindDays = ref(3);
 
 async function loadRemindConfig() {
   try {
@@ -1259,6 +1375,20 @@ async function loadRemindConfig() {
       backendReminder: config["backendReminder"] !== "false",
     };
     // 列表缩略图宽度（照片设置 → thumbWidth；0 表示始终用原图）
+    // 逾期窗口（超过则转「待处理」，不再主动提醒但保留在列表）
+    const rawReminder = (config as Record<string, unknown>)["reminder"];
+    let reminderCfg: { overdueRemindDays?: number } = {};
+    if (typeof rawReminder === "string") {
+      try {
+        reminderCfg = rawReminder ? JSON.parse(rawReminder) : {};
+      } catch {
+        reminderCfg = {};
+      }
+    } else if (rawReminder && typeof rawReminder === "object") {
+      reminderCfg = rawReminder as typeof reminderCfg;
+    }
+    const od = Number(reminderCfg.overdueRemindDays);
+    overdueRemindDays.value = Number.isFinite(od) && od >= 1 ? Math.min(30, Math.floor(od)) : 3;
     const rawAttach = (config as Record<string, unknown>)["attachment"];
     let attach: { thumbWidth?: number } = {};
     if (typeof rawAttach === "string") {
@@ -2395,6 +2525,36 @@ function formatTime(iso?: string): string {
 .check-value {
   font-size: 13px;
   color: #475569;
+}
+/* 到期项状态（1.2.6）：待处理 / 已办 / 已忽略 */
+.car-event.todo {
+  background: #fff7ed;
+  color: #c2410c;
+  border-color: #fdba74;
+}
+
+.car-event.done {
+  background: #f1f5f9;
+  color: #64748b;
+  border-color: #cbd5e1;
+}
+
+.event-act {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  padding: 1px 3px;
+  margin-left: 2px;
+  opacity: 0.55;
+  border-radius: 4px;
+}
+
+.event-act:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.06);
 }</style>
 
 

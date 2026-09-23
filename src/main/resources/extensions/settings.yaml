@@ -23,6 +23,18 @@ spec:
           label: 前台提醒
           value: true
           help: 在前台 /important-dates 页面顶部显示到期提醒
+        - $formkit: number
+          name: overdueRemindDays
+          label: 逾期后继续提醒天数
+          value: 3
+          min: 1
+          max: 30
+          help: 到期后仍会提醒几天（每天文案不同）。超过这个天数后转入「待处理」：不再主动提醒，但**一直保留在列表里**直到你点「已办」或「忽略」——不会被静默清掉。
+        - $formkit: checkbox
+          name: frontendShowOverdue
+          label: 前台显示逾期项
+          value: false
+          help: 默认关闭：前台横幅与悬浮提示只显示"即将到期且未办理"的事项，逾期项只在后台可见（避免把"保险过期"这类信息公开给访客）。打开后前台也会显示逾期项。
         - $formkit: checkbox
           name: allowDismiss
           label: 允许逐条忽略提醒

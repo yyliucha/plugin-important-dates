@@ -120,5 +120,40 @@ public class CarVo {
 
         /** 提醒项类型：date（重要日期）/ car（座驾到期）。 */
         private String eventType = "car";
+
+        // ---------- 提醒状态（1.2.6）----------
+
+        /** 状态：PENDING（待办）/ TODO（逾期超窗口，待处理）/ DONE（已办）/ SKIPPED（本周期忽略）。 */
+        private String status = "PENDING";
+
+        /** 已提醒过的节点是否已含当前节点（节点式：每个节点只主动弹一次）。 */
+        private boolean stageNotified;
+
+        /** 当前阶段编码（D15/D7/D3/D1/D0/O1…；不在节点日为空）。 */
+        private String stageCode;
+
+        /** 阶段文案（人性化，逐日不同；前台横幅/悬浮提示/后台列表共用）。 */
+        private String stageText;
+
+        /** 状态说明（已办时间、待处理天数等，后台展示用）。 */
+        private String stateText;
+
+        /** 逾期天数（未逾期为 0）。 */
+        private long overdueDays;
+
+        /** 办理状态原值（PENDING/DONE/SKIPPED）。 */
+        private String ackState = "PENDING";
+
+        /** 最近一次办理时间。 */
+        private String lastDoneAt;
+
+        /** 办理前的到期日。 */
+        private String lastDoneFrom;
+
+        /** 所属座驾记录标识（metadata.name）。 */
+        private String carId;
+
+        /** 该到期项在 spec.reminders 中的下标（写回节点/状态时用）。 */
+        private int reminderIndex = -1;
     }
 }

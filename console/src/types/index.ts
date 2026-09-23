@@ -188,6 +188,18 @@ export interface CarReminder {
   intervalKm?: number;
   lastServiceDate?: string;
   lastServiceKm?: number;
+  /** 办理状态：PENDING（待办）/ DONE（已办）/ SKIPPED（本周期忽略）（1.2.6） */
+  ackState?: "PENDING" | "DONE" | "SKIPPED";
+  /** 最近一次办理时间 */
+  lastDoneAt?: string;
+  /** 办理前的到期日 */
+  lastDoneFrom?: string;
+  /** 忽略时对应的到期日（日期变化后自动恢复提醒） */
+  skippedForDate?: string;
+  /** 已主动提醒过的节点（节点式：每个节点只弹一次，写库跨设备一致） */
+  notifiedStages?: string[];
+  /** 上述节点记录对应的到期日 */
+  notifiedForDate?: string;
 }
 
 export interface CarSpec {

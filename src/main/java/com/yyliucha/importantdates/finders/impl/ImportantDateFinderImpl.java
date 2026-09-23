@@ -23,6 +23,7 @@ import com.yyliucha.importantdates.support.DateCalc;
 import com.yyliucha.importantdates.support.VehicleSupport;
 import com.yyliucha.importantdates.vo.CarVo;
 import com.yyliucha.importantdates.vo.ImportantDateVo;
+import com.yyliucha.importantdates.support.ReminderSupport;
 import com.yyliucha.importantdates.vo.PersonVo;
 
 /**
@@ -120,7 +121,7 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
                     byName.put(p.getMetadata().getName(), p);
                 }
                 return client.listAll(Car.class, ListOptions.builder().build(), Sort.unsorted())
-                    .map(car -> toCarVo(car, byName, today, rule))
+                    .map(car -> toCarVo(car, byName, today, rule, rule.overdueDays()))
                     .filter(CarVo::isFrontendVisible)
                     .sort(Comparator.comparingInt(CarVo::getSortOrder)
                         .thenComparing(Comparator.comparing(CarVo::getCreatedAt,
@@ -128,20 +129,36 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
             }));
     }
 
-    /** 年检规则（设置「座驾设置 → 年检节点 / 起每年上线年份」）：默认第 2、4 年免检申领，第 6、10 年上线，第 11 年起每年 */
-    private record InspectionRule(java.util.List<Integer> nodes, int yearlyFrom) {
+    /**
+     * 座驾提醒规则（全部来自设置）：
+     * ① 年检节点与「起每年上线年份」（座驾设置）；② 逾期后继续提醒天数（提醒设置，默认 3）；
+     * ③ 默认提前提醒天数（座驾设置，默认 15）。
+     */
+    private record InspectionRule(java.util.List<Integer> nodes, int yearlyFrom, int overdueDays,
+        int defaultRemindDays) {
     }
 
     private Mono<InspectionRule> carInspectionRule() {
-        return settingFetcher.get("car")
+        Mono<Integer> overdue = settingFetcher.get("reminder")
+            .map(node -> node.path("overdueRemindDays")
+                .asInt(com.yyliucha.importantdates.support.ReminderSupport.DEFAULT_OVERDUE_DAYS))
+            .defaultIfEmpty(com.yyliucha.importantdates.support.ReminderSupport.DEFAULT_OVERDUE_DAYS)
+            .map(com.yyliucha.importantdates.support.ReminderSupport::clampOverdueDays);
+        Mono<InspectionRule> base = settingFetcher.get("car")
             .map(node -> new InspectionRule(
                 com.yyliucha.importantdates.support.VehicleSupport
                     .parseInspectionNodes(node.path("inspectionNodes").asText(null)),
                 node.path("inspectionYearlyFrom")
-                    .asInt(com.yyliucha.importantdates.support.VehicleSupport.DEFAULT_INSPECTION_YEARLY_FROM)))
+                    .asInt(com.yyliucha.importantdates.support.VehicleSupport.DEFAULT_INSPECTION_YEARLY_FROM),
+                com.yyliucha.importantdates.support.ReminderSupport.DEFAULT_OVERDUE_DAYS,
+                node.path("carDefaultRemindDays").asInt(15)))
             .defaultIfEmpty(new InspectionRule(
                 com.yyliucha.importantdates.support.VehicleSupport.DEFAULT_INSPECTION_NODES,
-                com.yyliucha.importantdates.support.VehicleSupport.DEFAULT_INSPECTION_YEARLY_FROM));
+                com.yyliucha.importantdates.support.VehicleSupport.DEFAULT_INSPECTION_YEARLY_FROM,
+                com.yyliucha.importantdates.support.ReminderSupport.DEFAULT_OVERDUE_DAYS,
+                15));
+        return base.zipWith(overdue,
+            (rule, days) -> new InspectionRule(rule.nodes(), rule.yearlyFrom(), days, rule.defaultRemindDays()));
     }
 
     @Override
@@ -151,16 +168,29 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
                 .filter(CarVo::isImportant)
                 .filter(vo -> vo.getStatus() == null || "IN_USE".equals(vo.getStatus()))
                 .flatMap(vo -> Flux.fromIterable(vo.getEvents())
-                    // 每项优先用自己的提前天数；未设置则用「座驾设置」默认；再退回全局提醒天数
+                    // 已办 / 已忽略：不再进入提醒面
+                    .filter(event -> !"DONE".equals(event.getStatus()) && !"SKIPPED".equals(event.getStatus()))
+                    // 待办：提前 N 天内 ~ 逾期窗口内主动提醒；待处理（逾期超窗口）不主动提醒但保留
                     .filter(event -> {
+                        // 待处理：不再主动提醒，但保留在后台列表与总览里，直到用户「已办」或「忽略」
+                        if ("TODO".equals(event.getStatus())) {
+                            return true;
+                        }
                         int window = event.getRemindDays() != null ? event.getRemindDays()
                             : (defaultDays > 0 ? defaultDays : days);
-                        return event.getDaysUntil() <= window && event.getDaysUntil() >= -30;
+                        return event.getDaysUntil() <= window;
                     })
                     .sort(Comparator.comparingLong(CarVo.CarEventVo::getDaysUntil)
                         .thenComparing(CarVo.CarEventVo::getLabel))));
     }
 
+    /** 该项的提前提醒天数（未设置时用默认值） */
+    private static int windowOf(Car.Reminder r, int defaultDays) {
+        if (r.getRemindDays() != null) {
+            return Math.max(0, r.getRemindDays());
+        }
+        return defaultDays > 0 ? defaultDays : ReminderSupport.DEFAULT_OVERDUE_DAYS;
+    }
     /** 座驾默认提前提醒天数（设置「座驾设置 → 默认提前提醒天数」）。 */
     private Mono<Integer> carDefaultRemindDays() {
         return settingFetcher.get("car")
@@ -168,7 +198,8 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
             .defaultIfEmpty(15);
     }
 
-    private CarVo toCarVo(Car car, Map<String, Person> people, LocalDate today, InspectionRule rule) {
+    private CarVo toCarVo(Car car, Map<String, Person> people, LocalDate today, InspectionRule rule,
+        int overdueDays) {
         var spec = car.getSpec();
         CarVo vo = new CarVo();
         vo.setName(car.getMetadata().getName());
@@ -245,7 +276,8 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
         // 共同持有标记（车主 + 驾驶人 ≥ 2 人时，前台可提示"共同使用"）
         vo.setSharedPeople(drivers.size() + (vo.getOwnerName() == null ? 0 : 1));
 
-        // 到期事项
+        // 到期事项（默认提前天数来自设置，用于计算阶段节点）
+        int defaultRemindDays = rule == null ? 15 : rule.defaultRemindDays();
         List<CarVo.CarEventVo> events = new ArrayList<>();
         if (spec.getReminders() != null) {
             for (Car.Reminder r : spec.getReminders()) {
@@ -282,11 +314,27 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
                 long daysUntil = java.time.temporal.ChronoUnit.DAYS.between(today, due);
                 ev.setDaysUntil(daysUntil);
                 ev.setOverdue(daysUntil < 0);
+                ev.setOverdueDays(daysUntil < 0 ? -daysUntil : 0);
                 ev.setRemindDays(r.getRemindDays());
                 ev.setRuleNote(ruleNote);
                 ev.setCarName(spec.getDisplayName());
                 ev.setCarIcon(VehicleSupport.typeIcon(spec.getVehicleType()));
                 ev.setCarType(spec.getVehicleType());
+                ev.setCarId(car.getMetadata().getName());
+                ev.setReminderIndex(spec.getReminders().indexOf(r));
+                // 提醒状态与文案（1.2.6）：状态由用户操作决定，阶段由到期日决定
+                String ack = ReminderSupport.effectiveAck(r.getAckState(), r.getSkippedForDate(), due.toString());
+                ev.setAckState(ack);
+                ev.setStatus(ReminderSupport.status(ack, daysUntil, overdueDays));
+                ev.setLastDoneAt(r.getLastDoneAt());
+                ev.setLastDoneFrom(r.getLastDoneFrom());
+                String stage = ReminderSupport.stageCode(daysUntil, windowOf(r, defaultRemindDays), overdueDays);
+                ev.setStageCode(stage);
+                ev.setStageNotified(stage != null && r.getNotifiedStages() != null
+                    && due.toString().equals(r.getNotifiedForDate()) && r.getNotifiedStages().contains(stage));
+                ev.setStageText(ReminderSupport.stageText(spec.getDisplayName(), label, daysUntil, overdueDays));
+                ev.setStateText(ReminderSupport.stateText(ev.getStatus(), r.getLastDoneAt(), r.getLastDoneFrom(),
+                    ev.getOverdueDays()));
                 events.add(ev);
             }
             events.sort(Comparator.comparingLong(CarVo.CarEventVo::getDaysUntil)
@@ -369,9 +417,29 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
         vo.setPersonNames(names);
         vo.setSortOrder(spec.getSortOrder() == null ? 0 : spec.getSortOrder());
         vo.setCreatedAt(date.getMetadata().getCreationTimestamp() == null ? null : date.getMetadata().getCreationTimestamp().toString());
+        // 节点式提醒（1.2.6）：纪念日/生日按「提前天数 / 1 天 / 当天」三个节点各弹一次
+        int dateWindow = dateRemindDays();
+        String stage = ReminderSupport.stageCode(vo.getDaysUntil(), dateWindow, 0);
+        vo.setStageCode(stage);
+        vo.setStageNotified(stage != null && vo.getNextSolarDate() != null
+            && vo.getNextSolarDate().equals(spec.getNotifiedForDate())
+            && spec.getNotifiedStages() != null && spec.getNotifiedStages().contains(stage));
+        vo.setStageText(ReminderSupport.dateStageText(vo.getTitle(), vo.getDaysUntil()));
         return vo;
     }
 
+    /** 纪念日/生日的提前提醒天数（设置「提醒设置 → 提前提醒天数」，默认 3） */
+    private int dateRemindDays() {
+        return cachedRemindDays > 0 ? cachedRemindDays : 3;
+    }
+
+    /** 提前提醒天数缓存（渲染前由路由层注入，保证与前台/接口口径一致） */
+    private volatile int cachedRemindDays = 0;
+
+    /** 由路由层在渲染前注入提前天数 */
+    public void cacheRemindDays(int days) {
+        this.cachedRemindDays = days;
+    }
     private PersonVo toPersonVo(Person person, LocalDate today, boolean showBirthday) {
         var spec = person.getSpec();
         PersonVo vo = new PersonVo();

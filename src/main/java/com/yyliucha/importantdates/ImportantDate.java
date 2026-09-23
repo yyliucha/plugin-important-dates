@@ -97,5 +97,18 @@ public class ImportantDate extends AbstractExtension {
          */
         @Schema(description = "排序权重")
         private Integer sortOrder = 0;
+
+        /**
+         * 已主动提醒过的节点（节点式：每个节点只弹一次，如 D3 / D1 / D0）；
+         * 记录在库中，关浏览器、换设备都不会重置（1.2.6）。
+         */
+        @Schema(description = "已提醒过的节点")
+        private java.util.List<String> notifiedStages = new java.util.ArrayList<>();
+
+        /**
+         * 上面这批节点记录对应的下一次日期；日期变化后自动清空重新开始（1.2.6）。
+         */
+        @Schema(description = "节点记录对应的下一次日期")
+        private String notifiedForDate;
     }
 }

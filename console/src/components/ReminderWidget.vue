@@ -21,7 +21,18 @@
             </div>
           </div>
           <div class="flex flex-none items-center gap-2">
-            <span class="whitespace-nowrap text-sm font-bold text-red-600">{{ daysLabel(r.daysUntil) }}</span>
+            <span class="whitespace-nowrap text-sm font-bold" :class="r.status === 'TODO' ? 'text-amber-700' : 'text-red-600'">
+              {{ r.status === "TODO" ? "待处理" : daysLabel(r.daysUntil) }}
+            </span>
+            <button
+              v-if="r.type === 'car' && r.carId && r.reminderIndex >= 0 && r.status !== 'DONE' && r.status !== 'SKIPPED'"
+              type="button"
+              class="dismiss-btn"
+              title="已办：循环项顺延一期，一次性项标记完成"
+              @click="markDone(r)"
+            >
+              ✓
+            </button>
             <button
               v-if="allowDismiss"
               type="button"
@@ -85,6 +96,9 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { Toast } from "@halo-dev/components";
+import { describeError, listCars } from "@/api";
+import { markReminderDone } from "@/utils/reminderActions";
 
 defineProps<{
   editMode?: boolean;
@@ -93,6 +107,11 @@ defineProps<{
 }>();
 
 interface ReminderItem {
+  carId?: string;
+  reminderIndex?: number;
+  status?: string;
+  stageText?: string;
+  overdueDays?: number;
   type?: string;
   title: string;
   daysUntil: number;
@@ -190,6 +209,24 @@ async function load() {
     // 接口异常时保持现状
   } finally {
     loading.value = false;
+  }
+}
+
+/** 已办：循环项顺延一期、一次性项标记完成（写库，跨端一致） */
+async function markDone(r: ReminderItem) {
+  if (!r.carId || r.reminderIndex == null || r.reminderIndex < 0) return;
+  try {
+    const cars = await listCars();
+    const car = cars.find((c) => c.metadata.name === r.carId);
+    if (!car) {
+      Toast.error("未找到该座驾，请刷新后重试");
+      return;
+    }
+    const detail = await markReminderDone(car, r.reminderIndex, r.label || r.title);
+    Toast.success(detail);
+    await load();
+  } catch (error) {
+    Toast.error(`操作失败：${describeError(error)}`);
   }
 }
 

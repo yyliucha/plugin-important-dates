@@ -59,6 +59,26 @@
 
 **实测对比**:写请求 6 PUT(+6 GET)→ **5 PATCH(0 GET)**;最大并发 **6 → 1**;全部 2xx 且顺序正确落库。
 
+## 1.2.6 提醒状态机(用户确认的设计)
+
+**背景**:此前只有"提醒",没有"办没办"——过期后仍每天提示,且**满 30 天静默消失**(真正没办的事被忘掉);"我做过了但前台还在显示"也无从处理。设计原则(用户明确要求):**插件只做单一的事,一切状态变化都以用户指令为准** —— 不做自动顺延、不做"仅管理员可见"这类复杂化。
+
+| 需求 | 落地 |
+|---|---|
+| 逾期默认 3 天(可配) | `reminder.overdueRemindDays`(1–30);超过转「待处理」:不再主动提醒但**永不静默消失** |
+| 逾期文案逐日不同 | `ReminderSupport.stageText`(与 `console/src/utils/reminderState.ts` 同源):15/7/3/1/0 天与逾期 1/2/3 天各一句,人性化措辞 |
+| 已办(唯一改状态的方式) | 循环项 → 按循环间隔**顺延一期**并留痕(`lastDoneAt`/`lastDoneFrom` + 操作日志);一次性项 → `ackState=DONE` 不再提醒 |
+| 忽略 | `ackState=SKIPPED` + `skippedForDate`:本周期不再提醒,**到期日一变自动恢复** |
+| 前台不显示逾期/已办 | 路由层过滤:横幅、卡片徽章、悬浮提示三处统一,只有"待办且未逾期"出现在访客可见面(可用 `frontendShowOverdue` 打开) |
+| 节点式悬浮提示 | 服务端在「记得」页渲染时下发本次该弹的节点(`window.__ID_TOAST__`),并把 `notifiedStages`/`notifiedForDate` **写库**(`ReminderStageMarker`):关浏览器、换设备都不重置 |
+| 只在本页面弹(方案 C) | `ReminderHeadProcessor` 只在模板变量 `idToastPayload` 存在时输出脚本 |
+| 状态写库 | `Car.Reminder` 新增 `ackState`/`lastDoneAt`/`lastDoneFrom`/`skippedForDate`/`notifiedStages`/`notifiedForDate`;`ImportantDate` 新增 `notifiedStages`/`notifiedForDate`;老数据缺失 = 待办,无需迁移脚本 |
+
+**顺手修掉的老 Bug**:`ReminderHeadProcessor` 注入脚本用自闭合写法(`<script ... />`),HTML 解析器会把后续整段文档吞进脚本文本 —— **开启全站悬浮提醒后「记得」页面内容整块消失**。1.2.6 改为成对 `<script ...></script>`。
+
+**验证(全新 Halo 2.26)**:冒烟 **50/50**、**新增提醒状态机专项 `verify-reminder-flow.mjs` 7/7**、图片失效 **7/7**(并借它暴露了上述脚本标签 Bug)、浏览器端到端 **13/13**、附件库 **5/5**、拖拽 **6/6**、1.2.5 新能力 **6/6**、设置核对 **19/19**。
+
+**交付(本地开发版,未推送/未发版)**:`build/libs/plugin-important-dates-1.2.6-SNAPSHOT.jar` + `docs/release-notes-1.2.6-SNAPSHOT.md`;截图 `docs/manual-test/e126-reminder-state.png`。
 ## 1.2.5 完善批次(用户确认「全做」的 14 项)
 
 按用户要求:**只本地开发 + 本地测试实例验证,不推送 GitHub、不生成发布包**,待确认后统一发版。
