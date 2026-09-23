@@ -292,13 +292,5 @@ export function resolveDueDate(
     return { date: next.date, phase: next.phase, rule: next.rule };
   }
   if (!due) return null;
-  const repeatMonths =
-    reminder.repeatMonths != null ? Number(reminder.repeatMonths) : defaultRepeatMonths(reminder.key);
-  if (repeatMonths > 0) {
-    let guard = 0;
-    while (due.getTime() < today.getTime() && guard++ < 60) {
-      due = addMonths(due, repeatMonths);
-    }
-  }
-  return { date: formatYmd(due) };
+  // 1.2.6：不再自动滚动 —— 过期即逾期，直到用户点「已办」才顺延（与后端同一口径）  return { date: formatYmd(due) };
 }

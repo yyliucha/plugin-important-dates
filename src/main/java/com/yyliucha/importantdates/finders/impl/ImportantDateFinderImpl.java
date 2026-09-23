@@ -365,16 +365,9 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
             return null;
         }
         // 循环间隔（月）：显式设置优先；未设置时取项目默认（保险/车船税/驾照=每年，年检=每年，保养=不循环）
-        int repeatMonths = r.getRepeatMonths() != null
-            ? r.getRepeatMonths() : VehicleSupport.defaultRepeatMonths(r.getKey());
-        if (repeatMonths > 0) {
-            int guard = 0;
-            while (due.isBefore(today) && guard++ < 60) {
-                due = due.plusMonths(repeatMonths);
-            }
-        }
-        return due;
-    }
+        // 1.2.6：**不再自动滚动**——到期日过了就是"逾期"，直到用户点「已办」才按循环间隔顺延到未来。
+        // （此前"过期即视为进入下一期"会让逾期彻底静默，用户既看不到提醒也看不到异常。）
+        return due;    }
 
     private static LocalDate parseDate(String text) {
         if (text == null || text.isBlank()) {

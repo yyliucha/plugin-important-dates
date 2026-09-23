@@ -64,16 +64,20 @@ public final class ReminderSupport {
     /**
      * 提前期节点列表：按该项的提前提醒天数裁剪（例如提前 30 天 → 30/15/7/3/1/0；提前 5 天 → 5/3/1/0）。
      */
-    public static List<Integer> advanceNodes(int remindDays) {
-        LinkedHashSet<Integer> nodes = new LinkedHashSet<>();
+    public static java.util.List<Integer> advanceNodes(int remindDays) {
+        java.util.LinkedHashSet<Integer> nodes = new java.util.LinkedHashSet<>();
         int window = Math.max(0, remindDays);
         nodes.add(window);
+        // 节奏 B：窗口内每 7 天一个节点（从窗口起点往下），进入最后 15 天后按 15/7/3/1/0 加密
+        for (int d = window - 7; d > 15; d -= 7) {
+            nodes.add(d);
+        }
         for (int n : BASE_NODES) {
             if (n <= window) {
                 nodes.add(n);
             }
         }
-        List<Integer> sorted = new ArrayList<>(nodes);
+        java.util.List<Integer> sorted = new java.util.ArrayList<>(nodes);
         sorted.sort((a, b) -> Integer.compare(b, a));
         return sorted;
     }

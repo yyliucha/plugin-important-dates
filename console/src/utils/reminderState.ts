@@ -25,6 +25,8 @@ const BASE_NODES = [15, 7, 3, 1, 0];
 export function advanceNodes(remindDays: number): number[] {
   const window = Math.max(0, remindDays || 0);
   const set = new Set<number>([window]);
+  // 节奏 B：窗口内每 7 天一个节点，进入最后 15 天后按 15/7/3/1/0 加密
+  for (let d = window - 7; d > 15; d -= 7) set.add(d);
   for (const n of BASE_NODES) {
     if (n <= window) set.add(n);
   }
