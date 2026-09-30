@@ -143,9 +143,16 @@
     }, MENU_TIMEOUT_MS);
   }
 
+  /**
+   * 弹出悬浮提示。
+   *
+   * @returns {boolean} 是否**真的弹出来了**。调用方只应在返回 true 时回报"已提醒"，
+   *   否则会在"被关闭期拦住 / 无内容"时白白消耗掉一个提醒节点（用户什么都没看到，
+   *   却再也收不到这个节点的提醒了）。
+   */
   function show(d) {
-    if (!d || d.toastEnabled === false) return;
-    if (isDismissed()) return;
+    if (!d || d.toastEnabled === false) return false;
+    if (isDismissed()) return false;
     var items = d.reminders || [];
     var body;
     if (items.length) {
@@ -155,7 +162,7 @@
       }).join("");
     } else {
       var emptyText = d.toastEmptyText == null ? "" : String(d.toastEmptyText);
-      if (!emptyText) return;
+      if (!emptyText) return false;
       body = '<div>' + esc(emptyText) + "</div>";
     }
     var title = d.toastTitle == null || String(d.toastTitle) === "" ? "重要日期提醒" : String(d.toastTitle);
@@ -225,6 +232,7 @@
       }, 1000);
       setTimeout(hide, secs * 1000);
     }
+    return true;
   }
 
   /** 读取 Cookie（Halo 的 CSRF 令牌） */
@@ -272,7 +280,9 @@
           if (!d || d.toastEnabled === false) return;
           var items = d.toastItems || [];
           if (!items.length) return;
-          show({
+          // 只有真的弹出来了才回报"已提醒"：否则用户什么都没看到，
+          // 这个提醒节点却被记成已弹过，之后再也收不到（静默丢失一次提醒）。
+          if (show({
             toastPosition: d.toastPosition,
             toastTitle: d.toastTitle,
             toastTemplate: d.toastTemplate,
@@ -281,8 +291,9 @@
             toastDefaultClose: d.toastDefaultClose,
             toastCloseMenu: d.toastCloseMenu,
             reminders: items
-          });
-          markSeen(items);
+          })) {
+            markSeen(items);
+          }
         })
         .catch(function () {});
     };

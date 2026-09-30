@@ -359,7 +359,9 @@ public class ImportantDateRouter {
                         // 只给"待办 + 未逾期 + 正好在节点上 + 该节点尚未提醒过"的项。
                         java.util.List<Map<String, Object>> toastItems = new java.util.ArrayList<>();
                         for (Map<String, Object> m : merged) {
-                            if (!"PENDING".equals(m.get("status"))) {
+                            // 只有座驾到期项带 status（"PENDING"/"TODO"/…）；纪念日与生日没有这个字段，
+                            // 不能因此被过滤掉，否则悬浮提示对纪念日/生日永远不弹。
+                            if ("car".equals(m.get("type")) && !"PENDING".equals(m.get("status"))) {
                                 continue;
                             }
                             Object daysObj = m.get("daysUntil");

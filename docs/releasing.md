@@ -41,11 +41,20 @@ This file records how releases are prepared, so every release looks consistent.
 
 1. Set the version in `gradle.properties` and `src/main/resources/plugin.yaml`.
 2. Update `README.md` + regenerate `README.store.md`; refresh screenshots if the UI changed.
+   **Also update `README.en.md`** — it is an independent translation and does *not* follow the Chinese file automatically
+   (1.2.6 removed the operation log from `README.md` but the English usage section kept advertising it until 1.3.0).
+   Anything user-visible that changed in this release — a removed feature, a new one, a renamed setting tab — must land in all three.
    - When regenerating `README.store.md`, turn **every** link into an absolute GitHub URL: the store renders this field on its own domain, so relative paths (`README.en.md`, `LICENSE`, `docs/...`) resolve against the store site and 404.
      - images: `docs/screenshots/x.png` → `https://raw.githubusercontent.com/yyliucha/plugin-important-dates/main/docs/screenshots/x.png`
      - docs: `README.en.md` → `https://github.com/yyliucha/plugin-important-dates/blob/main/README.en.md`; `LICENSE` → `.../blob/main/LICENSE`
+   - Then run the link check (validates **links and content**, so it catches a stale English section):
+     `node F:/dsh/halo-test/check-readmes.mjs` (three files match `origin/main`, version bump, key sections present)
+     and `node F:/dsh/halo-test/check-readme-links.mjs` (every link/image resolves with HTTP 200).
+     Run the link check **after** pushing — it reads GitHub, and `raw.githubusercontent.com` caches for ~5 minutes;
+     if a just-pushed change looks missing, confirm via `gh api repos/.../contents/<file>` before assuming a bad edit.
 3. Write the release notes: `docs/release-notes-<version>.md` (Chinese, for the store) and `docs/release-notes-<version>.en.md` (English).
-4. If `reminder-toast.js` changed, bump `TOAST_SCRIPT_VERSION` in `ReminderHeadProcessor` so browsers do not keep the cached old script.
+4. If `reminder-toast.js` changed, bump `TOAST_SCRIPT_VERSION` in `ReminderHeadProcessor` so browsers do not keep the cached old script
+   (plugin static assets are served with `max-age=31536000` — without the bump the new script never reaches returning visitors).
 5. `./gradlew clean build` → verify the jar metadata (`plugin.yaml` inside the jar shows the new version).
 5. Verify on a clean Halo 2.26 instance: `halo-smoke.mjs` (50/50, includes the 1.2.1 car checks) plus the browser end-to-end script (`browser-121-e2e.mjs`, 13/13) and the migration script (`migrate-check.mjs`).
 6. Commit and push (English message), wait for CI to pass.
