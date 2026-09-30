@@ -49,6 +49,15 @@ public class ImportantDateRouter {
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper =
         new com.fasterxml.jackson.databind.ObjectMapper();
 
+    /** 序列化为 JSON（写入页面数据块用，失败则返回 null 表示不输出该块） */
+    private String writeJson(Object value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     public ImportantDateRouter(ImportantDateFinder importantDateFinder,
         ReactiveSettingFetcher settingFetcher,
         TemplateNameResolver templateNameResolver,
@@ -113,7 +122,12 @@ public class ImportantDateRouter {
                                 model.put("showImportantTag", cfg.showImportantTag());
                                 model.put("allowDismiss", cfg.allowDismiss());
                                 model.put("frontendShowOverdue", cfg.frontendShowOverdue());
-                                // 悬浮提示（选项 C：只在本页面弹出）：只弹"当前节点且尚未提醒过"的项
+                                // 悬浮提示要弹的项：在本页面渲染时算好并标记"已提醒"。
+                                // 客户端上报接口（/important-dates-reminder-seen）对匿名访客是 403
+                                // —— Halo 默认只放行插件路由的 GET，POST 需要角色/权限模板
+                                // （见 docs.halo.run 插件安全 → 角色模板），而提醒记录必须写库才能
+                                // 跨设备只弹一次，所以标记留在服务端；脚本改用 data 块里带过来的
+                                // 这份数据（页面 HTML 本身仍不写提醒文案，避免页面缓存导致弹旧内容）。
                                 java.util.List<Map<String, Object>> toastItems = new java.util.ArrayList<>();
                                 List<CarVo.CarEventVo> carToNotify = new java.util.ArrayList<>();
                                 for (CarVo.CarEventVo e : allEvents) {
@@ -121,7 +135,6 @@ public class ImportantDateRouter {
                                         || e.isStageNotified()) {
                                         continue;
                                     }
-                                    // 悬浮提示属于前台可见面：逾期项同样不出现（除非显式打开开关）
                                     if (!cfg.frontendShowOverdue() && e.getDaysUntil() < 0) {
                                         continue;
                                     }
@@ -156,16 +169,28 @@ public class ImportantDateRouter {
                                     toastItems.add(item);
                                     dateToNotify.add(d);
                                 }
-                                Map<String, Object> toast = new LinkedHashMap<>();
-                                toast.put("toastEnabled", cfg.toastEnabled());
-                                toast.put("toastPosition", cfg.toastPosition());
-                                toast.put("toastTitle", cfg.toastTitle());
-                                toast.put("toastTemplate", cfg.toastTemplate());
-                                toast.put("toastEmptyText", cfg.toastEmptyText());
-                                toast.put("toastCloseSeconds", cfg.toastCloseSeconds());
-                                toast.put("toastDefaultClose", cfg.toastDefaultClose());
-                                toast.put("toastCloseMenu", cfg.toastCloseMenu());
-                                toast.put("reminders", toastItems);
+                                // 本次要弹出的项（脚本据此渲染，并做"同一浏览器本周期只弹一次"的本地去重）
+                                model.put("toastItems", toastItems);
+                                model.put("toastPosition", cfg.toastPosition());
+                                model.put("toastTitle", cfg.toastTitle());
+                                model.put("toastTemplate", cfg.toastTemplate());
+                                model.put("toastEmptyText", cfg.toastEmptyText());
+                                model.put("toastCloseSeconds", cfg.toastCloseSeconds());
+                                model.put("toastDefaultClose", cfg.toastDefaultClose());
+                                model.put("toastCloseMenu", cfg.toastCloseMenu());
+                                model.put("toastEnabled", cfg.toastEnabled());
+                                // 整个负载序列化成 JSON，交给前端脚本（避免内联可执行脚本）
+                                if (cfg.toastEnabled() && !toastItems.isEmpty()) {
+                                    Map<String, Object> payload = new LinkedHashMap<>();
+                                    payload.put("toastEnabled", true);
+                                    payload.put("toastPosition", cfg.toastPosition());
+                                    payload.put("toastTitle", cfg.toastTitle());
+                                    payload.put("toastTemplate", cfg.toastTemplate());
+                                    payload.put("toastCloseSeconds", cfg.toastCloseSeconds());
+                                    payload.put("toastDefaultClose", cfg.toastDefaultClose());
+                                    payload.put("toastCloseMenu", cfg.toastCloseMenu());
+                                    payload.put("reminders", toastItems);
+                                    model.put("toastPayloadJson", writeJson(payload));                                }
                                 model.put("idToastPage", Boolean.TRUE);
                                 model.put("showAvatar", cfg.showAvatar());
                                 // 座驾（1.2.0）：生活/爱车双视图数据
@@ -221,15 +246,17 @@ public class ImportantDateRouter {
                                 model.put("carPeople", carPeople);
                                 model.put("otherPeople", otherPeople);
                                 model.put(ModelConst.TEMPLATE_ID, TEMPLATE_ID);
-                                // 节点写库：先记录"本次弹过了"，再渲染页面（写失败不影响渲染，只是下次可能再弹一次）
+                                // 节点写库：先记录"本次弹过了"，再渲染页面（写失败不影响渲染，只是下次可能再弹一次）。
+                                // 记录写库才能跨设备/跨浏览器只弹一次；客户端上报接口对匿名访客是 403，
+                                // 因此标记只能在服务端做。
                                 return stageMarker.markCarEvents(carToNotify)
                                     .then(stageMarker.markDateEvents(dateToNotify))
                                     .onErrorResume(e -> Mono.empty())
                                     .then(templateNameResolver
-                                    .resolveTemplateNameOrDefault(request.exchange(), THEME_TEMPLATE)
-                                    .defaultIfEmpty(THEME_TEMPLATE)
-                                    .flatMap(templateName -> ServerResponse.ok()
-                                        .render(templateName, model)));
+                                        .resolveTemplateNameOrDefault(request.exchange(), THEME_TEMPLATE)
+                                        .defaultIfEmpty(THEME_TEMPLATE)
+                                        .flatMap(templateName -> ServerResponse.ok()
+                                            .render(templateName, model)));
                             });
                     })
             )

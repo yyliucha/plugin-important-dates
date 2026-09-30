@@ -10,9 +10,11 @@
  */
 (function () {
   // 便于排查：浏览器控制台执行 window.__ID_TOAST_VERSION 即可确认当前跑的是哪一版脚本
-  window.__ID_TOAST_VERSION = "1.2.6";
+  window.__ID_TOAST_VERSION = "131";
   var KEY_UNTIL = "id-toast-until";
   var KEY_FOREVER = "id-toast-forever";
+  /** 已经弹过的那批提醒（同一浏览器不重复弹；服务端另有写库记录用于跨设备） */
+  var KEY_SHOWN = "id-toast-shown";
   var MENU_ITEMS = [
     { label: "本次关闭", value: "once" },
     { label: "3 天内不显示", value: "3d" },
@@ -235,67 +237,40 @@
     return true;
   }
 
-  /** 读取 Cookie（Halo 的 CSRF 令牌） */
-  function cookie(name) {
-    var m = document.cookie.match(new RegExp("(^|;\\s*)" + name + "=([^;]*)"));
-    return m ? decodeURIComponent(m[2]) : "";
-  }
-
-  /** 回报"这个节点已经弹过了"（服务端写库，跨浏览器/设备一致） */
-  function markSeen(items) {
-    var payload = [];
-    items.forEach(function (i) {
-      if (i.type === "car" && i.carId && i.reminderIndex != null && i.stageCode) {
-        payload.push({
-          type: "car",
-          carId: i.carId,
-          reminderIndex: i.reminderIndex,
-          stageCode: i.stageCode,
-          date: i.date
-        });
-      } else if (i.type === "date" && i.name && i.stageCode) {
-        payload.push({ type: "date", name: i.name, stageCode: i.stageCode, nextSolarDate: i.date });
-      }
-    });
-    if (!payload.length) return;
-    var headers = { "Content-Type": "application/json" };
-    var xsrf = cookie("XSRF-TOKEN");
-    if (xsrf) headers["X-XSRF-TOKEN"] = xsrf;
-    fetch("/important-dates-reminder-seen", {
-      method: "POST",
-      headers: headers,
-      credentials: "same-origin",
-      body: JSON.stringify({ items: payload })
-    }).catch(function () {});
-  }
-
   function load() {
     var run = function () {
-      // 每次实时取数（带时间戳绕开缓存），避免"后台已改、前台还弹旧提醒"
-      fetch("/important-dates-reminders?ts=" + Date.now(), { credentials: "same-origin" })
-        .then(function (r) {
-          return r.json();
-        })
-        .then(function (d) {
-          if (!d || d.toastEnabled === false) return;
-          var items = d.toastItems || [];
-          if (!items.length) return;
-          // 只有真的弹出来了才回报"已提醒"：否则用户什么都没看到，
-          // 这个提醒节点却被记成已弹过，之后再也收不到（静默丢失一次提醒）。
-          if (show({
-            toastPosition: d.toastPosition,
-            toastTitle: d.toastTitle,
-            toastTemplate: d.toastTemplate,
-            toastEmptyText: d.toastEmptyText,
-            toastCloseSeconds: d.toastCloseSeconds,
-            toastDefaultClose: d.toastDefaultClose,
-            toastCloseMenu: d.toastCloseMenu,
-            reminders: items
-          })) {
-            markSeen(items);
-          }
-        })
-        .catch(function () {});
+      // 数据由页面渲染时给出（<script type="application/json" id="id-toast-data">）：
+      // 服务端在渲染时就已把要弹的节点写入"已提醒"，而客户端上报接口对匿名访客是 403
+      // （Halo 默认只放行插件路由的 GET），所以这里不再回查接口，直接读页面给的数据。
+      var node = document.getElementById("id-toast-data");
+      if (!node) return;
+      var d;
+      try {
+        d = JSON.parse(node.textContent || "{}");
+      } catch (e) {
+        return;
+      }
+      if (!d || d.toastEnabled === false) return;
+      var items = d.reminders || [];
+      if (!items.length) return;
+      // 同一浏览器本次提醒周期内只弹一次（服务端已写库；这里再挡一层，
+      // 避免刷新页面时因为页面缓存或并发渲染而重复弹出）
+      var stamp = items.map(function (i) {
+        return (i.type || "") + "#" + (i.name || i.carId || "") + "#" + (i.title || "") + "#" + (i.stageCode || "");
+      }).join("|");
+      if (lsGet(KEY_SHOWN) === stamp) return;
+      if (show({
+        toastPosition: d.toastPosition,
+        toastTitle: d.toastTitle,
+        toastTemplate: d.toastTemplate,
+        toastEmptyText: d.toastEmptyText,
+        toastCloseSeconds: d.toastCloseSeconds,
+        toastDefaultClose: d.toastDefaultClose,
+        toastCloseMenu: d.toastCloseMenu,
+        reminders: items
+      })) {
+        lsSet(KEY_SHOWN, stamp);
+      }
     };
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", run);

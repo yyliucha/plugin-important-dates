@@ -4,7 +4,7 @@ metadata:
   name: plugin-important-dates
 spec:
   enabled: true
-  version: 1.3.1-rc.2
+  version: 1.3.1-rc.3
   requires: ">=2.26.0"
   author:
     name: yyliucha
