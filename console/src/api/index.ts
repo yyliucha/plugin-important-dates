@@ -1,8 +1,7 @@
 import { axiosInstance } from "@halo-dev/api-client";
-import type { Car, ImportantDate, ListResult, LogAction, LogTargetType, OperationLog, Person } from "@/types";
+import type { Car, ImportantDate, ListResult, Person } from "@/types";
 
 const BASE = "/apis/importantdates.halo.run/v1alpha1/importantdates";
-const LOG_BASE = "/apis/importantdates.halo.run/v1alpha1/operationlogs";
 const PERSON_BASE = "/apis/importantdates.halo.run/v1alpha1/persons";
 const CAR_BASE = "/apis/importantdates.halo.run/v1alpha1/cars";
 
@@ -130,34 +129,6 @@ export async function updateImportantDate(item: ImportantDate): Promise<Importan
 
 export async function deleteImportantDate(name: string): Promise<void> {
   await axiosInstance.delete(`${BASE}/${name}`);
-}
-
-export async function writeOperationLog(
-  action: LogAction,
-  targetTitle: string,
-  targetName: string,
-  detail: string,
-  targetType: LogTargetType = "DATE"
-): Promise<void> {
-  // 1.2.6：操作日志功能已移除（界面无入口），这里保持空实现，避免继续写入无用数据。
-  void action;
-  void targetTitle;
-  void targetName;
-  void detail;
-  void targetType;
-}
-export async function listOperationLogs(
-  page = 1,
-  size = 20
-): Promise<{ items: OperationLog[]; total: number }> {
-  const { data } = await axiosInstance.get<ListResult<OperationLog>>(LOG_BASE, {
-    params: {
-      page,
-      size,
-      sort: "metadata.creationTimestamp,desc",
-    },
-  });
-  return { items: (data.items || []).filter((i) => !i.metadata?.deletionTimestamp), total: data.total || 0 };
 }
 
 /**

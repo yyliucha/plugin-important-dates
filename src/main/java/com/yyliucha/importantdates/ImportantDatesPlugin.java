@@ -50,27 +50,21 @@ public class ImportantDatesPlugin extends BasePlugin {
 
     private final SchemeManager schemeManager;
     private final ReactiveExtensionClient extensionClient;
-    private final com.yyliucha.importantdates.support.OperationLogCleaner logCleaner;
 
     public ImportantDatesPlugin(PluginContext pluginContext, SchemeManager schemeManager,
-        ReactiveExtensionClient extensionClient,
-        com.yyliucha.importantdates.support.OperationLogCleaner logCleaner) {
+        ReactiveExtensionClient extensionClient) {
         super(pluginContext);
         this.schemeManager = schemeManager;
         this.extensionClient = extensionClient;
-        this.logCleaner = logCleaner;
     }
 
     @Override
     public void start() {
         schemeManager.register(ImportantDate.class);
-        schemeManager.register(OperationLog.class);
         schemeManager.register(Person.class);
         schemeManager.register(Car.class);
         // 悬浮提醒旧默认文案一次性迁移（仅写插件自身配置）
         migrateToastDefaults();
-        // 操作日志自动清理（按设置保留天数）
-        logCleaner.start();
         // 座驾：老数据幂等迁移（项目级保险公司 → 车辆级，并去重）
         migrateCarInsurers();
         // 附件设置下拉动态化：把系统真实的「分类/策略」注入到插件 Setting 表单选项
@@ -80,9 +74,7 @@ public class ImportantDatesPlugin extends BasePlugin {
     @Override
     public void stop() {
         stopAttachmentOptionsRefresher();
-        logCleaner.stop();
         schemeManager.unregister(Scheme.buildFromType(ImportantDate.class));
-        schemeManager.unregister(Scheme.buildFromType(OperationLog.class));
         schemeManager.unregister(Scheme.buildFromType(Person.class));
         schemeManager.unregister(Scheme.buildFromType(Car.class));
     }

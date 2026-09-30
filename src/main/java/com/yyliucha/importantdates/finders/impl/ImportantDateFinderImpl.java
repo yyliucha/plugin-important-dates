@@ -210,8 +210,10 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
         vo.setVehicleType(spec.getVehicleType());
         vo.setVehicleTypeLabel(VehicleSupport.typeLabel(spec.getVehicleType()));
         vo.setVehicleTypeIcon(VehicleSupport.typeIcon(spec.getVehicleType()));
-        vo.setEnergyType(spec.getEnergyType());
-        vo.setEnergyTypeLabel(VehicleSupport.energyLabel(spec.getEnergyType()));
+        // 老数据的 energyType 常是默认 "FUEL"（自行车/电瓶车会中招）→ 展示时按车型纠偏，不改写存量数据
+        String energyType = VehicleSupport.normalizeEnergyType(spec.getVehicleType(), spec.getEnergyType());
+        vo.setEnergyType(energyType);
+        vo.setEnergyTypeLabel(VehicleSupport.energyLabel(energyType));
         vo.setColor(spec.getColor());
         vo.setStatus(spec.getStatus() == null ? "IN_USE" : spec.getStatus());
         vo.setSortOrder(spec.getSortOrder() == null ? 0 : spec.getSortOrder());
@@ -282,6 +284,10 @@ public class ImportantDateFinderImpl implements ImportantDateFinder {
         if (spec.getReminders() != null) {
             for (Car.Reminder r : spec.getReminders()) {
                 if (r == null || Boolean.FALSE.equals(r.getEnabled())) {
+                    continue;
+                }
+                // 车型不支持的到期项不参与提醒（数据保留，例如自行车下的旧交强险）
+                if (!VehicleSupport.supportsReminder(spec.getVehicleType(), r.getKey())) {
                     continue;
                 }
                 String ruleNote = null;

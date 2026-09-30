@@ -42,26 +42,6 @@ export interface ListResult<T> {
   items: T[];
 }
 
-export type LogAction = "CREATE" | "UPDATE" | "DELETE";
-
-/** 日志目标类型（旧数据为空按 DATE 处理） */
-export type LogTargetType = "DATE" | "PERSON" | "CAR";
-
-export interface OperationLogSpec {
-  action: LogAction;
-  targetTitle?: string;
-  targetName?: string;
-  targetType?: LogTargetType;
-  detail?: string;
-}
-
-export interface OperationLog {
-  apiVersion: string;
-  kind: string;
-  metadata: Metadata;
-  spec: OperationLogSpec;
-}
-
 export interface PersonSpec {
   displayName: string;
   nickname?: string;

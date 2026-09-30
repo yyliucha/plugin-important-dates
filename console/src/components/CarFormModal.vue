@@ -7,373 +7,366 @@
   >
     <div class="form">
       <!-- ===== 基本信息 ===== -->
-      <div class="section-title">基本信息</div>
-      <div class="row">
-        <label class="field half">
-          <span class="label">名称/昵称 *</span>
-          <input v-model="form.displayName" class="input" placeholder="例如：小白" />
-        </label>
-        <label class="field half">
-          <span class="label">车牌号</span>
-          <input v-model="form.plateNo" class="input" placeholder="例如：粤B12345（前台永远脱敏显示）" />
-        </label>
-      </div>
-      <div class="row">
-        <label class="field half">
-          <span class="label">品牌</span>
-          <input v-model="form.brand" class="input" placeholder="例如：比亚迪" />
-        </label>
-        <label class="field half">
-          <span class="label">车系型号</span>
-          <input v-model="form.model" class="input" placeholder="例如：汉 EV 2024 款" />
-        </label>
-      </div>
-      <div class="row">
-        <label class="field half">
-          <span class="label">车辆分类</span>
-          <select v-model="form.vehicleType" class="input">
-            <option v-for="t in VEHICLE_TYPES" :key="t.value" :value="t.value">
-              {{ t.icon }} {{ t.label }}
-            </option>
-          </select>
-        </label>
-        <label class="field half">
-          <span class="label">能源类型</span>
-          <select v-model="form.energyType" class="input">
-            <option v-for="e in ENERGY_TYPES" :key="e.value" :value="e.value">{{ e.label }}</option>
-          </select>
-        </label>
-      </div>
-      <div class="row">
-        <label class="field half">
-          <span class="label">颜色</span>
-          <input v-model="form.color" class="input" placeholder="例如：珍珠白" />
-        </label>
-        <label class="field half">
-          <span class="label">状态</span>
-          <select v-model="form.status" class="input">
-            <option v-for="s in VEHICLE_STATUSES" :key="s.value" :value="s.value">{{ s.label }}</option>
-          </select>
-        </label>
-      </div>
-
-      <!-- ===== 证照与里程 ===== -->
-      <div class="section-title">证照与里程（敏感字段仅后台可见）</div>
-      <div class="row">
-        <label class="field half">
-          <span class="label">车架号 VIN</span>
-          <input v-model="form.vin" class="input" placeholder="仅后台" />
-        </label>
-        <label class="field half">
-          <span class="label">发动机号</span>
-          <input v-model="form.engineNo" class="input" placeholder="仅后台" />
-        </label>
-      </div>
-      <div class="row">
-        <label class="field half">
-          <span class="label">首次登记日期（用于年检推算）</span>
-          <input ref="registeredDateInput" v-model="form.registeredDate" type="date" class="input" />
-        </label>
-        <label class="field half">
-          <span class="label">购买日期</span>
-          <input v-model="form.purchaseDate" type="date" class="input" />
-        </label>
-      </div>
-      <div class="row">
-        <label class="field half">
-          <span class="label">购买价格（元，仅后台）</span>
-          <input v-model.number="form.purchasePrice" type="number" min="0" step="100" class="input" placeholder="可选" />
-        </label>
-        <label class="field half">
-          <span class="label">当前里程（km）</span>
-          <input v-model.number="form.mileageKm" type="number" min="0" step="100" class="input" placeholder="例如：12000" />
-        </label>
-      </div>
-      <label class="field">
-        <span class="label">里程更新日期</span>
-        <input v-model="form.mileageUpdatedAt" type="date" class="input" />
-      </label>
-
-      <!-- ===== 保险公司（车辆级） ===== -->
-      <div class="field">
-        <span class="label">保险公司（车辆级：车下所有险种共用，仅后台可见）</span>
-        <input
-          v-model="form.insurer"
-          class="input"
-          list="insurer-options"
-          placeholder="例如：中国人保（留空表示未填写，逐个险种仍可单独指定）"
-        />
-        <datalist id="insurer-options">
-          <option v-for="name in COMMON_INSURERS" :key="name" :value="name" />
-        </datalist>
-        <div class="chip-row">
-          <span class="hint">常用：</span>
-          <button
-            v-for="name in COMMON_INSURERS.slice(0, 6)"
-            :key="name"
-            type="button"
-            class="chip"
-            @click="form.insurer = name"
-          >
-            {{ name }}
-          </button>
-          <button v-if="form.insurer" type="button" class="chip chip-clear" @click="form.insurer = ''">
-            清空
-          </button>
-        </div>
-      </div>
-
-      <!-- ===== 关联人员 ===== -->
-      <div class="section-title">关联人员（可选，用于统一徽章与前台显示）</div>
-      <div class="row">
-        <label class="field half">
-          <span class="label">车主</span>
-          <select v-model="form.ownerName" class="input">
-            <option value="">不关联</option>
-            <option v-for="p in persons" :key="p.metadata.name" :value="p.metadata.name">
-              {{ personTitle(p) }}
-            </option>
-          </select>
-        </label>
-        <div class="field half">
-          <span class="label">常用驾驶人（可多选）</span>
-          <div class="person-checks">
-            <label v-for="p in persons" :key="p.metadata.name" class="check">
-              <input
-                type="checkbox"
-                :checked="form.driverNames.includes(p.metadata.name)"
-                @change="toggleDriver(p.metadata.name)"
-              />
-              <span>{{ p.displayName || p.spec.displayName }}</span>
+      <details class="sec" :open="open.basic" @toggle="onToggle('basic', $event)">
+        <summary class="sec-head">
+          <span class="sec-name">基本信息</span>
+          <span class="sec-sum">{{ basicSummary }}</span>
+        </summary>
+        <div class="sec-body">
+          <div class="row">
+            <label class="field">
+              <span class="label">名称/昵称 *</span>
+              <input v-model="form.displayName" class="input" :placeholder="namePlaceholder" />
             </label>
-            <span v-if="!persons.length" class="hint">暂无人员，可先到「人员」页签添加。</span>
+            <label v-if="cap.hasPlate" class="field">
+              <span class="label">车牌号</span>
+              <input v-model="form.plateNo" class="input" placeholder="例如：粤B12345（前台永远脱敏显示）" />
+            </label>
           </div>
-        </div>
-      </div>
-
-      <!-- ===== 相册 ===== -->
-      <div class="section-title">相册（多图，可勾选是否在前台展示）</div>
-      <div class="album-actions">
-        <VButton size="sm" :loading="uploading" @click="triggerUpload">上传图片</VButton>
-        <VButton size="sm" @click="openLibrary">从附件库选择</VButton>
-        <VButton v-if="brokenCount" size="sm" type="danger" @click="removeBrokenPhotos">
-          移除失效图片（{{ brokenCount }}）
-        </VButton>
-        <span class="hint">
-          使用「附件设置」中的存储策略与分类；勾选「展示」的照片才会出现在前台相册，未勾选的仅后台可见（适合证件类照片）。
-        </span>
-      </div>
-      <input ref="fileInput" type="file" accept="image/*" multiple class="hidden-file" @change="onFileChange" />
-      <div v-if="!form.photos.length" class="hint" style="padding: 6px 0">还没有照片，先加几张吧～</div>
-      <div v-else class="album-list">
-        <div
-          v-for="(p, idx) in form.photos"
-          :key="p.url + idx"
-          class="album-item"
-          draggable="true"
-          @dragstart="dragIndex = idx"
-          @dragover.prevent
-          @drop="dropPhoto(idx)"
-        >
-          <span class="drag-handle" title="拖拽排序">⠿</span>
-          <img
-            v-if="!isBrokenPhoto(p.url)"
-            :src="thumb(p.url)"
-            alt=""
-            class="thumb"
-            loading="lazy"
-            @error="markPhotoFailed(p.url)"
-          />
-          <span v-else class="thumb thumb-broken" title="图片地址已失效">🚫</span>
-          <div class="album-meta">
-            <span class="album-name">{{ p.name || "未命名" }}</span>
-            <div class="album-tags">
-              <label class="check">
-                <input type="radio" :checked="p.isCover" @change="setCover(idx)" />
-                <span>封面</span>
-              </label>
-              <label class="check">
-                <input v-model="p.frontVisible" type="checkbox" />
-                <span>展示</span>
-              </label>
-              <span v-if="isBrokenPhoto(p.url)" class="broken-note">
-                图片已不可用（附件可能已被删除）
-                <button type="button" class="link-btn" @click="openLibraryFor(idx)">重新选择</button>
-              </span>
-            </div>
+          <div class="row">
+            <label class="field">
+              <span class="label">车辆分类</span>
+              <select v-model="form.vehicleType" class="input">
+                <option v-for="t in VEHICLE_TYPES" :key="t.value" :value="t.value">
+                  {{ t.icon }} {{ t.label }}
+                </option>
+              </select>
+            </label>
+            <label class="field">
+              <span class="label">状态</span>
+              <select v-model="form.status" class="input">
+                <option v-for="s in VEHICLE_STATUSES" :key="s.value" :value="s.value">{{ s.label }}</option>
+              </select>
+            </label>
           </div>
-          <VButton size="sm" type="danger" @click="form.photos.splice(idx, 1)">移除</VButton>
+          <div class="row">
+            <label class="field">
+              <span class="label">品牌</span>
+              <input v-model="form.brand" class="input" placeholder="例如：比亚迪" />
+            </label>
+            <label class="field">
+              <span class="label">车系型号</span>
+              <input v-model="form.model" class="input" placeholder="例如：汉 EV 2024 款" />
+            </label>
+          </div>
+          <label v-if="cap.tracksMileage" class="field">
+            <span class="label">当前里程（km）</span>
+            <input v-model.number="form.mileageKm" type="number" min="0" step="100" class="input" placeholder="例如：12000" />
+          </label>
         </div>
-      </div>
+      </details>
 
       <!-- ===== 到期提醒 ===== -->
-      <div class="section-title">到期提醒（保险 / 年检 / 保养 / 车船税…）</div>
-      <p class="hint">
-        年检默认提前 30 天提醒（办理含上线检验通常需 2–3 个工作日，建议提前安排）；保险类默认每年循环，
-        年检按首次登记日期与车型规则自动推算，均可手动覆盖；循环间隔选「不循环」表示提醒一次后不再滚动。
-      </p>
-      <div v-for="(r, idx) in form.reminders" :key="idx" class="reminder-card">
-        <!-- 第 1 行：项目 / 名称 / 保单号 / 到期日 -->
-        <div class="row">
-          <label class="field third">
-            <span class="label">项目</span>
-            <select v-model="r.key" class="input" @change="onReminderKeyChange(r)">
-              <option v-for="p in REMINDER_PRESETS" :key="p.key" :value="p.key">{{ p.label }}</option>
-            </select>
-          </label>
-          <label v-if="r.key === 'CUSTOM'" class="field third">
-            <span class="label">名称</span>
-            <input v-model="r.label" class="input" placeholder="例如：轮胎更换" />
-          </label>
-          <label v-if="isInsurance(r.key)" class="field third">
-            <span class="label">保单号（仅后台）</span>
-            <input v-model="r.policyNo" class="input" placeholder="仅后台" />
-          </label>
-          <label class="field third">
-            <span class="label">到期日</span>
-            <input v-if="dateLocked(r)" class="input locked" :value="lockedDateText(r)" disabled />
-            <input v-else v-model="r.date" type="date" class="input" />
-          </label>
-        </div>
-
-        <!-- 第 2 行：提前天数 / 循环间隔 -->
-        <div class="row">
-          <label class="field third">
-            <span class="label">提前提醒天数</span>
-            <input
-              v-model.number="r.remindDays"
-              type="number"
-              min="0"
-              class="input"
-              :placeholder="`默认 ${presetDays(r.key)}`"
-            />
-          </label>
-          <label class="field third">
-            <span class="label">循环间隔</span>
-            <select class="input" :value="repeatSelectValue(r)" @change="onRepeatSelect(r, $event)">
-              <option v-for="o in REPEAT_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
-              <option :value="REPEAT_CUSTOM">自定义月数…</option>
-            </select>
-          </label>
-          <label v-if="isCustomRepeat(r)" class="field third">
-            <span class="label">自定义月数</span>
-            <input v-model.number="r.customMonths" type="number" min="1" class="input" placeholder="例如：18" />
-          </label>
-        </div>
-
-        <!-- B 年检：按规则自动推算 / 手动指定 -->
-        <div v-if="r.key === 'INSPECTION'" class="sub-box">
-          <label class="check">
-            <input type="checkbox" :checked="r.manualDate === true" @change="toggleManualDate(r, $event)" />
-            <span>手动指定日期</span>
-          </label>
-          <template v-if="r.manualDate !== true">
-            <div v-if="inspectionPreview().date" class="hint strong">
-              按规则自动推算：{{ inspectionPreview().date }}（{{ inspectionPreview().phase }}）
+      <details class="sec" :open="open.reminders" @toggle="onToggle('reminders', $event)">
+        <summary class="sec-head">
+          <span class="sec-name">到期提醒</span>
+          <span class="sec-sum">{{ reminderSummary }}</span>
+        </summary>
+        <div class="sec-body">
+          <!-- 车辆级保险公司：只在有保险项的车型显示 -->
+          <div v-if="supportsInsurance" class="field">
+            <span class="label">保险公司（车下所有险种共用）</span>
+            <div class="insurer-row">
+              <input
+                v-model="form.insurer"
+                class="input"
+                list="insurer-options"
+                placeholder="例如：中国人保"
+              />
+              <button
+                v-for="name in COMMON_INSURERS.slice(0, 4)"
+                :key="name"
+                type="button"
+                class="chip"
+                @click="form.insurer = name"
+              >
+                {{ name }}
+              </button>
             </div>
-            <div class="hint" :class="{ warn: !inspectionPreview().date }">{{ inspectionPreview().rule }}</div>
-            <div v-if="!registrationBase" class="hint warn">
-              请先填写首次登记日期（或购买日期）用于自动推算；
-              <button type="button" class="link-btn" @click="focusRegisteredDate">去填写</button>
-            </div>
-            <div v-else class="hint">
-              推算依据：首次登记日期 {{ registrationBase }}
-              <template v-if="!form.registeredDate">（暂无登记日期，暂用购买日期，建议补充更准确）</template>
-            </div>
-          </template>
-          <div v-else class="hint">已改为手动指定：以上方「到期日」为准，清空则不提醒年检。</div>
-        </div>
+            <datalist id="insurer-options">
+              <option v-for="name in COMMON_INSURERS" :key="name" :value="name" />
+            </datalist>
+          </div>
 
-        <!-- C 与保险同期 -->
-        <div v-if="isSyncable(r.key)" class="sub-box">
-          <label class="check">
-            <input type="checkbox" :checked="syncChecked(r)" @change="toggleSync(r, $event)" />
-            <span>与保险同期（跟随交强险到期日）</span>
-          </label>
-          <div v-if="syncChecked(r)" class="hint">
-            <template v-if="compulsoryDate">已联动：{{ compulsoryDate }}（与交强险同日）</template>
-            <template v-else>还没有交强险到期日：请先在「交强险」项填写，或取消勾选后独立填写。</template>
+          <p v-if="!form.reminders.length" class="hint">还没有到期项，点下方「添加到期项」开始记录。</p>
+
+          <div v-for="(r, idx) in form.reminders" :key="idx" class="reminder-card">
+            <!-- 汇总行：项目 · 日期 · 动作 -->
+            <div class="rr-main">
+              <label class="field rr-item">
+                <select v-model="r.key" class="input" @change="onReminderKeyChange(r)">
+                  <option v-for="p in applicablePresets" :key="p.key" :value="p.key">{{ p.label }}</option>
+                </select>
+              </label>
+              <label v-if="r.key === 'CUSTOM'" class="field rr-label">
+                <input v-model="r.label" class="input" placeholder="名称，例如：轮胎更换" />
+              </label>
+              <label class="field rr-date">
+                <input v-if="dateLocked(r)" class="input locked" :value="lockedDateText(r)" disabled />
+                <input v-else v-model="r.date" type="date" class="input" />
+              </label>
+              <label class="check rr-enabled" title="启用提醒">
+                <input v-model="r.enabled" type="checkbox" />
+              </label>
+              <VButton size="sm" type="danger" @click="form.reminders.splice(idx, 1)">删除</VButton>
+            </div>
+
+            <!-- 状态与办理 -->
+            <div class="rr-status">
+              <span v-if="noNextNotice(r)" class="next-notice">已完成，不再提醒</span>
+              <span v-else-if="nextNoticeOf(r)" class="next-notice">下次提醒：{{ nextNoticeOf(r) }}</span>
+              <span v-if="r.key === 'INSPECTION' && r.manualDate !== true" class="next-notice">
+                {{ inspectionPreview().date ? `自动推算：${inspectionPreview().date}（${inspectionPreview().phase}）` : "缺首次登记日期，无法推算" }}
+              </span>
+              <span v-if="isSyncable(r.key) && syncChecked(r)" class="next-notice">
+                {{ compulsoryDate ? `与交强险同期：${compulsoryDate}` : "待填交强险到期日" }}
+              </span>
+              <VButton v-if="r.date && !dateLocked(r) && !isDone(r)" size="sm" @click="applyDoneNow(r)">
+                {{ effectiveRepeat(r) > 0 ? "已办，顺延一期" : "已办" }}
+              </VButton>
+              <VButton v-if="isDone(r)" size="sm" @click="applyUndoNow(r)">撤销办理</VButton>
+            </div>
+
+            <!-- 高级设置：折叠，默认不展开 -->
+            <button type="button" class="rr-toggle" @click="toggleRow(r)">
+              {{ isRowOpen(r) ? "收起设置" : "设置" }}
+              <span class="hint" v-if="!isRowOpen(r)">提前 {{ r.remindDays ?? presetDays(r.key) }} 天 · {{ repeatLabel(r) }}</span>
+            </button>
+            <div v-show="isRowOpen(r)" class="rr-adv">
+              <div class="row">
+                <label class="field">
+                  <span class="label">提前提醒天数</span>
+                  <input v-model.number="r.remindDays" type="number" min="0" class="input" :placeholder="`默认 ${presetDays(r.key)}`" />
+                </label>
+                <label class="field">
+                  <span class="label">循环间隔</span>
+                  <select class="input" :value="repeatSelectValue(r)" @change="onRepeatSelect(r, $event)">
+                    <option v-for="o in REPEAT_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
+                    <option :value="REPEAT_CUSTOM">自定义月数…</option>
+                  </select>
+                </label>
+                <label v-if="isCustomRepeat(r)" class="field">
+                  <span class="label">自定义月数</span>
+                  <input v-model.number="r.customMonths" type="number" min="1" class="input" placeholder="例如：18" />
+                </label>
+              </div>
+
+              <div v-if="r.key === 'INSPECTION'" class="sub-box">
+                <label class="check">
+                  <input type="checkbox" :checked="r.manualDate === true" @change="toggleManualDate(r, $event)" />
+                  <span>手动指定日期（关闭则按首次登记日期与车型规则自动推算）</span>
+                </label>
+                <div v-if="r.manualDate !== true && !registrationBase" class="hint warn">
+                  请在「更多资料」填写首次登记日期（或购买日期）用于自动推算；
+                  <button type="button" class="link-btn" @click="focusRegisteredDate">去填写</button>
+                </div>
+              </div>
+
+              <div v-if="isSyncable(r.key)" class="sub-box">
+                <label class="check">
+                  <input type="checkbox" :checked="syncChecked(r)" @change="toggleSync(r, $event)" />
+                  <span>与保险同期（跟随交强险到期日）</span>
+                </label>
+              </div>
+
+              <div v-if="r.key === 'MAINTENANCE'" class="sub-box">
+                <div class="row">
+                  <label class="field">
+                    <span class="label">上次保养日期</span>
+                    <input v-model="r.lastServiceDate" type="date" class="input" />
+                  </label>
+                  <label class="field">
+                    <span class="label">保养间隔月数</span>
+                    <input v-model.number="r.intervalMonths" type="number" min="0" class="input" placeholder="例如：6" />
+                  </label>
+                  <label v-if="cap.tracksMileage" class="field">
+                    <span class="label">上次保养里程</span>
+                    <input v-model.number="r.lastServiceKm" type="number" min="0" class="input" placeholder="例如：10000" />
+                  </label>
+                </div>
+              </div>
+
+              <div v-if="isInsurance(r.key)" class="sub-box">
+                <label class="check">
+                  <input type="checkbox" :checked="r.overrideInsurer === true" @change="toggleOverrideInsurer(r, $event)" />
+                  <span>使用其他保险公司</span>
+                </label>
+                <label v-if="r.overrideInsurer === true" class="field">
+                  <input v-model="r.insurer" class="input" list="insurer-options" placeholder="例如：中国平安" />
+                </label>
+                <div v-else class="hint">本项使用车辆级保险公司：{{ form.insurer || "（尚未填写）" }}</div>
+                <label class="field">
+                  <span class="label">保单号（仅后台）</span>
+                  <input v-model="r.policyNo" class="input" placeholder="仅后台" />
+                </label>
+              </div>
+            </div>
+          </div>
+          <div>
+            <VButton size="sm" @click="addReminder">+ 添加到期项</VButton>
           </div>
         </div>
+      </details>
 
-        <!-- 保养：按上次保养推算 -->
-        <div v-if="r.key === 'MAINTENANCE'" class="sub-box">
-          <div class="row">
-            <label class="field third">
-              <span class="label">上次保养日期</span>
-              <input v-model="r.lastServiceDate" type="date" class="input" />
-            </label>
-            <label class="field third">
-              <span class="label">保养间隔月数</span>
-              <input v-model.number="r.intervalMonths" type="number" min="0" class="input" placeholder="例如：6" />
-            </label>
-            <label class="field third">
-              <span class="label">上次保养里程</span>
-              <input v-model.number="r.lastServiceKm" type="number" min="0" class="input" placeholder="例如：10000" />
-            </label>
-          </div>
-          <div class="hint">「保养间隔月数」用于按上次保养日期推算下次到期日；「循环间隔」用于到期后是否继续滚动。</div>
-        </div>
-
-        <!-- 保险：可选覆盖车辆级保险公司 -->
-        <div v-if="isInsurance(r.key)" class="sub-box">
-          <label class="check">
-            <input type="checkbox" :checked="r.overrideInsurer === true" @change="toggleOverrideInsurer(r, $event)" />
-            <span>使用其他保险公司</span>
-          </label>
-          <div v-if="r.overrideInsurer === true" class="row">
-            <label class="field half">
-              <span class="label">本项保险公司（覆盖车辆级）</span>
-              <input v-model="r.insurer" class="input" list="insurer-options" placeholder="例如：中国平安" />
-            </label>
-          </div>
-          <div v-else class="hint">本项使用车辆级保险公司：{{ form.insurer || "（车辆级尚未填写）" }}</div>
-        </div>
-
-        <div class="reminder-footer">
-          <label class="check">
-            <input v-model="r.enabled" type="checkbox" />
-            <span>启用提醒</span>
-          </label>
-          <VSpace>
-            <span v-if="noNextNotice(r)" class="next-notice">已完成，不再提醒</span>
-            <span v-else-if="nextNoticeOf(r)" class="next-notice">
-              下次提醒：{{ nextNoticeOf(r) }}
-            </span>
-            <VButton
-              v-if="r.date && !dateLocked(r) && !isDone(r)"
-              size="sm"
-              @click="applyDoneNow(r)"
-            >
-              {{ effectiveRepeat(r) > 0 ? "已办，顺延一期" : "已办（一次性，完成后不再提醒）" }}
+      <!-- ===== 相册 ===== -->
+      <details class="sec" :open="open.album" @toggle="onToggle('album', $event)">
+        <summary class="sec-head">
+          <span class="sec-name">相册</span>
+          <span class="sec-sum">{{ form.photos.length ? `${form.photos.length} 张` : "暂无照片" }}</span>
+        </summary>
+        <div class="sec-body">
+          <div class="album-actions">
+            <VButton size="sm" :loading="uploading" @click="triggerUpload">上传图片</VButton>
+            <VButton size="sm" @click="openLibrary">从附件库选择</VButton>
+            <VButton v-if="brokenCount" size="sm" type="danger" @click="removeBrokenPhotos">
+              移除失效图片（{{ brokenCount }}）
             </VButton>
-            <VButton v-if="isDone(r)" size="sm" @click="applyUndoNow(r)">撤销办理</VButton>
-            <VButton size="sm" type="danger" @click="form.reminders.splice(idx, 1)">删除此项</VButton>
-          </VSpace>
+          </div>
+          <input ref="fileInput" type="file" accept="image/*" multiple class="hidden-file" @change="onFileChange" />
+          <div v-if="!form.photos.length" class="hint" style="padding: 6px 0">还没有照片，先加几张吧～</div>
+          <div v-else class="album-list">
+            <div
+              v-for="(p, idx) in form.photos"
+              :key="p.url + idx"
+              class="album-item"
+              draggable="true"
+              @dragstart="dragIndex = idx"
+              @dragover.prevent
+              @drop="dropPhoto(idx)"
+            >
+              <span class="drag-handle" title="拖拽排序">⠿</span>
+              <img
+                v-if="!isBrokenPhoto(p.url)"
+                :src="thumb(p.url)"
+                alt=""
+                class="thumb"
+                loading="lazy"
+                @error="markPhotoFailed(p.url)"
+              />
+              <span v-else class="thumb thumb-broken" title="图片地址已失效">🚫</span>
+              <div class="album-meta">
+                <span class="album-name">{{ p.name || "未命名" }}</span>
+                <div class="album-tags">
+                  <label class="check">
+                    <input type="radio" :checked="p.isCover" @change="setCover(idx)" />
+                    <span>封面</span>
+                  </label>
+                  <label class="check">
+                    <input v-model="p.frontVisible" type="checkbox" />
+                    <span>前台展示</span>
+                  </label>
+                  <span v-if="isBrokenPhoto(p.url)" class="broken-note">
+                    图片已不可用
+                    <button type="button" class="link-btn" @click="openLibraryFor(idx)">重新选择</button>
+                  </span>
+                </div>
+              </div>
+              <VButton size="sm" type="danger" @click="form.photos.splice(idx, 1)">移除</VButton>
+            </div>
+          </div>
         </div>
-      </div>
-      <div>
-        <VButton size="sm" @click="addReminder">+ 添加到期项</VButton>
-      </div>
+      </details>
 
-      <!-- ===== 备注与属性 ===== -->
-      <label class="field">
-        <span class="label">备注</span>
-        <textarea v-model="form.note" class="input textarea" rows="3" placeholder="例如：首保已做、轮胎品牌等"></textarea>
-      </label>
-      <div class="field">
-        <span class="label">属性</span>
-        <div class="person-checks">
-          <label class="check">
-            <input v-model="form.important" type="checkbox" />
-            <span>参与提醒（保险/年检/保养等到期会出现在仪表盘与弹窗）</span>
-          </label>
-          <label class="check">
-            <input v-model="form.visible" type="checkbox" />
-            <span>前台展示（「爱车」视图可见，车牌自动脱敏）</span>
-          </label>
+      <!-- ===== 关联人员 ===== -->
+      <details class="sec" :open="open.people" @toggle="onToggle('people', $event)">
+        <summary class="sec-head">
+          <span class="sec-name">关联人员</span>
+          <span class="sec-sum">{{ peopleSummary }}</span>
+        </summary>
+        <div class="sec-body">
+          <div class="row">
+            <label class="field">
+              <span class="label">车主</span>
+              <select v-model="form.ownerName" class="input">
+                <option value="">不关联</option>
+                <option v-for="p in persons" :key="p.metadata.name" :value="p.metadata.name">
+                  {{ personTitle(p) }}
+                </option>
+              </select>
+            </label>
+            <div class="field">
+              <span class="label">常用驾驶人（可多选）</span>
+              <div class="person-checks">
+                <label v-for="p in persons" :key="p.metadata.name" class="check">
+                  <input
+                    type="checkbox"
+                    :checked="form.driverNames.includes(p.metadata.name)"
+                    @change="toggleDriver(p.metadata.name)"
+                  />
+                  <span>{{ p.displayName || p.spec.displayName }}</span>
+                </label>
+                <span v-if="!persons.length" class="hint">暂无人员，可先到「人员」页签添加。</span>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      </details>
+
+      <!-- ===== 更多资料：默认收起，字段按车型显示 ===== -->
+      <details class="sec" :open="open.more" @toggle="onToggle('more', $event)">
+        <summary class="sec-head">
+          <span class="sec-name">更多资料</span>
+          <span class="sec-sum">证照 / 日期 / 备注</span>
+        </summary>
+        <div class="sec-body">
+          <div v-if="cap.hasEngine" class="row">
+            <label class="field">
+              <span class="label">{{ vehicleTypeLabel === "电瓶车" ? "整车编号 / 车架号" : "车架号 VIN" }}</span>
+              <input v-model="form.vin" class="input" placeholder="仅后台可见" />
+            </label>
+            <label v-if="form.vehicleType !== 'EBIKE'" class="field">
+              <span class="label">发动机号</span>
+              <input v-model="form.engineNo" class="input" placeholder="仅后台可见" />
+            </label>
+          </div>
+          <div class="row">
+            <label v-if="cap.isMotorVehicle" class="field">
+              <span class="label">首次登记日期（用于年检推算）</span>
+              <input ref="registeredDateInput" v-model="form.registeredDate" type="date" class="input" />
+            </label>
+            <label class="field">
+              <span class="label">购买日期</span>
+              <input v-model="form.purchaseDate" type="date" class="input" />
+            </label>
+          </div>
+          <div class="row">
+            <!-- 能源类型：自行车不烧油（整项隐藏）；电瓶车只有纯电（锁定显示） -->
+            <label v-if="cap.hasEngine" class="field">
+              <span class="label">能源类型</span>
+              <input v-if="energyLocked" class="input locked" :value="energyLabelOf(form.energyType)" disabled />
+              <select v-else v-model="form.energyType" class="input">
+                <option v-for="e in ENERGY_TYPES" :key="e.value" :value="e.value">{{ e.label }}</option>
+              </select>
+            </label>
+            <label class="field">
+              <span class="label">颜色</span>
+              <input v-model="form.color" class="input" placeholder="例如：珍珠白" />
+            </label>
+            <label class="field">
+              <span class="label">购买价格（元）</span>
+              <input v-model.number="form.purchasePrice" type="number" min="0" step="100" class="input" placeholder="仅后台可见" />
+            </label>
+          </div>
+          <label v-if="cap.tracksMileage" class="field">
+            <span class="label">里程更新日期</span>
+            <input v-model="form.mileageUpdatedAt" type="date" class="input" />
+          </label>
+          <label class="field">
+            <span class="label">备注</span>
+            <textarea v-model="form.note" class="input textarea" rows="2" placeholder="例如：首保已做、轮胎品牌等"></textarea>
+          </label>
+          <div class="person-checks">
+            <label class="check">
+              <input v-model="form.important" type="checkbox" />
+              <span>参与提醒</span>
+            </label>
+            <label class="check">
+              <input v-model="form.visible" type="checkbox" />
+              <span>前台展示（车牌自动脱敏）</span>
+            </label>
+          </div>
+        </div>
+      </details>
     </div>
 
     <!-- 附件库多选浮层（Teleport 到 body：避免 VModal 插槽内的 DOM 插入冲突） -->
@@ -444,7 +437,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from "vue";
+import { computed, nextTick, reactive, ref, watch } from "vue";
 import { Toast, VButton, VModal, VSpace } from "@halo-dev/components";
 import { axiosInstance } from "@halo-dev/api-client";
 import { createCar, describeError, fetchPluginJsonConfig, listCars, listPersons, updateCar } from "@/api";
@@ -470,14 +463,19 @@ import {
   DEFAULT_INSPECTION_YEARLY_FROM,
   addMonths,
   defaultRepeatMonths,
+  energyLabelOf,
   formatYmd,
   insuranceKey,
+  isEnergyLocked,
   nextInspection,
+  normalizeEnergyType,
   parseInspectionNodes,
   parseYmd,
   resolveDueDate,
   startOfToday,
   syncableKey,
+  vehicleCapability,
+  vehicleSupportsReminder,
 } from "@/utils/vehicle";
 import {
   UNGROUPED,
@@ -585,6 +583,121 @@ const fileInput = ref<HTMLInputElement>();
 const registeredDateInput = ref<HTMLInputElement>();
 const dragIndex = ref(-1);
 
+// ---------- 1.2.8：分区折叠 ----------
+// 用原生 <details>/<summary>：展开收起由浏览器保证，不依赖 v-show 或内联 display，
+// 避免被宿主（Halo 控制台）的全局样式覆盖导致内容错位。
+const open = reactive({ basic: true, reminders: true, album: false, people: false, more: false });
+/** 载入表单期间置位：避免车型赋值触发「归档不适用的到期项」 */
+let initializing = false;
+/** <details> 的 toggle 事件：把状态同步回 open（用户点击原生 summary 时也会触发） */
+function onToggle(key: keyof typeof open, e: Event) {
+  const el = e.target as HTMLDetailsElement;
+  if (el && typeof el.open === "boolean") {
+    open[key] = el.open;
+  }
+}
+/** 以编程方式展开/收起某个分区 */
+function setSection(key: keyof typeof open, value: boolean) {
+  open[key] = value;
+}
+
+/** 到期项「设置」区的展开状态（按行对象记录，避免用索引被增删打乱） */
+const openRows = ref<Set<FormReminder>>(new Set());
+function isRowOpen(r: FormReminder): boolean {
+  return openRows.value.has(r);
+}
+function toggleRow(r: FormReminder) {
+  const next = new Set(openRows.value);
+  if (next.has(r)) {
+    next.delete(r);
+  } else {
+    next.add(r);
+  }
+  openRows.value = next;
+}
+
+// ---------- 1.2.8：车型能力 ----------
+/** 当前车型支持哪些字段与到期项（电瓶车无保险/年检/车船税，自行车连车牌都没有） */
+const cap = computed(() => vehicleCapability(form.vehicleType));
+
+const vehicleTypeLabel = computed(
+  () => VEHICLE_TYPES.find((t) => t.value === form.vehicleType)?.label || ""
+);
+
+const namePlaceholder = computed(() => {
+  if (form.vehicleType === "EBIKE") return "例如：小电驴";
+  if (form.vehicleType === "BICYCLE") return "例如：通勤车";
+  return "例如：小白";
+});
+
+/** 可选的到期项模板：按车型过滤（不适用的项目不出现） */
+const applicablePresets = computed(() =>
+  REMINDER_PRESETS.filter((p) => cap.value.reminderKeys.includes(p.key))
+);
+
+/** 当前车型是否支持保险（电瓶车/自行车没有保险概念） */
+const supportsInsurance = computed(() => cap.value.reminderKeys.includes("INSURANCE_COMPULSORY"));
+
+/** 能源类型被车型锁死（电瓶车=纯电）：显示为只读，避免改出无意义的组合 */
+const energyLocked = computed(() => isEnergyLocked(form.vehicleType));
+
+/**
+ * 车型不匹配的到期项：保留数据但不展示（改回对应车型时原样恢复）。
+ * 保存时与可见项合并写回，避免用户只是改车型就丢掉保险/年检记录。
+ */
+const hiddenReminders = ref<CarReminder[]>([]);
+
+/**
+ * 车型切换后整理到期项：
+ * - 新车型不支持的项移入 hiddenReminders（数据保留）；
+ * - 之前因换车型被藏起来、现在又支持的项恢复出来；
+ * - 自行车自动改为「人力」，电瓶车避开「燃油」。
+ */
+function syncRemindersToType() {
+  const kept: FormReminder[] = [];
+  const dropped: CarReminder[] = [];
+  for (const r of form.reminders) {
+    if (cap.value.reminderKeys.includes(r.key || "CUSTOM")) {
+      kept.push(r);
+    } else {
+      dropped.push({ ...r });
+    }
+  }
+  const restored: FormReminder[] = [];
+  const stillHidden: CarReminder[] = [];
+  for (const r of hiddenReminders.value) {
+    if (cap.value.reminderKeys.includes(r.key || "CUSTOM")) {
+      restored.push({ ...r });
+    } else {
+      stillHidden.push(r);
+    }
+  }
+  form.reminders = [...kept, ...restored];
+  hiddenReminders.value = [...dropped, ...stillHidden];
+  const energy = normalizeEnergyType(form.vehicleType, form.energyType);
+  if (energy) form.energyType = energy as EnergyType;
+}
+
+const basicSummary = computed(() => {
+  const bits = [form.plateNo.trim()].filter(Boolean);
+  if (form.brand.trim() || form.model.trim()) {
+    bits.push([form.brand.trim(), form.model.trim()].filter(Boolean).join(" "));
+  }
+  return bits.join(" · ");
+});
+
+const reminderSummary = computed(() =>
+  form.reminders.length ? `${form.reminders.length} 项` : "未设置"
+);
+
+const peopleSummary = computed(() => {
+  if (form.ownerName) {
+    const owner = persons.value.find((p) => p.metadata.name === form.ownerName);
+    if (owner) return personTitle(owner);
+  }
+  return form.driverNames.length ? `${form.driverNames.length} 位驾驶人` : "";
+});
+
 // 附件库多选
 const libVisible = ref(false);
 const libLoading = ref(false);
@@ -677,8 +790,12 @@ function inspectionPreview() {
 }
 
 function focusRegisteredDate() {
-  registeredDateInput.value?.scrollIntoView({ behavior: "smooth", block: "center" });
-  registeredDateInput.value?.focus();
+  // 目标字段在折叠的「更多资料」里：<details> 收起时内容不可聚焦，必须先展开再等 DOM 更新
+  setSection("more", true);
+  void nextTick(() => {
+    registeredDateInput.value?.scrollIntoView({ behavior: "smooth", block: "center" });
+    registeredDateInput.value?.focus();
+  });
 }
 
 function syncChecked(r: FormReminder): boolean {
@@ -879,13 +996,25 @@ function saveDate(r: FormReminder): string | undefined {
 }
 
 function addReminder() {
+  // 默认给当前车型的第一个适用项：汽车 → 交强险，电瓶车/自行车 → 保养
+  const key = applicablePresets.value[0]?.key || "CUSTOM";
   form.reminders.push({
-    key: "INSURANCE_COMPULSORY",
+    key,
     date: "",
     enabled: true,
-    remindDays: presetDays("INSURANCE_COMPULSORY"),
-    repeatMonths: defaultRepeatMonths("INSURANCE_COMPULSORY"),
+    remindDays: presetDays(key),
+    repeatMonths: defaultRepeatMonths(key),
   });
+}
+
+/** 「设置」区未展开时，用一句人话概括提前天数与循环间隔 */
+function repeatLabel(r: FormReminder): string {
+  const months = effectiveRepeat(r);
+  if (months <= 0) return "不循环";
+  if (months === 12) return "每年";
+  if (months === 24) return "每两年";
+  if (months === 36) return "每三年";
+  return `每 ${months} 个月`;
 }
 
 function onReminderKeyChange(r: FormReminder) {
@@ -1204,7 +1333,9 @@ async function save() {
         sortOrder: props.car?.spec.sortOrder ?? 0,
         // 车辆级字段之外，保留非表单字段（如年检提示确认标记）
         inspectionNoticeAck: props.car?.spec.inspectionNoticeAck,
-        reminders: form.reminders.map((r) => ({
+        // 车型不适用的到期项不展示但也不丢：原样追加写回（它们已是存储格式，不再走表单派生逻辑）
+        reminders: [
+          ...form.reminders.map((r) => ({
           key: r.key || "CUSTOM",
           label: r.label?.trim() || undefined,
           date: saveDate(r),
@@ -1226,7 +1357,13 @@ async function save() {
           skippedForDate: r.skippedForDate || undefined,
           notifiedStages: r.notifiedStages || [],
           notifiedForDate: r.notifiedForDate || undefined,
-        })),
+          })),
+          // 被车型藏起来的项：原样写回（去掉仅界面用的字段）
+          ...hiddenReminders.value.map((r) => {
+            const { manualDate, syncInsurance, customRepeat, customMonths, originalDate, ...stored } = r as FormReminder;
+            return stored;
+          }),
+        ],
       },
     };
     if (props.car) {
@@ -1249,6 +1386,7 @@ watch(
   () => props.visible,
   async (v) => {
     if (!v) return;
+    initializing = true;
     void loadSettings();
     void loadAttachmentIndex();
     failedPhotoUrls.value = new Set();
@@ -1265,13 +1403,15 @@ watch(
         (r) => r.key === "INSURANCE_COMPULSORY" && r.enabled !== false
       );
       const compulsoryRawDate = compulsoryRaw?.date || "";
+      const loadedType = s.vehicleType || "SEDAN";
       Object.assign(form, {
         displayName: s.displayName || "",
         brand: s.brand || "",
         model: s.model || "",
         plateNo: s.plateNo || "",
-        vehicleType: s.vehicleType || "SEDAN",
-        energyType: s.energyType || "FUEL",
+        vehicleType: loadedType,
+        // 老数据兜底：电瓶车/自行车的能源类型可能存成默认的"燃油"，载入即归一到合理值
+        energyType: (normalizeEnergyType(loadedType, s.energyType) ?? s.energyType ?? "FUEL") as EnergyType,
         color: s.color || "",
         vin: s.vin || "",
         engineNo: s.engineNo || "",
@@ -1317,6 +1457,22 @@ watch(
     } else {
       Object.assign(form, empty());
     }
+    openRows.value = new Set();
+    // 载入完成后按车型整理一次：新车型不适用的历史项先收进 hiddenReminders（数据不丢）
+    syncRemindersToType();
+    initializing = false;
+  }
+);
+
+/**
+ * 车型切换：把不适用的到期项收起来、把恢复适用的放回来。
+ * 载入期间的赋值由上面的 syncRemindersToType() 统一处理，这里避免中途重复归档。
+ */
+watch(
+  () => form.vehicleType,
+  () => {
+    if (initializing) return;
+    syncRemindersToType();
   }
 );
 /** 在已保存的数据里定位这个到期项（弹窗内可能新增/删除过，按"项目 + 原到期日"匹配） */
@@ -1415,6 +1571,143 @@ async function refreshReminderRow(r: FormReminder, index: number) {
   font-weight: 600;
   color: #4f7cff;
   margin-top: 6px;
+}
+
+/* ---------- 分区折叠（1.2.8）：原生 <details>/<summary>，不依赖内联 display ---------- */
+.sec {
+  display: block;
+  flex: none;
+  min-height: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.sec-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  border: none;
+  background: #f8fafc;
+  padding: 9px 12px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  list-style: none;
+  user-select: none;
+}
+
+/* 去掉浏览器默认三角（Chrome / Firefox），改用 ::before 自绘 */
+.sec-head::-webkit-details-marker,
+.sec-head::marker {
+  display: none;
+  content: "";
+}
+
+.sec-head::before {
+  content: "▸";
+  color: #94a3b8;
+  font-size: 11px;
+  line-height: 1;
+  flex: none;
+  transition: transform 0.15s ease;
+}
+
+.sec[open] > .sec-head::before {
+  transform: rotate(90deg);
+}
+
+.sec-head:hover {
+  background: #f1f5f9;
+}
+
+.sec-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  flex: none;
+}
+
+.sec-sum {
+  margin-left: auto;
+  font-size: 12px;
+  color: #94a3b8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 55%;
+}
+
+.sec-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-top: 1px solid #eef2f7;
+}
+
+/* ---------- 到期项紧凑化（1.2.8）：一行看完项目/名称/日期/动作，细节收进「设置」 ---------- */
+.rr-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rr-item {
+  flex: 0 0 108px;
+}
+
+.rr-label {
+  flex: 1 1 130px;
+}
+
+.rr-date {
+  flex: 0 0 148px;
+}
+
+.rr-enabled {
+  flex: none;
+}
+
+.rr-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.rr-toggle {
+  align-self: flex-start;
+  border: none;
+  background: transparent;
+  color: #4f7cff;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rr-adv {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.insurer-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.insurer-row .input {
+  flex: 1 1 200px;
 }
 
 .row {

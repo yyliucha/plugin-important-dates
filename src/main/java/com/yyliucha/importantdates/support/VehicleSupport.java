@@ -101,6 +101,48 @@ public final class VehicleSupport {
         return REMINDER_LABELS.getOrDefault(key == null ? "" : key, "到期事项");
     }
 
+    // ---------- 车型能力（1.2.8）：与前端 console/src/utils/vehicle.ts 保持同一口径 ----------
+
+    /** 机动车适用的到期项（电瓶车/自行车没有保险、年检、车船税） */
+    private static final java.util.Set<String> MOTOR_KEYS = java.util.Set.of(
+        "INSURANCE_COMPULSORY", "INSURANCE_COMMERCIAL", "INSPECTION", "TAX", "MAINTENANCE"
+    );
+    /** 电瓶车 / 自行车：只有保养与自定义 */
+    private static final java.util.Set<String> LIGHT_KEYS = java.util.Set.of("MAINTENANCE", "CUSTOM");
+
+    /**
+     * 该车型是否适用某个到期项。
+     *
+     * <p>驾照换证属于「人」而非「车」，已从所有车型的座驾到期项中移除；
+     * 车型切换后残留的旧数据（如自行车下的交强险）不再参与提醒，但记录本身保留。
+     */
+    public static boolean supportsReminder(String vehicleType, String key) {
+        if (key == null || key.isBlank()) {
+            return false;
+        }
+        String type = vehicleType == null ? "" : vehicleType;
+        if ("EBIKE".equals(type) || "BICYCLE".equals(type)) {
+            return LIGHT_KEYS.contains(key);
+        }
+        return MOTOR_KEYS.contains(key);
+    }
+
+    /**
+     * 展示用能源类型纠偏（与前端 normalizeEnergyType 同一口径）：
+     * 自行车 → 人力；电瓶车 → 纯电；机动车若为「人力」（自行车改过来的残留）→ 燃油。
+     * 只用于展示，不改写已存数据。
+     */
+    public static String normalizeEnergyType(String vehicleType, String energy) {
+        String type = vehicleType == null ? "" : vehicleType;
+        if ("BICYCLE".equals(type)) {
+            return "HUMAN";
+        }
+        if ("EBIKE".equals(type)) {
+            return "EV";
+        }
+        return "HUMAN".equals(energy) ? "FUEL" : energy;
+    }
+
 /** 默认循环间隔（月）；0 表示不循环。年检走自动推算（见 nextInspection）。 */
     public static int defaultRepeatMonths(String key) {
         if (key == null) {

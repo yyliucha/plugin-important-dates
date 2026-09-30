@@ -295,7 +295,7 @@
               </div>
               <div class="car-sub">
                 {{ carTypeLabel(c) }}<template v-if="c.spec.brand || c.spec.model"> · {{ [c.spec.brand, c.spec.model].filter(Boolean).join(" ") }}</template>
-                <template v-if="c.spec.energyType"> · {{ energyLabel(c.spec.energyType) }}</template>
+                <template v-if="energyLabelFor(c.spec.vehicleType, c.spec.energyType)"> · {{ energyLabelFor(c.spec.vehicleType, c.spec.energyType) }}</template>
               </div>
               <div class="car-sub">
                 车牌：{{ c.spec.plateNo || "—" }}
@@ -494,80 +494,6 @@
       @saved="onCarSaved"
     />
 
-    <!-- ================= 操作日志 ================= -->
-    <VModal :visible="logVisible" title="操作日志" width="760" @close="logVisible = false">
-      <!-- 保持单一 table 结构：内容分支只发生在 tbody 内，避免弹窗过渡/滚动条初始化期间
-           切换节点导致 Vue insertBefore 报错（NotFoundError） -->
-      <table class="dates-table">
-        <thead>
-          <tr>
-            <th style="width: 24%">时间</th>
-            <th style="width: 12%">操作</th>
-            <th style="width: 18%">目标</th>
-            <th>详情</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="logError">
-            <td colspan="4" class="log-state">{{ logError }}</td>
-          </tr>
-          <template v-else-if="!logs.length">
-            <tr>
-              <td colspan="4" class="log-empty">
-                <div class="log-empty-title">暂无操作日志</div>
-                <div class="log-empty-sub">新增、编辑、删除重要日期或人员后，这里会记录明细。</div>
-              </td>
-            </tr>
-          </template>
-          <template v-else>
-            <tr v-for="log in logs" :key="log.metadata.name">
-              <td>{{ formatTime(log.metadata.creationTimestamp) }}</td>
-              <td>
-                <span
-                  class="log-action"
-                  :class="`log-action-${(log.spec.action || 'CREATE').toLowerCase()}`"
-                >
-                  {{ logActionText(log.spec.action) }}
-                </span>
-              </td>
-              <td>{{ log.spec.targetTitle || "—" }}</td>
-              <td><span class="note">{{ log.spec.detail || "—" }}</span></td>
-            </tr>
-          </template>
-        </tbody>
-      </table>
-      <div v-if="logsTotal > 0" class="log-pager">
-        <VSpace>
-          <VButton size="sm" :disabled="logsPage <= 1" @click="changeLogPage(logsPage - 1)">上一页</VButton>
-          <span class="muted">第 {{ logsPage }} / {{ logsTotalPages }} 页 · 共 {{ logsTotal }} 条</span>
-          <VButton size="sm" :disabled="logsPage >= logsTotalPages" @click="changeLogPage(logsPage + 1)">下一页</VButton>
-        </VSpace>
-      </div>
-    </VModal>
-
-    <!-- ================= 自检 ================= -->
-    <VModal :visible="selfCheckVisible" title="记得 · 自检" width="640" @close="selfCheckVisible = false">
-      <div class="form">
-        <div v-if="selfChecking" class="hint">正在自检…</div>
-        <template v-else>
-          <div v-for="(item, idx) in selfCheckItems" :key="idx" class="check-row">
-            <span class="check-level" :class="`check-${item.level}`">{{ item.level === "ok" ? "✓" : item.level === "warn" ? "!" : "✕" }}</span>
-            <div class="check-body">
-              <div class="check-label">{{ item.label }}</div>
-              <div class="check-value">{{ item.value }}</div>
-              <div v-if="item.hint" class="hint">{{ item.hint }}</div>
-            </div>
-          </div>
-          <div class="hint">检查时间：{{ selfCheckedAt }}（只读检查，不修改任何数据）</div>
-        </template>
-      </div>
-      <template #footer>
-        <VSpace>
-          <VButton @click="selfCheckVisible = false">关闭</VButton>
-          <VButton type="secondary" :loading="selfChecking" @click="openSelfCheck">重新自检</VButton>
-        </VSpace>
-      </template>
-    </VModal>
     <!-- ================= 导入 ================= -->
     <VModal :visible="importModalVisible" title="导入数据" width="560" @close="closeImportModal">
       <div v-if="!importResult" class="form">
@@ -654,7 +580,6 @@ import {
   fetchPluginJsonConfig,
   listCars,
   listImportantDates,
-  listOperationLogs,
   listPersons,
   patchCar,
   patchImportantDate,
@@ -663,18 +588,16 @@ import {
   updateCar,
   updateImportantDate,
   updatePerson,
-  writeOperationLog,
 } from "@/api";
 import CarFormModal from "@/components/CarFormModal.vue";
 import PersonFormModal from "@/components/PersonFormModal.vue";
 import SunLunarPicker from "@/components/SunLunarPicker.vue";
-import type { Car, CarReminder, DateType, ImportantDate, LogAction, LogTargetType, OperationLog, Person } from "@/types";
+import type { Car, CarReminder, DateType, ImportantDate, Person } from "@/types";
 import { VEHICLE_TYPES } from "@/types";
 import { lunarMonthDayText, nextSolarDate } from "@/utils/lunar";
-import { type InspectionNotice, inspectionNotice, resolveDueDate, startOfToday } from "@/utils/vehicle";
+import { type InspectionNotice, energyLabelFor, inspectionNotice, resolveDueDate, startOfToday, vehicleSupportsReminder } from "@/utils/vehicle";
 import { fetchLivePermalinks, isBrokenLocalImage } from "@/utils/attachmentLibrary";
 import { thumbUrl } from "@/utils/image";
-import { type CheckItem, runSelfCheck } from "@/utils/selfCheck";
 import { type ReminderStatus, stageTextOf, statusOf } from "@/utils/reminderState";
 import { isDoneThisCycle, markReminderDone, restoreReminder, skipReminder, undoReminderDone } from "@/utils/reminderActions";
 
@@ -695,11 +618,6 @@ const carModalVisible = ref(false);
 const editingCar = ref<Car | null>(null);
 
 const personFilter = ref("");
-
-const logVisible = ref(false);
-const logLoading = ref(false);
-const logError = ref("");
-const logs = ref<OperationLog[]>([]);
 
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const importModalVisible = ref(false);
@@ -864,17 +782,6 @@ function carIcon(c: Car): string {
   return carTypeInfo(c.spec.vehicleType).icon;
 }
 
-function energyLabel(type?: string): string {
-  const map: Record<string, string> = {
-    FUEL: "燃油",
-    EV: "纯电",
-    PHEV: "插电混动",
-    HEV: "油电混动",
-    HUMAN: "人力",
-  };
-  return map[type || ""] || "燃油";
-}
-
 function carCover(c: Car): string | undefined {
   const photos = c.spec.photos || [];
   if (!photos.length) return undefined;
@@ -987,6 +894,8 @@ function carEventsOf(c: Car): {
   for (let idx = 0; idx < reminders.length; idx++) {
     const r = reminders[idx];
     if (r.enabled === false) continue;
+    // 与后端 VehicleSupport.supportsReminder 同一口径：车型不适用的项（如自行车下的旧交强险）不参与提醒，记录保留
+    if (!vehicleSupportsReminder(c.spec.vehicleType, r.key)) continue;
     // 与后端 ImportantDateFinderImpl.resolveDueDate 同一口径：循环间隔 0 = 不滚动，年检按规则推算
     const resolved = resolveDueDate(r, {
       registeredDate: registrationBase,
@@ -1106,13 +1015,6 @@ async function dismissInspectionNotice(item: { car: Car; notice: InspectionNotic
     await patchCar(item.car.metadata.name, [{ op: "add", path: "/spec/inspectionNoticeAck", value: item.notice.key }]);
     item.car.spec.inspectionNoticeAck = item.notice.key;
     Toast.success("已确认，不再提示");
-    await appendLog(
-      "UPDATE",
-      item.car.spec.displayName,
-      item.car.metadata.name,
-      `确认年检规则提示（${item.notice.key === "YEARLY" ? "每年上线检验" : "上线检验期"}）`,
-      "CAR"
-    );
   } catch (error) {
     Toast.error(`操作失败：${describeError(error)}`);
   }
@@ -1237,13 +1139,6 @@ function openCarEdit(c: Car) {
 
 async function onCarSaved() {
   const c = editingCar.value;
-  await appendLog(
-    c ? "UPDATE" : "CREATE",
-    c?.spec.displayName || "座驾",
-    c?.metadata.name || "",
-    c ? "编辑座驾信息" : "新增座驾",
-    "CAR"
-  );
   await load();
 }
 
@@ -1258,7 +1153,6 @@ function removeCar(c: Car) {
         await deleteCar(c.metadata.name);
         cars.value = cars.value.filter((x) => x.metadata.name !== c.metadata.name);
         Toast.success("已删除");
-        await appendLog("DELETE", c.spec.displayName, c.metadata.name, "删除座驾", "CAR");
         await load();
       } catch (error) {
         Toast.error(`删除失败：${describeError(error)}`);
@@ -1272,13 +1166,6 @@ async function toggleCarVisible(c: Car, visibleValue: boolean) {
     await patchCar(c.metadata.name, [{ op: "add", path: "/spec/visible", value: visibleValue }]);
     c.spec.visible = visibleValue;
     Toast.success(visibleValue ? "已在前台展示（车牌会自动打码）" : "已取消前台展示");
-    await appendLog(
-      "UPDATE",
-      c.spec.displayName,
-      c.metadata.name,
-      visibleValue ? "开启前台展示" : "关闭前台展示",
-      "CAR"
-    );
   } catch (error) {
     Toast.error(`操作失败：${describeError(error)}`);
     await load();
@@ -1298,13 +1185,6 @@ function openPersonEdit(p: Person) {
 
 async function onPersonSaved() {
   const p = editingPerson.value;
-  await appendLog(
-    p ? "UPDATE" : "CREATE",
-    personTitleBy(p?.metadata.name || ""),
-    p?.metadata.name || "",
-    p ? `编辑人员信息` : "新增人员",
-    "PERSON"
-  );
   await load();
 }
 
@@ -1323,7 +1203,6 @@ function removePerson(p: Person) {
         // 立即从本地列表移除（Halo 软删除后索引清理存在微小延迟，避免依赖时序）
         persons.value = persons.value.filter((x) => x.metadata.name !== p.metadata.name);
         Toast.success("已删除");
-        await appendLog("DELETE", p.spec.displayName, p.metadata.name, "删除人员", "PERSON");
         await load();
       } catch (error) {
         Toast.error(`删除失败：${describeError(error)}`);
@@ -1489,12 +1368,6 @@ function remindText(item: ImportantDate): string {
 async function toggleDateVisible(item: ImportantDate, visibleValue: boolean) {
   try {
     await patchImportantDate(item.metadata.name, [{ op: "add", path: "/spec/visible", value: visibleValue }]);
-    await appendLog(
-      "UPDATE",
-      item.spec.title,
-      item.metadata.name,
-      visibleValue ? "开启前台展示" : "关闭前台展示"
-    );
     await load();
   } catch (error) {
     Toast.error(`切换失败：${describeError(error)}`);
@@ -1505,12 +1378,6 @@ async function toggleDateVisible(item: ImportantDate, visibleValue: boolean) {
 async function togglePersonVisible(p: Person, visibleValue: boolean) {
   try {
     await patchPerson(p.metadata.name, [{ op: "add", path: "/spec/visible", value: visibleValue }]);
-    await appendLog(
-      "UPDATE",
-      p.spec.displayName,
-      p.metadata.name,
-      visibleValue ? "开启前台展示" : "关闭前台展示"
-    );
     await load();
   } catch (error) {
     Toast.error(`切换失败：${describeError(error)}`);
@@ -1518,20 +1385,6 @@ async function togglePersonVisible(p: Person, visibleValue: boolean) {
   }
 }
 
-// ---------- 操作日志 ----------
-async function appendLog(
-  action: LogAction,
-  targetTitle: string,
-  targetName: string,
-  detail: string,
-  targetType: LogTargetType = "DATE"
-) {
-  try {
-    await writeOperationLog(action, targetTitle, targetName, detail, targetType);
-  } catch {
-    // 日志写入失败不影响主流程
-  }
-}
 
 function summaryOf(spec: ImportantDate["spec"]): string {
   const persons = (spec.personNames || [])
@@ -1616,11 +1469,9 @@ async function save() {
       const oldItem = dates.value.find((d) => d.metadata.name === editingName.value);
       await updateImportantDate(payload);
       Toast.success("已保存");
-      await appendLog("UPDATE", payload.spec.title, payload.metadata.name, diffOf(oldItem?.spec, payload.spec));
     } else {
       await createImportantDate(payload);
       Toast.success("已新增");
-      await appendLog("CREATE", payload.spec.title, payload.metadata.name, summaryOf(payload.spec));
     }
     closeModal();
     await load();
@@ -1643,7 +1494,6 @@ function remove(item: ImportantDate) {
         // 立即从本地列表移除（Halo 软删除后索引清理存在微小延迟，避免依赖时序）
         dates.value = dates.value.filter((d) => d.metadata.name !== item.metadata.name);
         Toast.success("已删除");
-        await appendLog("DELETE", item.spec.title, item.metadata.name, summaryOf(item.spec));
         await load();
       } catch (error) {
         Toast.error(`删除失败：${describeError(error)}`);
@@ -1862,7 +1712,6 @@ async function doImport() {
           spec: item.spec,
         });
         carsImported++;
-        await appendLog("CREATE", created.spec.displayName, created.metadata.name, "导入：新增座驾", "CAR");
       } catch (error) {
         carsFailed++;
         fail("座驾", item, error);
@@ -1879,7 +1728,6 @@ async function doImport() {
           spec: item.spec,
         });
         personsImported++;
-        await appendLog("CREATE", created.spec.displayName, created.metadata.name, "导入：新增人员");
       } catch (error) {
         personsFailed++;
         fail("人员", item, error);
@@ -1896,7 +1744,6 @@ async function doImport() {
           spec: item.spec,
         });
         imported++;
-        await appendLog("CREATE", created.spec.title, created.metadata.name, `导入：${summaryOf(created.spec)}`);
       } catch (error) {
         failed++;
         fail("重要日期", item, error);
@@ -1931,76 +1778,6 @@ function closeImportModal() {
   importItems.value = [];
   personImportItems.value = [];
   carImportItems.value = [];
-}
-
-// ---------- 自检（1.2.5） ----------
-const selfCheckVisible = ref(false);
-const selfChecking = ref(false);
-const selfCheckItems = ref<CheckItem[]>([]);
-const selfCheckedAt = ref("");
-
-async function openSelfCheck() {
-  selfCheckVisible.value = true;
-  selfChecking.value = true;
-  try {
-    const result = await runSelfCheck({
-      dates: dates.value,
-      persons: persons.value,
-      cars: cars.value,
-      remindDays: remindConfig.value.remindDays,
-      backendReminder: remindConfig.value.backendReminder,
-    });
-    selfCheckItems.value = result.items;
-    selfCheckedAt.value = result.checkedAt;
-  } catch (error) {
-    selfCheckItems.value = [{ label: "自检失败", value: describeError(error), level: "error" }];
-  } finally {
-    selfChecking.value = false;
-  }
-}
-// ---------- 日志弹窗（分页） ----------
-const LOG_PAGE_SIZE = 20;
-const logsPage = ref(1);
-const logsTotal = ref(0);
-const logsTotalPages = computed(() => Math.max(1, Math.ceil(logsTotal.value / LOG_PAGE_SIZE)));
-
-async function loadLogs(page: number) {
-  logLoading.value = true;
-  logError.value = "";
-  try {
-    const result = await listOperationLogs(page, LOG_PAGE_SIZE);
-    logs.value = result.items;
-    logsTotal.value = result.total;
-    logsPage.value = page;
-  } catch (error) {
-    logError.value = `日志加载失败：${(error as Error)?.message || "请稍后重试"}`;
-  } finally {
-    logLoading.value = false;
-  }
-}
-
-async function openLogs() {
-  // 先加载数据再打开弹窗：内容在弹窗打开前定型，避免打开动画期间切换节点
-  await loadLogs(1);
-  logVisible.value = true;
-}
-
-function changeLogPage(page: number) {
-  if (page < 1 || page > logsTotalPages.value) return;
-  void loadLogs(page);
-}
-
-function logTheme(action: LogAction): "primary" | "secondary" | "danger" {
-  return action === "CREATE" ? "primary" : action === "UPDATE" ? "secondary" : "danger";
-}
-
-function logActionText(action: LogAction): string {
-  return action === "CREATE" ? "新增" : action === "UPDATE" ? "编辑" : "删除";
-}
-
-function formatTime(iso?: string): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString("zh-CN", { hour12: false });
 }
 </script>
 
@@ -2181,53 +1958,6 @@ function formatTime(iso?: string): string {
   cursor: pointer;
 }
 
-.log-state {
-  padding: 48px 0;
-  text-align: center;
-  color: #6b7280;
-  font-size: 14px;
-}
-
-.log-empty {
-  padding: 48px 0;
-  text-align: center;
-}
-
-.log-empty-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #374151;
-}
-
-.log-empty-sub {
-  margin-top: 6px;
-  font-size: 13px;
-  color: #9ca3af;
-}
-
-.log-action {
-  display: inline-block;
-  font-size: 12px;
-  line-height: 1.6;
-  border-radius: 999px;
-  padding: 1px 10px;
-}
-
-.log-action-create {
-  background: #eef2ff;
-  color: #4338ca;
-}
-
-.log-action-update {
-  background: #f0fdf4;
-  color: #15803d;
-}
-
-.log-action-delete {
-  background: #fef2f2;
-  color: #b91c1c;
-}
-
 .form {
   display: flex;
   flex-direction: column;
@@ -2321,12 +2051,6 @@ function formatTime(iso?: string): string {
   vertical-align: middle;
   margin-right: 8px;
   box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.2);
-}
-
-.log-pager {
-  margin-top: 12px;
-  display: flex;
-  justify-content: flex-end;
 }
 
 .person-avatar-char {
@@ -2517,49 +2241,6 @@ function formatTime(iso?: string): string {
 }
 
 /* 自检面板（1.2.5） */
-.check-row {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  padding: 8px 0;
-  border-bottom: 1px solid #f1f5f9;
-}
-
-.check-level {
-  flex: none;
-  width: 20px;
-  height: 20px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.check-ok {
-  background: #ecfdf5;
-  color: #047857;
-}
-
-.check-warn {
-  background: #fffbeb;
-  color: #b45309;
-}
-
-.check-error {
-  background: #fef2f2;
-  color: #b91c1c;
-}
-
-.check-label {
-  font-weight: 600;
-}
-
-.check-value {
-  font-size: 13px;
-  color: #475569;
-}
 /* 到期项状态（1.2.6）：待处理 / 已办 / 已忽略 */
 .car-event.todo {
   background: #fff7ed;

@@ -4,7 +4,7 @@
  * 一切状态变化都由用户指令触发；写入走 1.2.5 统一的 JSON Patch 通道
  * （只改变化字段、带 429/5xx 退避重试），不整对象覆盖。
  */
-import { patchCar, patchImportantDate, type PatchOp, writeOperationLog } from "@/api";
+import { patchCar, patchImportantDate, type PatchOp } from "@/api";
 import type { Car } from "@/types";
 import { addMonths, defaultRepeatMonths, formatYmd, parseYmd, resolveDueDate, startOfToday } from "@/utils/vehicle";
 
@@ -68,7 +68,6 @@ export async function markReminderDone(car: Car, reminderIndex: number, displayL
     { op: "add", path: "/skippedForDate", value: "" },
   ];
   let detail = "已办";
-  let logDetail = detail;
   // 保养类：语义是"我刚保养完" —— 更新上次保养日期，并按保养间隔推算下次到期
   const interval = r.intervalMonths != null ? Number(r.intervalMonths) : 0;
   if (r.key === "MAINTENANCE" && interval > 0) {
@@ -81,8 +80,6 @@ export async function markReminderDone(car: Car, reminderIndex: number, displayL
     ops.push({ op: "add", path: "/ackState", value: "PENDING" });
     await patchCar(car.metadata.name, basePatch(reminderIndex, ops));
     const detailText = `保养记好啦 ✅ 下次保养时间是 ${cnDate(formatYmd(next))}${yearHint(formatYmd(next))}`;
-    const logText = `刚做完保养：上次保养日期更新为 ${cnDate(formatYmd(today))}，下次保养时间 ${cnDate(formatYmd(next))}（保养间隔 ${interval} 个月）`;
-    await writeOperationLog("UPDATE", `${car.spec.displayName} · ${displayLabel}`, car.metadata.name, logText, "CAR");
     return detailText;
   }
   if (months > 0) {
@@ -94,21 +91,12 @@ export async function markReminderDone(car: Car, reminderIndex: number, displayL
     // 记录"顺延到哪天"：本期已办过 → 按钮改为「撤销顺延」，防止同一期被反复点击滚到很远的年份
     ops.push({ op: "add", path: "/lastDoneTo", value: nextText });
     detail = `办好了 ✅ 下次到期时间是 ${cnDate(nextText)}${yearHint(nextText)}`;
-    logDetail = `已办：按 ${months} 个月的周期顺延，到期日 ${cnDate(from)} 顺延到 ${cnDate(nextText)}`;
   } else {
     // 一次性项：办完即完成
     ops.push({ op: "add", path: "/ackState", value: "DONE" });
     detail = "办好了 ✅ 这项以后不会再提醒你";
-    logDetail = `已办：一次性事项已完成，不再提醒（原来到期日是 ${cnDate(from)}）`;
   }
   await patchCar(car.metadata.name, basePatch(reminderIndex, ops));
-  await writeOperationLog(
-    "UPDATE",
-    `${car.spec.displayName} · ${displayLabel}`,
-    car.metadata.name,
-    detail,
-    "CAR"
-  );
   return detail;
 }
 
@@ -122,13 +110,6 @@ export async function skipReminder(car: Car, reminderIndex: number, displayLabel
       { op: "add", path: "/skippedForDate", value: from },
     ])
   );
-  await writeOperationLog(
-    "UPDATE",
-    `${car.spec.displayName} · ${displayLabel}`,
-    car.metadata.name,
-    `本周期忽略提醒（到期日 ${from || "—"}）`,
-    "CAR"
-  );
 }
 
 /** 恢复：撤销忽略 / 撤销"已完成"。 */
@@ -140,19 +121,11 @@ export async function restoreReminder(car: Car, reminderIndex: number, displayLa
       { op: "add", path: "/skippedForDate", value: "" },
     ])
   );
-  await writeOperationLog(
-    "UPDATE",
-    `${car.spec.displayName} · ${displayLabel}`,
-    car.metadata.name,
-    "恢复提醒",
-    "CAR"
-  );
 }
 
 /** 纪念日：忽略 / 恢复（纪念日不会逾期，只有"本周期不再提示"） */
 export async function skipDateReminder(name: string, title: string): Promise<void> {
   await patchImportantDate(name, [{ op: "add", path: "/spec/notifiedForDate", value: "__skipped__" }]);
-  await writeOperationLog("UPDATE", title, name, "本周期忽略提醒", "DATE");
 }
 
 export async function restoreDateReminder(name: string, title: string): Promise<void> {
@@ -160,7 +133,6 @@ export async function restoreDateReminder(name: string, title: string): Promise<
     { op: "add", path: "/spec/notifiedForDate", value: "" },
     { op: "add", path: "/spec/notifiedStages", value: [] },
   ]);
-  await writeOperationLog("UPDATE", title, name, "恢复提醒", "DATE");
 }
 
 /**
@@ -187,18 +159,7 @@ export async function undoReminderDone(car: Car, reminderIndex: number, displayL
       { op: "add", path: "/skippedForDate", value: "" },
     ])
   );
-  await writeOperationLog(
-    "UPDATE",
-    `${car.spec.displayName} · ${displayLabel}`,
-    car.metadata.name,
-    `已撤销办理：到期日从 ${cnDate(from2Text(r.lastDoneTo))} 还原为 ${cnDate(restore)}`,
-    "CAR"
-  );
   return `已撤销 ✅ 到期日回到 ${cnDate(restore)}${yearHint(restore)}`;
-}
-
-function from2Text(value?: string): string {
-  return value && value.trim() ? value : "—";
 }
 
 /** 本期是否已经办过（顺延后的日期就是当前生效的到期日） */

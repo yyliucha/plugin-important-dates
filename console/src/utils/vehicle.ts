@@ -61,6 +61,89 @@ export function syncableKey(key?: string): boolean {
   return key === "INSPECTION" || key === "TAX";
 }
 
+// ---------- 车型能力（1.2.8）：按「有没有发动机 / 有没有牌照」分档，决定表单显示哪些字段与到期项 ----------
+
+export interface VehicleCapability {
+  /** 有发动机：显示能源类型、车架号 VIN、发动机号 */
+  hasEngine: boolean;
+  /** 有机动车号牌：显示车牌号 */
+  hasPlate: boolean;
+  /** 走机动车管理：有保险 / 年检 / 车船税 */
+  isMotorVehicle: boolean;
+  /** 记里程：人力车没有里程概念 */
+  tracksMileage: boolean;
+  /** 可选的到期项模板 key（按 REMINDER_PRESETS 的顺序过滤，未列出的不显示） */
+  reminderKeys: string[];
+}
+
+/**
+ * 三轮/四轮机动车（保险、年检、车船税齐全）。
+ * 注意：驾照换证是「人」的事、不是车的事（同一人开两辆车会重复提醒），已从座驾到期项中移除；
+ * 老数据里已有的 LICENSE 项会走「保留但不展示」（见 CarFormModal 的 hiddenReminders）。
+ */
+const MOTOR_KEYS = ["INSURANCE_COMPULSORY", "INSURANCE_COMMERCIAL", "INSPECTION", "TAX", "MAINTENANCE"];
+/** 电瓶车：多数地区不需要保险与年检，按当地规定可自定义 */
+const EBIKE_KEYS = ["MAINTENANCE", "CUSTOM"];
+/** 自行车：只有保养（刹车/链条/轮胎）值得记 */
+const BICYCLE_KEYS = ["MAINTENANCE", "CUSTOM"];
+
+export function vehicleCapability(type?: string | null): VehicleCapability {
+  switch (type || "") {
+    case "EBIKE":
+      return { hasEngine: true, hasPlate: true, isMotorVehicle: false, tracksMileage: true, reminderKeys: EBIKE_KEYS };
+    case "BICYCLE":
+      return { hasEngine: false, hasPlate: false, isMotorVehicle: false, tracksMileage: false, reminderKeys: BICYCLE_KEYS };
+    default:
+      // 汽车、摩托车、货车、客车等一律按机动车处理
+      return { hasEngine: true, hasPlate: true, isMotorVehicle: true, tracksMileage: true, reminderKeys: MOTOR_KEYS };
+  }
+}
+
+/** 该车型是否适用某个到期项（不适用 = 表单不显示；已有数据保留但不展示） */
+export function vehicleSupportsReminder(type: string | null | undefined, key?: string): boolean {
+  return !!key && vehicleCapability(type).reminderKeys.includes(key);
+}
+
+/**
+ * 车型对应的合理能源类型（用于切换车型时的兜底）：
+ * - 自行车 → 人力；电瓶车 → 纯电；
+ * - 机动车（汽车/摩托等）→ 若当前是"人力"则回到"燃油"。
+ * 返回 null 表示该车型对能源没有强制要求（保持用户当前选择）。
+ */
+export function normalizeEnergyType(type: string | null | undefined, energy?: string | null): string | null {
+  if (type === "BICYCLE") return "HUMAN";
+  // 电瓶车只有纯电：任何内燃机相关的值（或空值）都归一到纯电
+  if (type === "EBIKE") return energy === "EV" ? null : "EV";
+  // 机动车挂着"人力"是自行车改过来的残留，回到燃油；其余保持不动
+  return energy === "HUMAN" ? "FUEL" : null;
+}
+
+/** 能源类型是否由车型锁死（电瓶车=纯电、自行车=人力） */
+export function isEnergyLocked(type?: string | null): boolean {
+  return type === "EBIKE" || type === "BICYCLE";
+}
+
+/** 能源类型显示名；无值时不给"燃油"这种会误导的兜底（自行车不应显示燃油） */
+export function energyLabelOf(energy?: string | null): string {
+  const labels: Record<string, string> = {
+    FUEL: "燃油",
+    EV: "纯电",
+    PHEV: "插电混动",
+    HEV: "油电混动",
+    HUMAN: "人力",
+  };
+  return labels[energy || ""] || "";
+}
+
+/**
+ * 展示用能源标签：按车型纠偏后再取名字。
+ * 老数据的 energyType 常是默认的 "FUEL"（自行车/电瓶车都会中招），
+ * 这里在**展示时**按车型规则纠偏，不去改写用户已存的数据。
+ */
+export function energyLabelFor(type: string | null | undefined, energy?: string | null): string {
+  return energyLabelOf(normalizeEnergyType(type, energy) ?? energy);
+}
+
 /** 保险类到期项（可填保单号、可单独指定保险公司） */
 export function insuranceKey(key?: string): boolean {
   return key === "INSURANCE_COMPULSORY" || key === "INSURANCE_COMMERCIAL";
@@ -292,5 +375,6 @@ export function resolveDueDate(
     return { date: next.date, phase: next.phase, rule: next.rule };
   }
   if (!due) return null;
-  // 1.2.6：不再自动滚动 —— 过期即逾期，直到用户点「已办」才顺延（与后端同一口径）  return { date: formatYmd(due) };
+  // 1.2.6：不再自动滚动 —— 过期即逾期，直到用户点「已办」才顺延（与后端同一口径）
+  return { date: formatYmd(due) };
 }
