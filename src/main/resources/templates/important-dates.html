@@ -401,13 +401,6 @@
         });
       })();
     </script>
-
-    <!-- 悬浮提示数据（本页面渲染时算好；外部脚本 reminder-toast.js 读取后弹出）。
-         用 JSON 数据块承载，不作为可执行内联脚本；写入的节点已在服务端标记"已提醒"。
-         注意：必须放在 th:fragment="content" 内部 —— 本页整体 th:replace 到主题 layout，
-         只渲染 ::head 与 ::content 两个片段，片段之外的内容会被静默丢弃。 -->
-    <script type="application/json" id="id-toast-data" th:if="${toastPayloadJson != null}"
-            th:utext="${toastPayloadJson}"></script>
   </th:block>
 </html>
 

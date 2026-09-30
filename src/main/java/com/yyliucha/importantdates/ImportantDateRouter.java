@@ -58,6 +58,73 @@ public class ImportantDateRouter {
         }
     }
 
+    // ---------- 悬浮提示的"同一浏览器只弹一次"（cookie 记录已交付的条目指纹） ----------
+
+    /** 访客无法写库（上报接口是 403），所以同一浏览器的去重放在 cookie 里；跨设备由库里的 notifiedStages 负责。 */
+    private static final String TOAST_SEEN_COOKIE = "id-toast-seen";
+    /** cookie 里最多保留多少条指纹（防止无限增长） */
+    private static final int TOAST_SEEN_MAX = 20;
+
+    /** cookie 里的分隔符：不能用逗号（RFC2616 cookie 值不允许 ','，会被容器直接拒绝） */
+    private static final String TOAST_SEEN_SEP = "|";
+
+    /**
+     * 条目指纹：内容变了就视为新提醒（换周期 / 改了到期日 / 文案变了都会重新弹）。
+     * 不含 stageCode —— 否则同一条提醒在不同节点会被当成不同内容，一天弹好几次。
+     */
+    private static String toastSignature(Map<String, Object> m) {
+        String kind = String.valueOf(m.get("type"));
+        String who = "date".equals(kind)
+            ? String.valueOf(m.get("name"))
+            : String.valueOf(m.get("carId")) + "#" + String.valueOf(m.get("reminderIndex"));
+        return Integer.toHexString((kind + "|" + who + "|" + String.valueOf(m.get("date")) + "|"
+            + String.valueOf(m.get("text"))).hashCode());
+    }
+
+    private static boolean seenCookie(org.springframework.web.reactive.function.server.ServerRequest request,
+        String sig) {
+        return cookieSigs(request).contains(sig);
+    }
+
+    /** 已交付过的指纹（按出现顺序） */
+    private static java.util.LinkedHashSet<String> cookieSigs(
+        org.springframework.web.reactive.function.server.ServerRequest request) {
+        java.util.LinkedHashSet<String> set = new java.util.LinkedHashSet<>();
+        var cookie = request.cookies().getFirst(TOAST_SEEN_COOKIE);
+        if (cookie == null || cookie.getValue() == null || cookie.getValue().isBlank()) {
+            return set;
+        }
+        for (String part : cookie.getValue().split("\\" + TOAST_SEEN_SEP)) {
+            String v = part.trim();
+            if (!v.isEmpty()) {
+                set.add(v);
+            }
+        }
+        return set;
+    }
+
+    /**
+     * 合并写入：保留浏览器已有的指纹，再追加本次交付的；超出上限时丢最旧的。
+     * （不能用本次的列表直接覆盖，否则之前弹过的条目会因为指纹丢失而重新弹。）
+     */
+    private static org.springframework.http.ResponseCookie deliveryCookie(
+        org.springframework.web.reactive.function.server.ServerRequest request,
+        java.util.List<String> sigs) {
+        java.util.LinkedHashSet<String> all = cookieSigs(request);
+        all.addAll(sigs);
+        while (all.size() > TOAST_SEEN_MAX) {
+            var it = all.iterator();
+            it.next();
+            it.remove();
+        }
+        return org.springframework.http.ResponseCookie.from(TOAST_SEEN_COOKIE,
+                String.join(TOAST_SEEN_SEP, all.toArray(new String[0])))
+            .path("/")
+            .maxAge(java.time.Duration.ofDays(30))
+            .sameSite("Lax")
+            .build();
+    }
+
     public ImportantDateRouter(ImportantDateFinder importantDateFinder,
         ReactiveSettingFetcher settingFetcher,
         TemplateNameResolver templateNameResolver,
@@ -122,75 +189,10 @@ public class ImportantDateRouter {
                                 model.put("showImportantTag", cfg.showImportantTag());
                                 model.put("allowDismiss", cfg.allowDismiss());
                                 model.put("frontendShowOverdue", cfg.frontendShowOverdue());
-                                // 悬浮提示要弹的项：在本页面渲染时算好并标记"已提醒"。
-                                // 客户端上报接口（/important-dates-reminder-seen）对匿名访客是 403
-                                // —— Halo 默认只放行插件路由的 GET，POST 需要角色/权限模板
-                                // （见 docs.halo.run 插件安全 → 角色模板），而提醒记录必须写库才能
-                                // 跨设备只弹一次，所以标记留在服务端；脚本改用 data 块里带过来的
-                                // 这份数据（页面 HTML 本身仍不写提醒文案，避免页面缓存导致弹旧内容）。
-                                java.util.List<Map<String, Object>> toastItems = new java.util.ArrayList<>();
-                                List<CarVo.CarEventVo> carToNotify = new java.util.ArrayList<>();
-                                for (CarVo.CarEventVo e : allEvents) {
-                                    if (!"PENDING".equals(e.getStatus()) || e.getStageCode() == null
-                                        || e.isStageNotified()) {
-                                        continue;
-                                    }
-                                    if (!cfg.frontendShowOverdue() && e.getDaysUntil() < 0) {
-                                        continue;
-                                    }
-                                    Map<String, Object> item = new LinkedHashMap<>();
-                                    item.put("type", "car");
-                                    item.put("carName", e.getCarName());
-                                    item.put("carIcon", e.getCarIcon());
-                                    item.put("title", e.getCarName() == null || e.getCarName().isBlank()
-                                        ? e.getLabel() : e.getCarName() + " · " + e.getLabel());
-                                    item.put("label", e.getLabel());
-                                    item.put("daysUntil", e.getDaysUntil());
-                                    item.put("dateText", e.getDateText());
-                                    item.put("overdue", e.isOverdue());
-                                    item.put("stageCode", e.getStageCode());
-                                    item.put("text", e.getStageText());
-                                    toastItems.add(item);
-                                    carToNotify.add(e);
-                                }
-                                List<ImportantDateVo> dateToNotify = new java.util.ArrayList<>();
-                                for (ImportantDateVo d : allDates) {
-                                    if (d.getStageCode() == null || d.isStageNotified()) {
-                                        continue;
-                                    }
-                                    Map<String, Object> item = new LinkedHashMap<>();
-                                    item.put("type", "date");
-                                    item.put("title", d.getTitle());
-                                    item.put("daysUntil", d.getDaysUntil());
-                                    item.put("dateText", d.getDateText());
-                                    item.put("nextSolarDate", d.getNextSolarDate());
-                                    item.put("stageCode", d.getStageCode());
-                                    item.put("text", d.getStageText());
-                                    toastItems.add(item);
-                                    dateToNotify.add(d);
-                                }
-                                // 本次要弹出的项（脚本据此渲染，并做"同一浏览器本周期只弹一次"的本地去重）
-                                model.put("toastItems", toastItems);
-                                model.put("toastPosition", cfg.toastPosition());
-                                model.put("toastTitle", cfg.toastTitle());
-                                model.put("toastTemplate", cfg.toastTemplate());
-                                model.put("toastEmptyText", cfg.toastEmptyText());
-                                model.put("toastCloseSeconds", cfg.toastCloseSeconds());
-                                model.put("toastDefaultClose", cfg.toastDefaultClose());
-                                model.put("toastCloseMenu", cfg.toastCloseMenu());
-                                model.put("toastEnabled", cfg.toastEnabled());
-                                // 整个负载序列化成 JSON，交给前端脚本（避免内联可执行脚本）
-                                if (cfg.toastEnabled() && !toastItems.isEmpty()) {
-                                    Map<String, Object> payload = new LinkedHashMap<>();
-                                    payload.put("toastEnabled", true);
-                                    payload.put("toastPosition", cfg.toastPosition());
-                                    payload.put("toastTitle", cfg.toastTitle());
-                                    payload.put("toastTemplate", cfg.toastTemplate());
-                                    payload.put("toastCloseSeconds", cfg.toastCloseSeconds());
-                                    payload.put("toastDefaultClose", cfg.toastDefaultClose());
-                                    payload.put("toastCloseMenu", cfg.toastCloseMenu());
-                                    payload.put("reminders", toastItems);
-                                    model.put("toastPayloadJson", writeJson(payload));                                }
+                                // 悬浮提示：要弹的项与"同一浏览器只弹一次"全部由
+                                // /important-dates-reminders 负责，脚本自行拉取（全站/仅本页都走这条路）。
+                                // 这里既不预先生成、也不预先标记 —— 原先"渲染时就标记已提醒"是配合
+                                // 页面内嵌的提示内容，改成实时拉取后会让脚本拿到空数据、弹窗永不出现。
                                 model.put("idToastPage", Boolean.TRUE);
                                 model.put("showAvatar", cfg.showAvatar());
                                 // 座驾（1.2.0）：生活/爱车双视图数据
@@ -246,17 +248,11 @@ public class ImportantDateRouter {
                                 model.put("carPeople", carPeople);
                                 model.put("otherPeople", otherPeople);
                                 model.put(ModelConst.TEMPLATE_ID, TEMPLATE_ID);
-                                // 节点写库：先记录"本次弹过了"，再渲染页面（写失败不影响渲染，只是下次可能再弹一次）。
-                                // 记录写库才能跨设备/跨浏览器只弹一次；客户端上报接口对匿名访客是 403，
-                                // 因此标记只能在服务端做。
-                                return stageMarker.markCarEvents(carToNotify)
-                                    .then(stageMarker.markDateEvents(dateToNotify))
-                                    .onErrorResume(e -> Mono.empty())
-                                    .then(templateNameResolver
-                                        .resolveTemplateNameOrDefault(request.exchange(), THEME_TEMPLATE)
-                                        .defaultIfEmpty(THEME_TEMPLATE)
-                                        .flatMap(templateName -> ServerResponse.ok()
-                                            .render(templateName, model)));
+                                return templateNameResolver
+                                    .resolveTemplateNameOrDefault(request.exchange(), THEME_TEMPLATE)
+                                    .defaultIfEmpty(THEME_TEMPLATE)
+                                    .flatMap(templateName -> ServerResponse.ok()
+                                        .render(templateName, model));
                             });
                     })
             )
@@ -295,9 +291,19 @@ public class ImportantDateRouter {
                     Mono<List<CarVo.CarEventVo>> carEvents = cfg.carEventsEnabled()
                         ? importantDateFinder.listUpcomingCarEvents(cfg.remindDays()).collectList()
                         : Mono.just(java.util.Collections.emptyList());
-                    return dateEvents.zipWith(carEvents).map(tuple -> {
-                        List<Map<String, Object>> merged = new java.util.ArrayList<>();
-                        for (ImportantDateVo r : tuple.getT1()) {
+                    return dateEvents.zipWith(carEvents)
+                        .flatMap(tuple -> remindersResponse(request, cfg, tuple.getT1(), tuple.getT2()));
+                })
+            );
+    }
+
+    /** 提醒接口的响应（同步构建，单独成方法便于类型清晰） */
+    private Mono<ServerResponse> remindersResponse(
+        org.springframework.web.reactive.function.server.ServerRequest request,
+        ReminderConfig cfg, List<ImportantDateVo> allDates, List<CarVo.CarEventVo> allEvents) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        List<Map<String, Object>> merged = new java.util.ArrayList<>();
+                        for (ImportantDateVo r : allDates) {
                             Map<String, Object> item = new LinkedHashMap<>();
                             item.put("type", "date");
                             item.put("title", r.getTitle());
@@ -312,7 +318,7 @@ public class ImportantDateRouter {
                             item.put("text", r.getStageText());
                             merged.add(item);
                         }
-                        for (CarVo.CarEventVo e : tuple.getT2()) {
+                        for (CarVo.CarEventVo e : allEvents) {
                             Map<String, Object> item = new LinkedHashMap<>();
                             item.put("type", "car");
                             item.put("carName", e.getCarName());
@@ -382,9 +388,12 @@ public class ImportantDateRouter {
                         }
                         result.put("reminders", limited);
                         result.put("overflowCount", overflow);
-                        // 悬浮提示数据：每次实时计算（不写进页面，避免页面缓存导致"后台已改、前台还弹"）。
-                        // 只给"待办 + 未逾期 + 正好在节点上 + 该节点尚未提醒过"的项。
+                        // 悬浮提示数据：每次实时计算，页面脚本拉取后弹出。
+                        // 阈值与"提前提醒天数"一致（进入提醒期就每访一次弹一次，直到用户点关闭/
+                        // 或服务端已记录该节点已提醒）—— 节点式的 15/7/3/1/0 只控制**主动提醒节奏**，
+                        // 不该让"刚进入提醒期"的日子不弹。
                         java.util.List<Map<String, Object>> toastItems = new java.util.ArrayList<>();
+                        java.util.List<String> delivered = new java.util.ArrayList<>();
                         for (Map<String, Object> m : merged) {
                             // 只有座驾到期项带 status（"PENDING"/"TODO"/…）；纪念日与生日没有这个字段，
                             // 不能因此被过滤掉，否则悬浮提示对纪念日/生日永远不弹。
@@ -395,10 +404,17 @@ public class ImportantDateRouter {
                             if (!(daysObj instanceof Number num) || num.longValue() < 0) {
                                 continue;
                             }
-                            if (m.get("stageCode") == null || Boolean.TRUE.equals(m.get("stageNotified"))) {
+                            if (Boolean.TRUE.equals(m.get("stageNotified"))) {
+                                continue;
+                            }
+                            // 该浏览器已经弹过这一条 → 不再重复给（cookie 记的是内容指纹，
+                            // 到期日或提醒内容一变，指纹就变，会自动重新提醒）
+                            String sig = toastSignature(m);
+                            if (seenCookie(request, sig)) {
                                 continue;
                             }
                             toastItems.add(m);
+                            delivered.add(sig);
                         }
                         result.put("toastItems", toastItems);
                         // 待处理（逾期超过窗口）：不再主动提醒，但计入总览，永远不会静默消失
@@ -412,13 +428,14 @@ public class ImportantDateRouter {
                         // 完整列表（不做"每类最多 N 条"降噪）：供控制台仪表盘小组件分页展示，
                         // 口径与前台一致，仅页数由 dashboardPageSize 决定。
                         result.put("allReminders", merged);
-                        return result;
-                    })
-                        .flatMap(map -> ServerResponse.ok()
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .bodyValue(map));
-                })
-            );
+                        // 本次交付的条目记进 cookie：同一浏览器不再重复弹（跨设备由库里的
+                        // notifiedStages 负责；访客无法写库，那是个 403 的写接口）
+                        ServerResponse.BodyBuilder builder = ServerResponse.ok()
+                            .contentType(MediaType.APPLICATION_JSON);
+                        if (!delivered.isEmpty()) {
+                            builder = builder.cookie(deliveryCookie(request, delivered));
+                        }
+                        return builder.bodyValue(result);
     }
 
     /**
