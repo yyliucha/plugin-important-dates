@@ -41,6 +41,12 @@ public class ImportantDateRouter {
     private static final String TEMPLATE_ID = "plugin:plugin-important-dates:important-dates";
     private static final int DEFAULT_REMIND_DAYS = 3;
     private static final int DEFAULT_TOAST_CLOSE_SECONDS = 8;
+    /**
+     * 服务端逻辑版本标记，随提醒接口一起返回。
+     * 用于确认站点上**实际生效**的是哪一版（插件目录里可能残留多个 jar，
+     * Halo 有时会加载到旧的，光看插件页显示的版本号不足以判断）。
+     */
+    private static final String BUILD_MARKER = "1.3.1-rc.8";
 
     private final ImportantDateFinder importantDateFinder;
     private final ReactiveSettingFetcher settingFetcher;
@@ -193,48 +199,55 @@ public class ImportantDateRouter {
                 org.springframework.web.reactive.function.server.RequestPredicates.GET(
                     "/important-dates-reminders"),
                 request -> reminderConfig().flatMap(cfg -> {
-                    Map<String, Object> result = new LinkedHashMap<>();
-                    result.put("enabled", cfg.frontendReminder());
-                    result.put("remindDays", cfg.remindDays());
-                    result.put("toastCloseSeconds", cfg.toastCloseSeconds());
-                    result.put("toastEnabled", cfg.toastEnabled());
-                    result.put("toastScope", cfg.toastScope());
-                    result.put("toastPosition", cfg.toastPosition());
-                    result.put("toastTitle", cfg.toastTitle());
-                    result.put("toastTemplate", cfg.toastTemplate());
-                    result.put("toastEmptyText", cfg.toastEmptyText());
-                    result.put("toastDefaultClose", cfg.toastDefaultClose());
-                    result.put("toastCloseMenu", cfg.toastCloseMenu());
-                    result.put("toastMaxPerType", cfg.toastMaxPerType());
-                    result.put("dashboardPageSize", cfg.dashboardPageSize());
-                    result.put("dashboardPagination", cfg.dashboardPagination());
-                    result.put("allowDismiss", cfg.allowDismiss());
-                    result.put("overdueRemindDays", cfg.overdueRemindDays());
-                    result.put("frontendShowOverdue", cfg.frontendShowOverdue());
-                    // 页面横幅由 frontendReminder 控制；全站悬浮提醒由 toastEnabled 控制
-                    if (!cfg.frontendReminder() && !cfg.toastEnabled()) {
-                        result.put("reminders", java.util.Collections.emptyList());
-                        return ServerResponse.ok()
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .bodyValue(result);
-                    }
                     Mono<List<ImportantDateVo>> dateEvents =
                         importantDateFinder.listUpcoming(cfg.remindDays()).collectList();
                     Mono<List<CarVo.CarEventVo>> carEvents = cfg.carEventsEnabled()
                         ? importantDateFinder.listUpcomingCarEvents(cfg.remindDays()).collectList()
                         : Mono.just(java.util.Collections.emptyList());
+                    // 两个数据源都要取：即使页面横幅关闭，悬浮提示仍可能需要（反之亦然）
                     return dateEvents.zipWith(carEvents)
-                        .flatMap(tuple -> remindersResponse(request, cfg, tuple.getT1(), tuple.getT2()));
+                        .flatMap(tuple -> remindersResponse(cfg, tuple.getT1(), tuple.getT2()));
                 })
             );
     }
 
     /** 提醒接口的响应（同步构建，单独成方法便于类型清晰） */
     private Mono<ServerResponse> remindersResponse(
-        org.springframework.web.reactive.function.server.ServerRequest request,
         ReminderConfig cfg, List<ImportantDateVo> allDates, List<CarVo.CarEventVo> allEvents) {
         Map<String, Object> result = new LinkedHashMap<>();
+        // 版本标记：便于确认站点上实际生效的是哪一版服务端逻辑（排查用，无敏感信息）
+        result.put("build", BUILD_MARKER);
+        result.put("enabled", cfg.frontendReminder());
+        result.put("remindDays", cfg.remindDays());
+        result.put("toastCloseSeconds", cfg.toastCloseSeconds());
+        result.put("toastEnabled", cfg.toastEnabled());
+        result.put("toastScope", cfg.toastScope());
+        result.put("toastPosition", cfg.toastPosition());
+        result.put("toastTitle", cfg.toastTitle());
+        result.put("toastTemplate", cfg.toastTemplate());
+        result.put("toastEmptyText", cfg.toastEmptyText());
+        result.put("toastDefaultClose", cfg.toastDefaultClose());
+        result.put("toastCloseMenu", cfg.toastCloseMenu());
+        result.put("toastMaxPerType", cfg.toastMaxPerType());
+        result.put("dashboardPageSize", cfg.dashboardPageSize());
+        result.put("dashboardPagination", cfg.dashboardPagination());
+        result.put("allowDismiss", cfg.allowDismiss());
+        result.put("overdueRemindDays", cfg.overdueRemindDays());
+        result.put("frontendShowOverdue", cfg.frontendShowOverdue());
         List<Map<String, Object>> merged = new java.util.ArrayList<>();
+        // 页面横幅由 frontendReminder 控制；全站悬浮提醒由 toastEnabled 控制。
+        // 两者都关时无需计算列表（但配置字段照常返回，前端据 toastEnabled 判断是否弹）。
+        if (!cfg.frontendReminder() && !cfg.toastEnabled()) {
+            result.put("reminders", java.util.Collections.emptyList());
+            result.put("toastItems", java.util.Collections.emptyList());
+            result.put("overflowCount", 0);
+            result.put("todoCount", 0);
+            result.put("pendingCount", 0);
+            result.put("allReminders", java.util.Collections.emptyList());
+            return ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(result);
+        }
                         for (ImportantDateVo r : allDates) {
                             Map<String, Object> item = new LinkedHashMap<>();
                             item.put("type", "date");
