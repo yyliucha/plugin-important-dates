@@ -10,7 +10,7 @@
  */
 (function () {
   // 便于排查：浏览器控制台执行 window.__ID_TOAST_VERSION 即可确认当前跑的是哪一版脚本
-  window.__ID_TOAST_VERSION = "133";
+  window.__ID_TOAST_VERSION = "134";
   var KEY_UNTIL = "id-toast-until";
   var KEY_FOREVER = "id-toast-forever";
   /** 本浏览器**确实弹出过**的提醒指纹（只在弹窗真的显示后才记录） */
@@ -196,9 +196,14 @@
     var menuEnabled = d.toastCloseMenu !== false;
     box.querySelector("span").addEventListener("click", function () {
       if (menuEnabled) {
+        // 有菜单：点 × 先给选择，5 秒未选则按默认行为执行
         showCloseMenu(box, defaultChoice, hide);
       } else {
-        applyDismiss(defaultChoice, hide);
+        // 没有菜单：点 × 只是收起当前这个弹窗。
+        // 不能在这里套用"默认关闭行为"—— 那样站主把默认设成「1 天内不显示 / 永久关闭」时，
+        // 访客（或站主自己）随手点一下 × 就被静默静音了，而且因为菜单不显示，
+        // 根本看不出发生了什么，表现为"刷新一次之后就再也不弹了"。
+        hide();
       }
     });
     requestAnimationFrame(function () {
