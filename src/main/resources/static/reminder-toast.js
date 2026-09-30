@@ -10,11 +10,10 @@
  */
 (function () {
   // 便于排查：浏览器控制台执行 window.__ID_TOAST_VERSION 即可确认当前跑的是哪一版脚本
-  window.__ID_TOAST_VERSION = "132";
+  window.__ID_TOAST_VERSION = "133";
   var KEY_UNTIL = "id-toast-until";
   var KEY_FOREVER = "id-toast-forever";
   /** 本浏览器**确实弹出过**的提醒指纹（只在弹窗真的显示后才记录） */
-  var KEY_SHOWN = "id-toast-shown-v2";
   var MENU_ITEMS = [
     { label: "本次关闭", value: "once" },
     { label: "3 天内不显示", value: "3d" },
@@ -47,33 +46,6 @@
     try {
       window.localStorage.removeItem(k);
     } catch (e) {}
-  }
-
-  /** 提醒的"内容指纹"：到期日或文案一变就视为新提醒（换周期会重新弹） */
-  function sigOf(i) {
-    var who = i.type === "date" ? (i.name || i.title) : ((i.carId || "") + "#" + (i.reminderIndex | 0));
-    return (i.type || "") + ":" + who + ":" + (i.date || i.dateText || "") + ":" + (i.text || i.title || "");
-  }
-
-  /** 已弹出过的指纹列表 */
-  function readShown() {
-    var raw = lsGet(KEY_SHOWN);
-    if (!raw) return [];
-    try {
-      var arr = JSON.parse(raw);
-      return Object.prototype.toString.call(arr) === "[object Array]" ? arr : [];
-    } catch (e) {
-      return [];
-    }
-  }
-
-  /** 记录已弹出的指纹（只保留最近 30 条，避免无限增长） */
-  function writeShown(list) {
-    var uniq = [];
-    for (var i = list.length - 1; i >= 0 && uniq.length < 30; i--) {
-      if (uniq.indexOf(list[i]) < 0) uniq.unshift(list[i]);
-    }
-    lsSet(KEY_SHOWN, JSON.stringify(uniq));
   }
 
   /** 是否仍处于"关闭期"（按时长/永久记忆判断；过期的自动清理）。 */
@@ -279,12 +251,9 @@
           if (!d || d.toastEnabled === false) return;
           var items = d.toastItems || [];
           if (!items.length) return;
-          var shown = readShown();
-          var fresh = items.filter(function (i) {
-            return shown.indexOf(sigOf(i)) < 0;
-          });
-          if (!fresh.length) return;
-          if (show({
+          // 每次打开页面都提示（页主选择的行为）：服务端每次给出完整清单，这里不再按浏览器记账。
+          // 「关闭方式」里的时长/永久选项仍然生效（记在 localStorage，见 isDismissed）。
+          show({
             toastPosition: d.toastPosition,
             toastTitle: d.toastTitle,
             toastTemplate: d.toastTemplate,
@@ -292,10 +261,8 @@
             toastCloseSeconds: d.toastCloseSeconds,
             toastDefaultClose: d.toastDefaultClose,
             toastCloseMenu: d.toastCloseMenu,
-            reminders: fresh
-          })) {
-            writeShown(shown.concat(fresh.map(sigOf)));
-          }
+            reminders: items
+          });
         })
         .catch(function () {});
     };
