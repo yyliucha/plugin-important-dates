@@ -42,7 +42,7 @@ A Halo 2.x plugin that remembers things for you: anniversaries, birthdays and th
 - **Dead images degrade gracefully**: when an attachment is deleted (or blocked by another plugin's global rule), a public cover falls back to the vehicle icon, an avatar to the initial character and an album photo to a placeholder — **visitors never see a broken image**; the console flags `含失效图片 N` / `大头贴已失效` and offers one-click removal or per-photo replacement
 - **Bandwidth-friendly images**: lists, album grids and public cards use `?width=` derivatives (480 px by default, configurable, 0 = original) while opening a photo still shows the original; uploads above 1.5 MB are **compressed in the browser** first (1920 px by default, switchable off)
 - **Reminder state machine (1.2.6)**: a past due date now means *overdue* (no silent roll-over) - reminders run day by day, then the item moves to a to-do state that is never dropped; only pressing Done rolls it forward: repeating items by their cycle, **maintenance items record "just serviced"**, one-off items completed, and all of it can be **undone in one click**
-- **Cadence**: a reminder node every 7 days inside the window, the 15/7/3/1/0 ladder near the end, overdue days 1/2/3 - each node pops once and is stored in the database
+- **Cadence**: a reminder node every 7 days inside the window, the 15/7/3/1/0 ladder near the end, overdue days 1/2/3 - each node pops once and is stored in the database. This governs the console banner and the dashboard widget; the site-wide popup follows the rule below and appears on every page load
 - **In-place actions**: Done / Undo inside the vehicle dialog persist immediately, refresh just that row and keep the dialog open
 - **Dismiss a single reminder**: the ✕ on each line of the public banner and the dashboard widget means "not again this due cycle" (stored in the browser, restored automatically when the due date changes), with one-click restore and a setting to switch the capability off
 - **Configurable inspection rule**: "Vehicle settings → inspection nodes (2,4,6,10 by default)" and "yearly on-site inspection from (11 by default)" adapt to your local vehicle-office rules, and the form preview and reminders follow
@@ -57,7 +57,7 @@ A Halo 2.x plugin that remembers things for you: anniversaries, birthdays and th
 **🔔 Reminders (three places, your choice)**
 - **Dashboard widget** (Halo 2.21+): always visible, refreshed every minute, with **paging (5 items per page by default, adjustable or switchable off)** showing the complete reminder list (Dashboard → Edit → Add widget → Widget centre → group “记得”)
 - **Admin + public banners**: “Tomorrow is「Wedding Anniversary」” / “Insurance of「小白」is due in 7 days”
-- **Site-wide toast** (optional): position, wording and auto-close are configurable
+- **Site-wide toast** (optional): position, wording and auto-close are configurable, and it now appears on every page load
 - Dates and vehicle due items are **merged into one list sorted by days left**; the toast shows at most N items per type and merges the rest into a summary
 
 **👁 Privacy**
@@ -106,7 +106,9 @@ A Halo 2.x plugin that remembers things for you: anniversaries, birthdays and th
 - **Enable**: emitted through the official `TemplateHeadProcessor`; disabling removes it, uninstalling takes it away with the plugin
 - **Position**: bottom-right / bottom-left / top-right / top-left / bottom-centre / screen-centre (default bottom-right)
 - **Placeholders**: `{title}`, `{whenText}`, `{daysUntil}`, `{dateText}`, `{nextSolarDate}`
-- **Behaviour**: auto-close (8s by default, with countdown and progress bar); the × menu offers **this time / 3 days / 10 days / forever**; the site owner can set the default × action and whether the menu is shown
+- **Behaviour**: **the popup appears on every page load** (since 1.3.1; previously once per browser); auto-close (8s by default, with countdown and progress bar); the × menu offers **this time / 3 days / 10 days / forever**
+- **Close menu** (on by default): pressing × offers those four choices; with the menu switched off, × only dismisses the popup that is on screen and never silences the reminder behind your back
+  - ⚠️ The menu has a 5-second timeout: if nothing is chosen it applies the **default × action**. Set that default to "this time" or "3 days" - **not "forever"** - or a slow click will silence the popup permanently
 
 > Historical note: versions up to 1.0.21 used “code injection”, and 1.0.30–1.1.1 maintained an injected snippet. Since 1.1.2 the plugin uses the official extension point — **if your site still has `id-toast:start/end` in Settings → Code injection, please delete it once.**
 
@@ -127,9 +129,11 @@ cd plugin-important-dates
 ./gradlew build
 ```
 
-The artifact is written to `build/libs/plugin-important-dates-<version>.jar` (current version: `1.3.0`; previous stable: `1.2.7`). Hard-refresh your browser once after installing a new build.
+The artifact is written to `build/libs/plugin-important-dates-<version>.jar` (current version: `1.3.1`; previous stable: `1.3.0`). Hard-refresh your browser once after installing a new build, and restart the Halo process.
 
-> Release notes: **1.3.0** tiers the vehicle form by what the vehicle actually has (e-bike locked to EV, bicycle without plate or energy type), keeps data when the type changes instead of destroying it, rebuilds the dialog around collapsible sections, drops driver licence renewal from vehicle reminders, and fixes a defect introduced in 1.2.6 that made the due-item badges on the console vehicle cards disappear entirely.
+> Release notes: **1.3.1** fixes a chain of defects that stopped the site-wide popup from ever appearing (date items were filtered out, nodes were marked as delivered before the script could fetch them, the report endpoint is 403 for visitors, and a scope mismatch hid the data on every page but one), shows the popup on every page load, and stops a stray × from muting the reminder silently.
+>
+> Previous: **1.3.0** tiers the vehicle form by what the vehicle actually has (e-bike locked to EV, bicycle without plate or energy type), keeps data when the type changes, rebuilds the dialog around collapsible sections, and drops driver licence renewal from vehicle reminders.
 
 ## License
 

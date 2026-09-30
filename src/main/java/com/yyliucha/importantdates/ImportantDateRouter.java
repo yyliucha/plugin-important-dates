@@ -46,7 +46,7 @@ public class ImportantDateRouter {
      * 用于确认站点上**实际生效**的是哪一版（插件目录里可能残留多个 jar，
      * Halo 有时会加载到旧的，光看插件页显示的版本号不足以判断）。
      */
-    private static final String BUILD_MARKER = "1.3.1-rc.11";
+    private static final String BUILD_MARKER = "1.3.1";
 
     private final ImportantDateFinder importantDateFinder;
     private final ReactiveSettingFetcher settingFetcher;
