@@ -35,6 +35,8 @@ A Halo 2.x plugin that remembers things for you: anniversaries, birthdays and th
 
 **🚗 Vehicles (cars / e-bikes / bicycles)**
 - **17 categories** (sedan / SUV / MPV / sports / off-road / pickup / wagon / hatchback / crossover / van / RV / truck / bus / motorcycle / **e-bike / bicycle** / other), energy type (fuel / EV / PHEV / HEV / human), brand & model, colour, VIN, engine no., registration & purchase dates, mileage, status (in use / sold / scrapped)
+- **Only the fields your vehicle actually has (1.3.0)**: the form is tiered by "does it have an engine, does it have a plate" — a **bicycle** shows no plate, energy type, frame number, mileage or purchase price; an **e-bike** keeps the plate and frame number (labelled "frame / vehicle number"), locks the energy type to **EV** and hides the engine number and first-registration date; the insurer and the insurance / inspection / road-tax items only appear for cars, motorcycles and other motor vehicles. The dialog is regrouped into **five collapsible sections** (basic info and due items open by default; album, people and more collapsed with a summary), and each due item is a single row with its details behind "settings"
+- **Switching vehicle type never loses data**: turn a car into a bicycle and its insurance / inspection items are **kept in the database but no longer shown or alerted on** (absent from the form, the cards and the public page); switch back and they return exactly as they were, due dates untouched
 - **Photo album**: upload or multi-select from the attachment library, drag to reorder, set cover; **each photo can be toggled visible/hidden** (hidden ones stay admin-only — handy for licence and insurance papers)
 - **Attachment library scope**: under Settings → Photo settings you can point the **person avatar** and the **vehicle album** at a category (group) and a storage policy; when nothing matches, the scope **widens automatically** and the dialog explains what is in effect and how many images match (no more empty lists), with a one-click "show all images"
 - **Dead images degrade gracefully**: when an attachment is deleted (or blocked by another plugin's global rule), a public cover falls back to the vehicle icon, an avatar to the initial character and an album photo to a placeholder — **visitors never see a broken image**; the console flags `含失效图片 N` / `大头贴已失效` and offers one-click removal or per-photo replacement
@@ -44,7 +46,7 @@ A Halo 2.x plugin that remembers things for you: anniversaries, birthdays and th
 - **In-place actions**: Done / Undo inside the vehicle dialog persist immediately, refresh just that row and keep the dialog open
 - **Dismiss a single reminder**: the ✕ on each line of the public banner and the dashboard widget means "not again this due cycle" (stored in the browser, restored automatically when the due date changes), with one-click restore and a setting to switch the capability off
 - **Configurable inspection rule**: "Vehicle settings → inspection nodes (2,4,6,10 by default)" and "yearly on-site inspection from (11 by default)" adapt to your local vehicle-office rules, and the form preview and reminders follow
-- **Due reminders**: compulsory & commercial insurance, inspection, maintenance (computed from last service + interval), road tax, licence renewal, custom items; per-item lead days, on/off and **repeat interval** (every year / two years / three years / one-off / custom months); sold/scrapped vehicles stop reminding
+- **Due reminders**: compulsory & commercial insurance, inspection, maintenance (computed from last service + interval), road tax, custom items; per-item lead days, on/off and **repeat interval** (every year / two years / three years / one-off / custom months); sold/scrapped vehicles stop reminding (driver licence renewal is no longer attached to a vehicle as of 1.3.0 - it belongs to a person, so one driver with two cars is not reminded twice)
 - **One insurer per vehicle**: a vehicle-level insurer shared by every policy item (with quick picks for common companies); a single item can still override it, and existing data is migrated idempotently at startup
 - **Inspection derived from the rules**: the next inspection is derived from the first registration date plus the vehicle category (sticker in years 2/4, on-site in years 6/10, yearly from year 11) with the stage and its basis shown; a manual date can override it, and the default lead time is 30 days
 - **Inspection and road tax follow the insurance date** by default (untick to enter a separate date); the same date is saved
@@ -80,7 +82,7 @@ A Halo 2.x plugin that remembers things for you: anniversaries, birthdays and th
 
 ## Compatibility
 
-- **Halo 2.26+** (built against the official 2.26 docs and extension points; Java 17 bytecode; full regression on a clean 2.26 instance: 50/50 passed; 1.2.5 additionally verified with 13/13 browser end-to-end checks and 18 targeted checks)
+- **Halo 2.26+** (built against the official 2.26 docs and extension points; Java 17 bytecode; 1.3.0 verified on a real 2.26 instance against existing data including 10 historical vehicles — functional suite 18/18 and front-end regression 5/5, covering the card due items, the vehicle-type linkage, data retention across a type switch, the collapsible sections and legacy-data correction)
 - Administrators get all permissions after installation; no role setup needed
 
 ## Install & upgrade
@@ -125,7 +127,9 @@ cd plugin-important-dates
 ./gradlew build
 ```
 
-The artifact is written to `build/libs/plugin-important-dates-<version>.jar` (current version: `1.2.6`; previous stable: `1.2.5`). Hard-refresh your browser once after installing a new build.
+The artifact is written to `build/libs/plugin-important-dates-<version>.jar` (current version: `1.3.0`; previous stable: `1.2.7`). Hard-refresh your browser once after installing a new build.
+
+> Release notes: **1.3.0** tiers the vehicle form by what the vehicle actually has (e-bike locked to EV, bicycle without plate or energy type), keeps data when the type changes instead of destroying it, rebuilds the dialog around collapsible sections, drops driver licence renewal from vehicle reminders, and fixes a defect introduced in 1.2.6 that made the due-item badges on the console vehicle cards disappear entirely.
 
 ## License
 
