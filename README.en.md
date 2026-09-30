@@ -98,8 +98,8 @@ A Halo 2.x plugin that remembers things for you: anniversaries, birthdays and th
 - **Add a date**: name, date type, date (solar grid / lunar year-month-day), linked people (multi-select), notes; set “important” and “show on frontend”
 - **People tab**: manage people and their frontend visibility; drag to sort
 - **Vehicles tab**: manage vehicle records, album (per-photo “show” toggle) and due items; drag to sort; toggle frontend visibility right on the card
-- **Operation log / export / import**: buttons at the top right
-- **Reminder & privacy settings**: Plugins → 记得 → Settings (reminders, vehicles, photos, privacy, logs)
+- **Export / import**: buttons at the top right
+- **Reminder & privacy settings**: Plugins → 记得 → Settings (reminders, site-wide toast, display, privacy, photos, vehicles)
 
 ## Site-wide toast (optional, settings-driven)
 
