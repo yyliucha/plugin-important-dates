@@ -57,74 +57,6 @@ public class ImportantDateRouter {
             return null;
         }
     }
-
-    // ---------- 悬浮提示的"同一浏览器只弹一次"（cookie 记录已交付的条目指纹） ----------
-
-    /** 访客无法写库（上报接口是 403），所以同一浏览器的去重放在 cookie 里；跨设备由库里的 notifiedStages 负责。 */
-    private static final String TOAST_SEEN_COOKIE = "id-toast-seen";
-    /** cookie 里最多保留多少条指纹（防止无限增长） */
-    private static final int TOAST_SEEN_MAX = 20;
-
-    /** cookie 里的分隔符：不能用逗号（RFC2616 cookie 值不允许 ','，会被容器直接拒绝） */
-    private static final String TOAST_SEEN_SEP = "|";
-
-    /**
-     * 条目指纹：内容变了就视为新提醒（换周期 / 改了到期日 / 文案变了都会重新弹）。
-     * 不含 stageCode —— 否则同一条提醒在不同节点会被当成不同内容，一天弹好几次。
-     */
-    private static String toastSignature(Map<String, Object> m) {
-        String kind = String.valueOf(m.get("type"));
-        String who = "date".equals(kind)
-            ? String.valueOf(m.get("name"))
-            : String.valueOf(m.get("carId")) + "#" + String.valueOf(m.get("reminderIndex"));
-        return Integer.toHexString((kind + "|" + who + "|" + String.valueOf(m.get("date")) + "|"
-            + String.valueOf(m.get("text"))).hashCode());
-    }
-
-    private static boolean seenCookie(org.springframework.web.reactive.function.server.ServerRequest request,
-        String sig) {
-        return cookieSigs(request).contains(sig);
-    }
-
-    /** 已交付过的指纹（按出现顺序） */
-    private static java.util.LinkedHashSet<String> cookieSigs(
-        org.springframework.web.reactive.function.server.ServerRequest request) {
-        java.util.LinkedHashSet<String> set = new java.util.LinkedHashSet<>();
-        var cookie = request.cookies().getFirst(TOAST_SEEN_COOKIE);
-        if (cookie == null || cookie.getValue() == null || cookie.getValue().isBlank()) {
-            return set;
-        }
-        for (String part : cookie.getValue().split("\\" + TOAST_SEEN_SEP)) {
-            String v = part.trim();
-            if (!v.isEmpty()) {
-                set.add(v);
-            }
-        }
-        return set;
-    }
-
-    /**
-     * 合并写入：保留浏览器已有的指纹，再追加本次交付的；超出上限时丢最旧的。
-     * （不能用本次的列表直接覆盖，否则之前弹过的条目会因为指纹丢失而重新弹。）
-     */
-    private static org.springframework.http.ResponseCookie deliveryCookie(
-        org.springframework.web.reactive.function.server.ServerRequest request,
-        java.util.List<String> sigs) {
-        java.util.LinkedHashSet<String> all = cookieSigs(request);
-        all.addAll(sigs);
-        while (all.size() > TOAST_SEEN_MAX) {
-            var it = all.iterator();
-            it.next();
-            it.remove();
-        }
-        return org.springframework.http.ResponseCookie.from(TOAST_SEEN_COOKIE,
-                String.join(TOAST_SEEN_SEP, all.toArray(new String[0])))
-            .path("/")
-            .maxAge(java.time.Duration.ofDays(30))
-            .sameSite("Lax")
-            .build();
-    }
-
     public ImportantDateRouter(ImportantDateFinder importantDateFinder,
         ReactiveSettingFetcher settingFetcher,
         TemplateNameResolver templateNameResolver,
@@ -389,11 +321,13 @@ public class ImportantDateRouter {
                         result.put("reminders", limited);
                         result.put("overflowCount", overflow);
                         // 悬浮提示数据：每次实时计算，页面脚本拉取后弹出。
-                        // 阈值与"提前提醒天数"一致（进入提醒期就每访一次弹一次，直到用户点关闭/
-                        // 或服务端已记录该节点已提醒）—— 节点式的 15/7/3/1/0 只控制**主动提醒节奏**，
-                        // 不该让"刚进入提醒期"的日子不弹。
+                        // 这里**不做交付去重** —— "同一浏览器只弹一次"由脚本在弹窗真的显示之后
+                        // 记到 localStorage。曾经用 cookie 在服务端"交付即记账"，结果是：
+                        // 只要交付过一次（哪怕当时被关闭期挡住、或用户根本没看到），
+                        // 该浏览器就永久被判为"弹过了"，弹窗再也不出现。
+                        // 阈值与"提前提醒天数"一致：进入提醒期就弹，不要求正好落在 15/7/3/1/0 节点上
+                        // （节点只管主动提醒的节奏，不该决定弹窗能否出现）。
                         java.util.List<Map<String, Object>> toastItems = new java.util.ArrayList<>();
-                        java.util.List<String> delivered = new java.util.ArrayList<>();
                         for (Map<String, Object> m : merged) {
                             // 只有座驾到期项带 status（"PENDING"/"TODO"/…）；纪念日与生日没有这个字段，
                             // 不能因此被过滤掉，否则悬浮提示对纪念日/生日永远不弹。
@@ -407,14 +341,7 @@ public class ImportantDateRouter {
                             if (Boolean.TRUE.equals(m.get("stageNotified"))) {
                                 continue;
                             }
-                            // 该浏览器已经弹过这一条 → 不再重复给（cookie 记的是内容指纹，
-                            // 到期日或提醒内容一变，指纹就变，会自动重新提醒）
-                            String sig = toastSignature(m);
-                            if (seenCookie(request, sig)) {
-                                continue;
-                            }
                             toastItems.add(m);
-                            delivered.add(sig);
                         }
                         result.put("toastItems", toastItems);
                         // 待处理（逾期超过窗口）：不再主动提醒，但计入总览，永远不会静默消失
@@ -428,14 +355,9 @@ public class ImportantDateRouter {
                         // 完整列表（不做"每类最多 N 条"降噪）：供控制台仪表盘小组件分页展示，
                         // 口径与前台一致，仅页数由 dashboardPageSize 决定。
                         result.put("allReminders", merged);
-                        // 本次交付的条目记进 cookie：同一浏览器不再重复弹（跨设备由库里的
-                        // notifiedStages 负责；访客无法写库，那是个 403 的写接口）
-                        ServerResponse.BodyBuilder builder = ServerResponse.ok()
-                            .contentType(MediaType.APPLICATION_JSON);
-                        if (!delivered.isEmpty()) {
-                            builder = builder.cookie(deliveryCookie(request, delivered));
-                        }
-                        return builder.bodyValue(result);
+                        return ServerResponse.ok()
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .bodyValue(result);
     }
 
     /**

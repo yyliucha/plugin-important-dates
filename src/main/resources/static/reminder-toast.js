@@ -10,11 +10,11 @@
  */
 (function () {
   // 便于排查：浏览器控制台执行 window.__ID_TOAST_VERSION 即可确认当前跑的是哪一版脚本
-  window.__ID_TOAST_VERSION = "131";
+  window.__ID_TOAST_VERSION = "132";
   var KEY_UNTIL = "id-toast-until";
   var KEY_FOREVER = "id-toast-forever";
-  /** 已经弹过的那批提醒（同一浏览器不重复弹；服务端另有写库记录用于跨设备） */
-  var KEY_SHOWN = "id-toast-shown";
+  /** 本浏览器**确实弹出过**的提醒指纹（只在弹窗真的显示后才记录） */
+  var KEY_SHOWN = "id-toast-shown-v2";
   var MENU_ITEMS = [
     { label: "本次关闭", value: "once" },
     { label: "3 天内不显示", value: "3d" },
@@ -47,6 +47,33 @@
     try {
       window.localStorage.removeItem(k);
     } catch (e) {}
+  }
+
+  /** 提醒的"内容指纹"：到期日或文案一变就视为新提醒（换周期会重新弹） */
+  function sigOf(i) {
+    var who = i.type === "date" ? (i.name || i.title) : ((i.carId || "") + "#" + (i.reminderIndex | 0));
+    return (i.type || "") + ":" + who + ":" + (i.date || i.dateText || "") + ":" + (i.text || i.title || "");
+  }
+
+  /** 已弹出过的指纹列表 */
+  function readShown() {
+    var raw = lsGet(KEY_SHOWN);
+    if (!raw) return [];
+    try {
+      var arr = JSON.parse(raw);
+      return Object.prototype.toString.call(arr) === "[object Array]" ? arr : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /** 记录已弹出的指纹（只保留最近 30 条，避免无限增长） */
+  function writeShown(list) {
+    var uniq = [];
+    for (var i = list.length - 1; i >= 0 && uniq.length < 30; i--) {
+      if (uniq.indexOf(list[i]) < 0) uniq.unshift(list[i]);
+    }
+    lsSet(KEY_SHOWN, JSON.stringify(uniq));
   }
 
   /** 是否仍处于"关闭期"（按时长/永久记忆判断；过期的自动清理）。 */
@@ -239,11 +266,11 @@
 
   function load() {
     var run = function () {
-      // 数据实时取自 /important-dates-reminders（公开 GET，匿名可访问）。
-      // 该接口会按"本浏览器是否已经弹过"过滤（cookie 记内容指纹），所以无论作用域是
-      // "仅记得页面"还是"全站所有页面"都能拿到数据。
-      // 注意：不要改成读页面里内嵌的数据块 —— 那样只有 /important-dates 一个页面有数据，
-      // 全站作用域下其它页面一条都拿不到（曾因此导致全站模式完全不弹）。
+      // 数据实时取自 /important-dates-reminders（公开 GET，匿名可访问），
+      // 服务端总是给出"进入提醒期且尚未写库标记"的完整清单。
+      // "同一浏览器只弹一次"在**弹窗真的显示之后**才记到 localStorage ——
+      // 不能用服务端 cookie 交付即记账：那样只要交付过一次（哪怕当时没看见、
+      // 或被关闭期挡住），之后就一直被判为"弹过了"，用户永远收不到。
       fetch("/important-dates-reminders?ts=" + Date.now(), { credentials: "same-origin" })
         .then(function (r) {
           return r.json();
@@ -252,7 +279,12 @@
           if (!d || d.toastEnabled === false) return;
           var items = d.toastItems || [];
           if (!items.length) return;
-          show({
+          var shown = readShown();
+          var fresh = items.filter(function (i) {
+            return shown.indexOf(sigOf(i)) < 0;
+          });
+          if (!fresh.length) return;
+          if (show({
             toastPosition: d.toastPosition,
             toastTitle: d.toastTitle,
             toastTemplate: d.toastTemplate,
@@ -260,8 +292,10 @@
             toastCloseSeconds: d.toastCloseSeconds,
             toastDefaultClose: d.toastDefaultClose,
             toastCloseMenu: d.toastCloseMenu,
-            reminders: items
-          });
+            reminders: fresh
+          })) {
+            writeShown(shown.concat(fresh.map(sigOf)));
+          }
         })
         .catch(function () {});
     };
