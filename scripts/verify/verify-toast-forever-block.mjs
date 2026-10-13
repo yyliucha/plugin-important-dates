@@ -1,7 +1,9 @@
 import { base, CHROME, LAUNCH, OUT_DIR, REPO, requireInstance } from "./_env.mjs";
 await requireInstance();
 
-// 验证：陈旧的"关闭期/永久关闭"记录会不会让弹窗彻底不再出现
+// 验证：没有「永久不再提示」之后，静音会不会变成不可逆
+//   ① 老版本留下的 id-toast-forever 标记要被清掉，不能继续吃静音
+//   ② 关闭菜单关掉时，点 × 只收起当前弹窗，不写任何静音标记
 import puppeteer from "puppeteer-core";
 
 const RUN = Date.now();
@@ -29,17 +31,18 @@ const api = (p, i = {}) => page.evaluate(async (path, init) => {
 }, p, i);
 const CM = "/api/v1alpha1/configmaps/plugin-important-dates-configmap";
 const cm = await api(CM); const meta = JSON.parse(cm.text).metadata || {}; const orig = JSON.parse(cm.text).data || {};
-// 完全复刻用户设置：关闭方式菜单 = 否，默认关闭行为 = 永久关闭
-await api(CM, { method: "PUT", body: JSON.stringify({ apiVersion: "v1alpha1", kind: "ConfigMap",
+const writeToast = (over) => api(CM, { method: "PUT", body: JSON.stringify({ apiVersion: "v1alpha1", kind: "ConfigMap",
   metadata: { name: "plugin-important-dates-configmap", ...meta },
-  data: Object.assign({}, orig, { toast: JSON.stringify(Object.assign({}, JSON.parse(orig.toast || "{}"), {
-    toastEnabled: true, toastScope: "SITE", toastCloseSeconds: 30, toastCloseMenu: false, toastDefaultClose: "forever" })) })})});
+  data: Object.assign({}, orig, { toast: JSON.stringify(Object.assign({}, JSON.parse(orig.toast || "{}"),
+    { toastEnabled: true, toastScope: "SITE", toastCloseSeconds: 30 }, over)) })})});
+// 复刻最容易踩坑的配置：关掉菜单，默认关闭行为是「5 天内不显示」
+await writeToast({ toastCloseMenu: false, toastDefaultClose: "5d" });
 await new Promise((r) => setTimeout(r, 3500));
 const DATE_BASE = "/apis/importantdates.halo.run/v1alpha1/importantdates";
 const d0 = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })();
 const nm = `date-forever-${RUN}`;
 await api(DATE_BASE, { method: "POST", body: JSON.stringify({ apiVersion: "importantdates.halo.run/v1alpha1", kind: "ImportantDate",
-  metadata: { name: nm }, spec: { title: `永久关闭测试-${RUN}`, dateType: "SOLAR", solarDate: d0, important: true, visible: true } })});
+  metadata: { name: nm }, spec: { title: `永久静音测试-${RUN}`, dateType: "SOLAR", solarDate: d0, important: true, visible: true } })});
 
 const ctx = await browser.createBrowserContext();
 const p = await ctx.newPage();
@@ -50,14 +53,18 @@ const waitBox = async () => {
   }
   return false;
 };
+const clearMarks = () => p.evaluate(() => ["id-toast-until", "id-toast-forever", "id-toast-last", "id-toast-last-count", "id-toast-day"]
+  .forEach((k) => localStorage.removeItem(k)));
 try {
   await check("P1 首次访问弹出", async () => {
+    await p.goto(`${base}/`, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await clearMarks();
     await p.goto(`${base}/`, { waitUntil: "domcontentloaded", timeout: 60000 });
     assert(await waitBox(), "未弹出");
     return "弹出";
   });
 
-  await check("P2 菜单关闭时，点 × 不再静默写入永久关闭标记", async () => {
+  await check("P2 菜单关闭时，点 × 不再静默写入任何静音标记", async () => {
     await p.evaluate(() => {
       const el = document.getElementById("id-toast-box");
       el.querySelector("span").dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -74,11 +81,28 @@ try {
     return "仍会弹出";
   });
 
-  await check("P4 清掉该标记后恢复", async () => {
-    await p.evaluate(() => localStorage.removeItem("id-toast-forever"));
+  await check("P4 老版本留下的 id-toast-forever 标记被清掉，不再永久静音", async () => {
+    // 1.3.1 及更早版本可能给这个浏览器写下过"永久不再提示"
+    await p.evaluate(() => { localStorage.setItem("id-toast-forever", "1"); localStorage.removeItem("id-toast-until"); });
     await p.goto(`${base}/`, { waitUntil: "domcontentloaded", timeout: 60000 });
-    assert(await waitBox(), "清除后仍未弹出");
-    return "恢复弹出";
+    assert(await waitBox(), "陈旧永久标记仍在拦截弹窗");
+    const raw = await p.evaluate(() => localStorage.getItem("id-toast-forever"));
+    assert(raw === null, `陈旧标记未被清理: ${raw}`);
+    return "标记已清理并恢复弹出";
+  });
+
+  await check("P5 正常设置下不会写下永久标记（三处都应无关）", async () => {
+    await clearMarks();
+    await p.goto(`${base}/`, { waitUntil: "domcontentloaded", timeout: 60000 });
+    assert(await waitBox(), "未弹出");
+    await p.evaluate(() => {
+      const el = document.getElementById("id-toast-box");
+      el.querySelector("span").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await new Promise((r) => setTimeout(r, 600));
+    const st = await p.evaluate(() => ({ forever: localStorage.getItem("id-toast-forever"), until: localStorage.getItem("id-toast-until") }));
+    assert(!st.forever, "不该出现永久标记");
+    return st.until ? "只写了有期限的静音" : "未写静音标记";
   });
 } finally {
   await api(`${DATE_BASE}/${nm}`, { method: "DELETE" });
@@ -88,4 +112,3 @@ try {
   await browser.close();
   process.exit(fail > 0 ? 1 : 0);
 }
-

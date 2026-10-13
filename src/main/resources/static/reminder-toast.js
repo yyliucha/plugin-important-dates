@@ -4,26 +4,51 @@
  * 配置全部来自 GET /important-dates-reminders（公开接口）。
  *
  * 关闭行为（配置化）：
- *   - 点 × 弹出「关闭方式」菜单（本次 / 3 天 / 10 天 / 永久），5 秒不选按站主默认关闭行为
- *   - 默认关闭行为由 toastDefaultClose 下发（once/1d/3d/7d/10d/30d/forever）
- *   - 「本次关闭」只收起当前弹窗；按时长/永久记录在 localStorage，到期自动恢复
+ *   - 点 × 弹出「关闭方式」菜单（本次关闭 / 今天不再提示 / N 天内不显示），5 秒不选按站主默认关闭行为
+ *   - 「本次关闭」只收起当前弹窗；其余选项记录在 localStorage，到期自动恢复
+ *   - 没有「永久不再提示」：静音总是有期限，避免访客手一滑就再也收不到提醒
+ *   - 可选的「N 天」由服务端下发（toastDurations，来自插件设置），改设置不用改脚本
  */
 (function () {
   // 便于排查：浏览器控制台执行 window.__ID_TOAST_VERSION 即可确认当前跑的是哪一版脚本
-  window.__ID_TOAST_VERSION = "135";
+  window.__ID_TOAST_VERSION = "136";
   var KEY_UNTIL = "id-toast-until";
-  var KEY_FOREVER = "id-toast-forever";
+  /** 1.3.1 及更早版本写下的「永久静音」标记：现在不再支持，读到就清掉 */
+  var KEY_FOREVER_LEGACY = "id-toast-forever";
   /** 提示频率记录（按访客浏览器计）：上次弹出的时间戳、当天已弹次数与当天日期 */
   var KEY_LAST_SHOWN = "id-toast-last";
   var KEY_DAY = "id-toast-day";
-  var MENU_ITEMS = [
-    { label: "本次关闭", value: "once" },
-    { label: "今天不再提示", value: "today" },
-    { label: "3 天内不显示", value: "3d" },
-    { label: "10 天内不显示", value: "10d" },
-    { label: "永久关闭", value: "forever" }
-  ];
+  /** 设置里没给或给坏了时候的兜底时长（天） */
+  var FALLBACK_DURATIONS = [3, 5, 7, 30];
   var MENU_TIMEOUT_MS = 5000;
+
+  /** 规范化服务端下发的时长列表：只保留 1–365 的整数，去重、升序。 */
+  function normalizeDurations(list) {
+    var raw = Object.prototype.toString.call(list) === "[object Array]" ? list : FALLBACK_DURATIONS;
+    var out = [];
+    for (var i = 0; i < raw.length; i++) {
+      var n = Number(raw[i]);
+      if (!isFinite(n)) continue;
+      n = Math.floor(n);
+      if (n < 1 || n > 365) continue;
+      if (out.indexOf(n) === -1) out.push(n);
+    }
+    if (!out.length) out = FALLBACK_DURATIONS.slice();
+    out.sort(function (a, b) { return a - b; });
+    return out;
+  }
+
+  /** 菜单内容：本次关闭、今天不再提示，加上设置里挑的时长（没有任何「永久」项）。 */
+  function buildMenuItems(durations) {
+    var items = [
+      { label: "本次关闭", value: "once" },
+      { label: "今天不再提示", value: "today" }
+    ];
+    durations.forEach(function (d) {
+      items.push({ label: d + " 天内不显示", value: "d" + d });
+    });
+    return items;
+  }
 
   function esc(s) {
     return String(s == null ? "" : s)
@@ -51,10 +76,11 @@
     } catch (e) {}
   }
 
-  /** 是否仍处于"关闭期"（按时长/永久记忆判断；过期的自动清理）。 */
+  /** 是否仍处于"关闭期"（按时长判断；过期的自动清理）。 */
   function isDismissed() {
-    if (lsGet(KEY_FOREVER) === "1") {
-      return true;
+    // 老版本可能留下过「永久静音」标记：直接清掉，否则这些人会以为自己被永久拉黑了
+    if (lsGet(KEY_FOREVER_LEGACY) !== null) {
+      lsRemove(KEY_FOREVER_LEGACY);
     }
     var until = Number(lsGet(KEY_UNTIL) || 0);
     if (until > 0) {
@@ -66,22 +92,23 @@
     return false;
   }
 
-  /** 按选择执行关闭：once 仅收起当前弹窗；today/时长/永久写入 localStorage。 */
+  /**
+   * 按选择执行关闭：
+   *   once      只收起当前弹窗，不记录
+   *   today     撑到当地当天 24 点
+   *   d<N>      N 天内不再提示
+   * 认不出来的选择一律按「本次关闭」处理，绝不能变成永久静音。
+   */
   function applyDismiss(choice, hide) {
-    if (choice === "forever") {
-      lsSet(KEY_FOREVER, "1");
-      lsRemove(KEY_UNTIL);
-    } else if (choice === "today") {
-      // 今天不再提示：撑到当地当天 24 点，跨天自动恢复
+    if (choice === "today") {
       var end = new Date();
       end.setHours(24, 0, 0, 0);
       lsSet(KEY_UNTIL, String(end.getTime()));
-      lsRemove(KEY_FOREVER);
-    } else if (choice && choice !== "once") {
-      var days = { "1d": 1, "3d": 3, "7d": 7, "10d": 10, "30d": 30 }[choice];
-      if (days) {
+    } else {
+      var m = /^d(\d+)$/.exec(String(choice || ""));
+      var days = m ? Number(m[1]) : 0;
+      if (days >= 1) {
         lsSet(KEY_UNTIL, String(Date.now() + days * 86400000));
-        lsRemove(KEY_FOREVER);
       }
     }
     if (hide) {
@@ -120,7 +147,8 @@
   }
 
   /** 弹出「关闭方式」菜单；5 秒未选择自动按默认行为执行。 */
-  function showCloseMenu(box, defaultChoice, hide) {
+  function showCloseMenu(box, defaultChoice, hide, durations) {
+    var items = buildMenuItems(durations);
     var menu = document.createElement("div");
     menu.style.cssText =
       "position:absolute;right:8px;top:0;transform:translateY(calc(-100% - 6px));" +
@@ -128,7 +156,7 @@
       "box-shadow:0 6px 18px rgba(0,0,0,.25);padding:4px;min-width:150px;" +
       "z-index:9;font-size:13px;color:#9a3412;";
     var list = document.createElement("div");
-    MENU_ITEMS.forEach(function (item, idx) {
+    items.forEach(function (item, idx) {
       var btn = document.createElement("button");
       btn.type = "button";
       btn.innerText = item.label;
@@ -203,15 +231,15 @@
     }
     var defaultChoice = d.toastDefaultClose || "once";
     var menuEnabled = d.toastCloseMenu !== false;
+    var durations = normalizeDurations(d.toastDurations);
     box.querySelector("span").addEventListener("click", function () {
       if (menuEnabled) {
         // 有菜单：点 × 先给选择，5 秒未选则按默认行为执行
-        showCloseMenu(box, defaultChoice, hide);
+        showCloseMenu(box, defaultChoice, hide, durations);
       } else {
-        // 没有菜单：点 × 只是收起当前这个弹窗。
-        // 不能在这里套用"默认关闭行为"—— 那样站主把默认设成「1 天内不显示 / 永久关闭」时，
-        // 访客（或站主自己）随手点一下 × 就被静默静音了，而且因为菜单不显示，
-        // 根本看不出发生了什么，表现为"刷新一次之后就再也不弹了"。
+        // 没有菜单：点 × 只是收起当前这个弹窗（默认关闭行为里也没有「永久」可选了，
+        // 但仍然不在这里套用默认行为 —— 访客点一下就没反应、也看不出发生了什么，
+        // 只会表现为"刷新一次之后就再也不弹了"）。
         hide();
       }
     });
@@ -310,6 +338,7 @@
             toastCloseSeconds: d.toastCloseSeconds,
             toastDefaultClose: d.toastDefaultClose,
             toastCloseMenu: d.toastCloseMenu,
+            toastDurations: d.toastDurations,
             reminders: items
           })) {
             markShown();

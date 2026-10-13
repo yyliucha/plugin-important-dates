@@ -133,9 +133,11 @@ const saved = await api(CM, { method: "PUT", body: JSON.stringify(cm) });
 if (![200, 201].includes(saved.status)) throw new Error(`开启悬浮提醒失败 ${saved.status}: ${saved.text.slice(0, 120)}`);
 await new Promise((r) => setTimeout(r, 2000));
 
-// ---------- ③ 节点式：第一次弹、第二次不弹 ----------
-await check("③ 悬浮提示按节点只弹一次（含写库）", async () => {
-  // 1.2.6 起：提醒数据改为每次实时取（/important-dates-reminders 的 toastItems），弹出后由页面回报写库
+// ---------- ③ 节点式：每次访问都下发；服务端不记账，弹窗去重记在浏览器 ----------
+await check("③ 悬浮提示每次访问都下发 · 服务端不写「已弹过」记录", async () => {
+  // 1.3.1 起：服务端不再做"交付即记账"。以前弹一次就往车的 notifiedStages 里写一笔，
+  // 结果用户没看到（脚本被缓存、弹窗被拦）也判定为已提醒，之后再也不弹。
+  // 现在服务端每次都照常下发，去重完全交给浏览器（localStorage）。
   const TOAST_CAR = `car-toastnode-${RUN}`;
   const made = await api("/apis/importantdates.halo.run/v1alpha1/cars", {
     method: "POST",
@@ -171,15 +173,18 @@ await check("③ 悬浮提示按节点只弹一次（含写库）", async () => 
   await new Promise((r) => setTimeout(r, 4000));
   const car = await json(`/apis/importantdates.halo.run/v1alpha1/cars/${TOAST_CAR}`);
   const stages = car.spec.reminders[0].notifiedStages || [];
-  if (!stages.includes("D3")) throw new Error(`节点未写库: ${JSON.stringify(stages)}`);
-  if (car.spec.reminders[0].notifiedForDate !== car.spec.reminders[0].date) {
-    throw new Error("节点记录未绑定到期日");
+  if (stages.length) throw new Error(`服务端不该再写"已弹过"记录: ${JSON.stringify(stages)}`);
+  if (car.spec.reminders[0].notifiedForDate) {
+    throw new Error(`服务端不该再写 notifiedForDate: ${car.spec.reminders[0].notifiedForDate}`);
   }
+  // 浏览器侧应该记下"刚弹过"（提示频率用的时间戳）
+  const shown = await page.evaluate(() => localStorage.getItem("id-toast-last"));
+  if (!shown) throw new Error("浏览器未记录弹出时间（id-toast-last 为空）");
   const after = await readToast();
-  if (after.some((i) => i.text.includes(`节点项-${RUN}`))) {
-    throw new Error(`弹出后仍在候选里（未回报）: ${JSON.stringify(after.map((a) => a.text))}`);
+  if (!after.some((i) => i.text.includes(`节点项-${RUN}`))) {
+    throw new Error(`服务端把该项从候选里移除了（应始终下发，由浏览器去重）: ${JSON.stringify(after.map((a) => a.text))}`);
   }
-  return `弹出前下发「${hit.text}」(D3)，弹出后写库=${JSON.stringify(stages)} 且不再重复`;
+  return `下发「${hit.text}」(D3)，服务端记录=无，浏览器记录=${shown}，再次访问仍下发`;
 });
 // ---------- ④ 已办：循环项顺延一期 / 一次性项完成 ----------
 await check("④ 已办：循环项顺延一期并留痕", async () => {

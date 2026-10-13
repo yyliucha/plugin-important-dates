@@ -48,25 +48,32 @@ This file records how releases are prepared, so every release looks consistent.
      - images: `docs/screenshots/x.png` → `https://raw.githubusercontent.com/yyliucha/plugin-important-dates/main/docs/screenshots/x.png`
      - docs: `README.en.md` → `https://github.com/yyliucha/plugin-important-dates/blob/main/README.en.md`; `LICENSE` → `.../blob/main/LICENSE`
    - Then run the link check (validates **links and content**, so it catches a stale English section):
-     `node F:/dsh/halo-test/check-readmes.mjs` (three files match `origin/main`, version bump, key sections present)
-     and `node F:/dsh/halo-test/check-readme-links.mjs` (every link/image resolves with HTTP 200).
+     `npm run verify:readmes` — it runs `check-readmes.mjs` (three files match `origin/main`, version bump, key sections present)
+     and `check-readme-links.mjs` (every link/image resolves with HTTP 200).
+     Both take the repo root from `REPO_ROOT` (default: this repo), so they work from any checkout.
      Run the link check **after** pushing — it reads GitHub, and `raw.githubusercontent.com` caches for ~5 minutes;
      if a just-pushed change looks missing, confirm via `gh api repos/.../contents/<file>` before assuming a bad edit.
 3. Write the release notes: `docs/release-notes-<version>.md` (Chinese, for the store) and `docs/release-notes-<version>.en.md` (English).
 4. If `reminder-toast.js` changed, bump `TOAST_SCRIPT_VERSION` in `ReminderHeadProcessor` so browsers do not keep the cached old script
    (plugin static assets are served with `max-age=31536000` — without the bump the new script never reaches returning visitors).
+   Bump it whenever the toast behaves differently, **even if you only changed settings**: the old cached script would otherwise
+   ignore the new fields. Also keep the numbers in sync in `reminder-toast.js` (`__ID_TOAST_VERSION`) and `ImportantDateRouter`
+   (`BUILD_MARKER`) so `?v=` matches the build that is actually deployed.
+5. If you added or renamed a **setting**, remember that existing sites keep their stored ConfigMap: write the new key with a safe
+   default in `settings.yaml` and make the server tolerate it being absent (e.g. `toastDurations` falls back to `3/5/7/30`, and the
+   toast ignores an unknown `toastDefaultClose` instead of muting forever).
 5. `./gradlew clean build` → verify the jar metadata (`plugin.yaml` inside the jar shows the new version).
 6. Verify against a running Halo instance that already has the plugin — the suite now lives **in this repo**:
 
    ```bash
    npm install                       # 一次性：装 puppeteer-core
    npm run verify                    # 全部套件
-   npm run verify:smoke              # 只跑冒烟（50/50）
+   npm run verify:smoke              # 只跑冒烟
    npm run verify:toast              # 只跑悬浮弹窗相关
    HALO_BASE=http://127.0.0.1:8090 npm run verify
    ```
 
-   套件分组见 `scripts/verify/run-all.mjs`：`smoke`（冒烟 50/50）、`behavior`（提醒状态机 + 图片失效降级）、
+   套件分组见 `scripts/verify/run-all.mjs`：`smoke`（冒烟）、`behavior`（提醒状态机 + 图片失效降级）、
    `ui`（控制台功能 + 前台）、`toast`（弹窗契约/频率/关闭方式/全站作用域）、`data`（附件库范围 + 拖拽排序）。
    脚本只通过接口与无头浏览器操作，会自建并清理测试数据。
    文档类检查用 `npm run verify:readmes`（三份 README 与远端一致 + 所有链接可访问）。
@@ -79,8 +86,12 @@ This file records how releases are prepared, so every release looks consistent.
 - `build/libs/plugin-important-dates-<version>.jar` must contain the console bundle: check for `console/main.*.js` inside the jar before shipping.
   The `buildFrontend` task may report success while producing nothing when npm cannot be started from Gradle
   (error: `A problem occurred starting process 'command 'npm''`). Set `NPM_CMD` to the npm executable, e.g.
-  `$env:NPM_CMD = "C:\Users\Administrator\AppData\Local\nvm\v22.20.0\npm.cmd"`, or build the UI first
+  `$env:NPM_CMD = "C:\nvm4w\nodejs\npm.cmd"`, or build the UI first
   (`cd console; npm run build`) and then package with `./gradlew build -x buildFrontend`.
+  A long-lived Gradle daemon also pins the `PATH` it was started with, so a freshly installed node may be invisible to it;
+  `./gradlew --stop` (or `NPM_CMD`) clears that up. `console/build/dist` must not be empty — an empty dist silently ships a
+  plugin whose settings page and dashboard widget are missing. Windows also needs a JDK 17+ for Gradle itself: the box defaults
+  to JDK 11, so pass `JAVA_HOME="C:\Program Files\Java\jdk-23"` (the plugin targets Java 17 bytecode).
 - Regression scripts live in this repo under `scripts/verify/`; they need a **running Halo instance with the plugin installed**.
   Start Halo with a work dir that uses **forward slashes** (`--halo.work-dir=F:/dsh/halo-test/work-xxx`) — backslashes break
   H2's `r2dbc:///` URL — and keep it as a detached process, not inside a job that can be killed.

@@ -386,7 +386,9 @@ try {
     const m = await readModal();
     assert(m.plateVisible, "改成汽油车后应显示车牌号");
     assert(m.energyValue !== null && !m.energyReadonly, `汽油车能源类型应可选，实际 value=${m.energyValue} readonly=${m.energyReadonly}`);
-    assert(m.options.length === 5, `汽油车应有 5 个到期项，实际 ${m.options.length}: ${m.options.join("/")}`);
+    // 6 项：交强险 / 商业险 / 年检 / 保养 / 车船税 / 自定义
+    // （自定义曾经漏在车型能力表外，导致这类到期项建得出来却永远不提醒）
+    assert(m.options.length === 6, `汽油车应有 6 个到期项，实际 ${m.options.length}: ${m.options.join("/")}`);
     return `选项=${m.options.join("/")} 行数=${m.rows}`;
   });
   await shot("switch-to-sedan");

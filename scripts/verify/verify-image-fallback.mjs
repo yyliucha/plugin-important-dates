@@ -196,22 +196,42 @@ await check("座驾表单相册行提示失效并可移除", async () => {
   }, String(RUN));
   if (!opened) throw new Error("未找到「失效图车」或编辑按钮");
   await new Promise((r) => setTimeout(r, 2500));
-  const album = await page.evaluate(() => {
+  // 相册分区默认是收起的（<details>），收起时 innerText 取不到行内文案，先展开
+  const expanded = await page.evaluate(async () => {
+    const modal = [...document.querySelectorAll(".modal, [role='dialog'], .vc-modal")].find((m) => (m.innerText || "").includes("编辑座驾"));
+    if (!modal) return { ok: false, why: "弹窗未找到" };
+    const sec = [...modal.querySelectorAll("details.sec")].find((d) => (d.querySelector(".sec-name")?.innerText || "").includes("相册"));
+    if (!sec) return { ok: false, why: "未找到相册分区" };
+    sec.open = true;
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    return { ok: sec.open, why: "" };
+  });
+  if (!expanded.ok) throw new Error(`相册分区未展开: ${expanded.why}`);
+  await new Promise((r) => setTimeout(r, 800));
+  const modalInfo = await page.evaluate(() => {
     const modal = [...document.querySelectorAll(".modal, [role='dialog'], .vc-modal")].find((m) => (m.innerText || "").includes("编辑座驾"));
     if (!modal) return null;
     const rows = [...modal.querySelectorAll(".album-item")];
-    return rows.map((r) => ({
-      text: (r.innerText || "").replace(/\s+/g, " "),
-      brokenThumb: !!r.querySelector(".thumb-broken"),
-      hasImg: !!r.querySelector("img.thumb"),
-    }));
+    return {
+      removeBrokenLabel: [...modal.querySelectorAll(".album-actions button")]
+        .map((b) => (b.innerText || "").trim())
+        .find((t) => t.includes("移除失效图片")) || "",
+      rows: rows.map((r) => ({
+        text: (r.innerText || "").replace(/\s+/g, " "),
+        brokenThumb: !!r.querySelector(".thumb-broken"),
+        hasImg: !!r.querySelector("img.thumb"),
+      })),
+    };
   });
+  if (!modalInfo) throw new Error("弹窗未打开");
+  const album = modalInfo.rows;
   if (!album?.length) throw new Error("相册为空或弹窗未打开");
   const broken = album.find((r) => r.brokenThumb);
   if (!broken) throw new Error(`未标记失效缩略图: ${JSON.stringify(album)}`);
   if (!broken.text.includes("图片已不可用")) throw new Error(`缺少说明文案: ${broken.text}`);
   if (broken.hasImg) throw new Error("失效图片仍渲染 <img>");
-  return `${broken.text.slice(0, 40)}…`;
+  if (!modalInfo.removeBrokenLabel) throw new Error("相册区没有「移除失效图片」按钮");
+  return `${broken.text.slice(0, 40)}…；${modalInfo.removeBrokenLabel}`;
 });
 
 // ---------- 前台：降级渲染 ----------

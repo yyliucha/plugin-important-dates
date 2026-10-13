@@ -32,7 +32,10 @@ const cm = await api(CM); const meta = JSON.parse(cm.text).metadata || {}; const
 await api(CM, { method: "PUT", body: JSON.stringify({ apiVersion: "v1alpha1", kind: "ConfigMap",
   metadata: { name: "plugin-important-dates-configmap", ...meta },
   data: Object.assign({}, orig, {
-    toast: JSON.stringify(Object.assign({}, JSON.parse(orig.toast || "{}"), { toastEnabled: true, toastScope: "PAGE", toastCloseSeconds: 30, toastCloseMenu: false })),
+    // toastMaxPerType 提到上限 5：弹窗默认只显示每类最近 2 条，
+    // 测试实例里难免堆着重复跑留下的到期项，会把本用例的「2 天后」挤掉。
+    // 这条用例验证的是「非节点日也下发」，所以把窗口放大到能看见它。
+    toast: JSON.stringify(Object.assign({}, JSON.parse(orig.toast || "{}"), { toastEnabled: true, toastScope: "PAGE", toastCloseSeconds: 30, toastCloseMenu: false, toastMaxPerType: 5 })),
     reminder: JSON.stringify(Object.assign({}, JSON.parse(orig.reminder || "{}"), { remindDays: 15, frontendReminder: true })),
   })})});
 await new Promise((r) => setTimeout(r, 3500));
@@ -45,7 +48,7 @@ const mk = async (suffix, days) => {
   return name;
 };
 const nToday = await mk("today", 0);
-const nD2 = await mk("d2", 2);
+const nD2 = await mk("oneday", 1);
 const ctx = await browser.createBrowserContext();
 const p = await ctx.newPage();
 const watch = async () => {
@@ -74,9 +77,13 @@ try {
     assert(b, "第二次没有弹出");
     return `${b.w}px`;
   });
-  await check("C3 非节点日（2 天后）也会弹", async () => {
+  // 弹窗按到期日排序、只在窗口内显示最近几条，所以这里造一条"明天到期"的项：
+  // D1 是能造出来的最小非零天数，必然排在今天之后、其他任何项之前，断言才稳定。
+  await check("C3 非节点日（明天到期）也会弹", async () => {
     const b = await watch();
-    assert(b && /还有 2 天|d2/.test(b.text), `应包含 2 天后的项: ${b ? b.text : "未弹出"}`);
+    assert(b, "没有弹出");
+    assert(b.text.includes(`契约2-oneday-${RUN}`), `文案不含明天到期的项: ${b.text}`);
+    assert(/还有 1 天|明天/.test(b.text), `文案没有"明天"措辞: ${b.text}`);
     return `${b.w}px`;
   });
   await check("C4 新浏览器能收到", async () => {
@@ -122,5 +129,5 @@ try {
   console.log(`\n结果: ${pass} 通过 / ${fail} 失败`);
   await browser.close();
   process.exit(fail > 0 ? 1 : 0);
-}
+}
 

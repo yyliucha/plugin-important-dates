@@ -18,7 +18,7 @@ A Halo 2.x plugin that remembers things for you: anniversaries, birthdays and th
 | ![Public page](docs/screenshots/screenshot-frontend-page.png) | **Public `/important-dates`** — Life view: important dates + the people you care about (birthday countdowns) |
 | ![Garage view](docs/screenshots/screenshot-frontend-car.png) | **Garage view**: vehicle cards (masked plate, due badges) + owners & drivers (matching badges) + other people |
 | ![Album viewer](docs/screenshots/screenshot-frontend-album.png) | **Album viewer**: click a cover to browse full-screen (read-only, Esc to close); only photos marked “show” are public |
-| ![Toast reminder](docs/screenshots/screenshot-toast.png) | **Site-wide toast**: configurable position, countdown + progress bar, dismiss menu (session / 3 days / 10 days / forever) |
+| ![Toast reminder](docs/screenshots/screenshot-toast.png) | **Site-wide toast**: configurable position, countdown + progress bar, dismiss menu (this time / not today / hide for N days) |
 
 ## Features
 
@@ -104,9 +104,11 @@ A Halo 2.x plugin that remembers things for you: anniversaries, birthdays and th
 - **Enable**: emitted through the official `TemplateHeadProcessor`; disabling removes it, uninstalling takes it away with the plugin
 - **Position**: bottom-right / bottom-left / top-right / top-left / bottom-centre / screen-centre (default bottom-right)
 - **Placeholders**: `{title}`, `{whenText}`, `{daysUntil}`, `{dateText}`, `{nextSolarDate}`
-- **Behaviour**: **the popup appears on every page load** (since 1.3.1; previously once per browser); auto-close (8s by default, with countdown and progress bar); the × menu offers **this time / 3 days / 10 days / forever**
-- **Close menu** (on by default): pressing × offers those four choices; with the menu switched off, × only dismisses the popup that is on screen and never silences the reminder behind your back
-  - ⚠️ The menu has a 5-second timeout: if nothing is chosen it applies the **default × action**. Set that default to "this time" or "3 days" - **not "forever"** - or a slow click will silence the popup permanently
+- **Behaviour**: **the popup appears on every page load** (since 1.3.1; previously once per browser); auto-close (8s by default, with countdown and progress bar); the × menu offers **this time / not today / hide for N days**
+- **Close menu** (on by default): pressing × offers those choices; with the menu switched off, × only dismisses the popup that is on screen and never silences the reminder behind your back
+  - The durations are selectable in the settings (default **3 / 5 / 7 / 30 days**)
+  - **There is no "never show again"**: every silence has an expiry, so nobody can mute the popup for good with one careless click
+  - ⚠️ The menu has a 5-second timeout: if nothing is chosen it applies the **default × action** (keep it at "this time" or "not today")
 
 > Historical note: versions up to 1.0.21 used “code injection”, and 1.0.30–1.1.1 maintained an injected snippet. Since 1.1.2 the plugin uses the official extension point — **if your site still has `id-toast:start/end` in Settings → Code injection, please delete it once.**
 

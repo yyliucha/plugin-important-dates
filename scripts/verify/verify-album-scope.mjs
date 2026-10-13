@@ -132,9 +132,17 @@ const openCarLibrary = async () => {
   });
   if (!clicked) throw new Error("未找到座驾卡片");
   await new Promise((r) => setTimeout(r, 2500));
-  const opened = await page.evaluate(() => {
+  const opened = await page.evaluate(async () => {
     const modal = [...document.querySelectorAll(".modal, [role='dialog'], .vc-modal")].find((m) => (m.innerText || "").includes("编辑座驾"));
-    const btn = [...(modal?.querySelectorAll("button") || [])].find((b) => (b.innerText || "").trim() === "从附件库选择");
+    if (!modal) return false;
+    // 「从附件库选择」在相册分区里，而相册分区默认是收起的：先展开，否则按钮虽然
+    // 在 DOM 里但不可见，直接点也会被当成"找不到"。
+    const sec = [...modal.querySelectorAll("details.sec")].find((d) => (d.querySelector(".sec-name")?.innerText || "").includes("相册"));
+    if (sec && !sec.open) {
+      sec.open = true;
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    }
+    const btn = [...(modal.querySelectorAll("button") || [])].find((b) => (b.innerText || "").trim() === "从附件库选择");
     if (!btn) return false;
     btn.click();
     return true;

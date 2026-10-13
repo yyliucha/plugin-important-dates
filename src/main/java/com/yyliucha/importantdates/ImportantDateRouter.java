@@ -228,6 +228,8 @@ public class ImportantDateRouter {
         result.put("toastEmptyText", cfg.toastEmptyText());
         result.put("toastDefaultClose", cfg.toastDefaultClose());
         result.put("toastCloseMenu", cfg.toastCloseMenu());
+        // 关闭菜单里"N 天内不显示"的可选天数（没有「永久」项）
+        result.put("toastDurations", cfg.toastDurations());
         result.put("toastMaxPerType", cfg.toastMaxPerType());
         // 提示频率限制（1.3.3）：由前端按浏览器记录执行
         result.put("toastFrequency", cfg.toastFrequency());
@@ -458,12 +460,15 @@ public class ImportantDateRouter {
                 toastFrequency = "every";
             }
             int toastFrequencyN = Math.max(1, Math.min(60, intValue(t, "toastFrequencyN", 3)));
+            // 关闭菜单里可选的时长（天）：设置多选，服务端规范化后下发，前端照着渲染
+            List<Integer> toastDurations = parseToastDurations(t, "toastDurations");
             return new ReminderConfig(days, frontendReminder, showImportantTag,
                 toastCloseSeconds, toastEnabled, toastPosition, toastTitle, toastTemplate,
                 toastEmptyText, toastDefaultClose, toastCloseMenu, showAvatar,
                 carEventsEnabled, carFrontendSection, carSkinEnabled, toastMaxPerType,
                 dashboardPageSize, dashboardPagination, allowDismiss, overdueRemindDays,
-                frontendShowOverdue, toastScope, toastFrequency, toastFrequencyN);
+                frontendShowOverdue, toastScope, toastFrequency, toastFrequencyN,
+                toastDurations);
         });
     }
 
@@ -507,7 +512,48 @@ public class ImportantDateRouter {
         boolean carEventsEnabled, boolean carFrontendSection, boolean carSkinEnabled,
         int toastMaxPerType, int dashboardPageSize, boolean dashboardPagination,
         boolean allowDismiss, int overdueRemindDays, boolean frontendShowOverdue,
-        String toastScope, String toastFrequency, int toastFrequencyN) {
+        String toastScope, String toastFrequency, int toastFrequencyN,
+        List<Integer> toastDurations) {
+    }
+
+    /** 关闭菜单里可选的时长（天）兜底值：没有任何「永久不再提示」。 */
+    static final List<Integer> DEFAULT_TOAST_DURATIONS = List.of(3, 5, 7, 30);
+
+    /**
+     * 解析设置里的「N 天内不显示」多选时长。
+     *
+     * <p>表单多选存回来的形态不固定：可能是数组 {@code ["3","30"]}、也可能是逗号分隔的
+     * 文本 {@code "3,30"}，留空或全填坏时回退默认值。这里统一规范化成去重升序的天数列表，
+     * 并限制在 1–365 天之间 —— 前端只是照着下发值渲染菜单，不会再出现「永久」这种无期限选项。
+     */
+    static List<Integer> parseToastDurations(JsonNode node, String field) {
+        List<Integer> out = new java.util.ArrayList<>();
+        JsonNode value = node == null ? null : node.path(field);
+        if (value != null && value.isArray()) {
+            for (JsonNode item : value) {
+                addDuration(out, item.asText(""));
+            }
+        } else if (value != null && !value.isMissingNode() && !value.isNull()) {
+            for (String part : value.asText("").split(",")) {
+                addDuration(out, part);
+            }
+        }
+        if (out.isEmpty()) {
+            return DEFAULT_TOAST_DURATIONS;
+        }
+        java.util.Collections.sort(out);
+        return out;
+    }
+
+    private static void addDuration(List<Integer> out, String raw) {
+        try {
+            int days = (int) Math.floor(Double.parseDouble(String.valueOf(raw).trim()));
+            if (days >= 1 && days <= 365 && !out.contains(days)) {
+                out.add(days);
+            }
+        } catch (NumberFormatException ignored) {
+            // 空值或非数字：跳过，交给兜底逻辑
+        }
     }
 }
 
