@@ -130,3 +130,9 @@ cd plugin-important-dates
 The artifact is written to `build/libs/plugin-important-dates-<version>.jar` (current version: `1.3.2`; previous stable: `1.3.1`). Hard-refresh your browser once after installing a new build, and restart the Halo process.
 
 > Release notes: **1.3.2** is copy only: every public description now says "记得" and nothing else. The plugin id, data and upgrade path are unchanged, and behaviour matches 1.3.1.
+>
+> Previous: **1.3.1** fixed a chain of defects that stopped the popup from appearing and made it show on every page load; **1.3.0** tiered the vehicle form by vehicle type, kept data across a type switch, and rebuilt the edit dialog.
+
+## License
+
+[MIT](LICENSE)
