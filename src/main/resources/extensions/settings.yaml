@@ -103,6 +103,8 @@ spec:
           options:
             - label: 本次关闭（刷新/换页重新弹出）
               value: once
+            - label: 今天不再提示（当天 24 点前不再弹）
+              value: today
             - label: 1 天内不显示
               value: 1d
             - label: 3 天内不显示
@@ -115,7 +117,26 @@ spec:
               value: 30d
             - label: 永久关闭
               value: forever
-          help: 访客点 × 后的默认关闭行为；开启「关闭方式菜单」时，点 × 会先弹出选择菜单，5 秒未选择则按此默认执行（本次关闭仅收起当前弹窗，不记任何状态）
+          help: 未选择时执行的默认行为（菜单开启后 5 秒未选也会套用它）。⚠️ 若把这里设成「永久关闭」，访客手慢一点就会被永久静音，建议保持「本次关闭」或「今天不再提示」
+        - $formkit: select
+          name: toastFrequency
+          label: 提示频率
+          value: every
+          options:
+            - label: 每次打开页面都提示
+              value: every
+            - label: 每天最多提示 N 次
+              value: daily
+            - label: 每 N 分钟最多提示一次
+              value: interval
+          help: 弹窗出现得太频繁时可在这里限制。「每次打开页面都提示」最容易看到，但浏览任何页面都会浮出来一次；限制按访客浏览器记录，跨设备各自计算
+        - $formkit: number
+          name: toastFrequencyN
+          label: 频率限制的 N
+          value: 3
+          min: 1
+          max: 60
+          help: 配合上面的「提示频率」使用：选「每天最多」时表示一天最多弹几次（默认 3 次）；选「每 N 分钟」时表示两次提示之间至少间隔多少分钟（默认 30 分钟）。选「每次打开页面都提示」时本项无效
         - $formkit: number
           name: toastMaxPerType
           label: 每类最多显示条数
@@ -127,7 +148,7 @@ spec:
           name: toastCloseMenu
           label: 关闭方式菜单
           value: true
-          help: 点 × 弹出「本次关闭 / 3 天内不显示 / 10 天内不显示 / 永久关闭」选择；关闭后直接按「× 关闭默认行为」执行。时长与永久记录在访客浏览器 localStorage，到期自动恢复（清浏览器站点数据可重置）
+          help: 开启时点 × 弹出「本次关闭 / 今天不再提示 / 3 天内不显示 / 10 天内不显示 / 永久关闭」选择，5 秒未选择则按「× 关闭默认行为」执行；关闭菜单时点 × 只收起当前这个弹窗，不写任何记录。各项时长记录在访客浏览器 localStorage，到期自动恢复（清浏览器站点数据可重置）
     - group: basic
       label: 展示设置
       formSchema:

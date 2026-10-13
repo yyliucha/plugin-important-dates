@@ -56,10 +56,23 @@ This file records how releases are prepared, so every release looks consistent.
 4. If `reminder-toast.js` changed, bump `TOAST_SCRIPT_VERSION` in `ReminderHeadProcessor` so browsers do not keep the cached old script
    (plugin static assets are served with `max-age=31536000` — without the bump the new script never reaches returning visitors).
 5. `./gradlew clean build` → verify the jar metadata (`plugin.yaml` inside the jar shows the new version).
-5. Verify on a clean Halo 2.26 instance: `halo-smoke.mjs` (50/50, includes the 1.2.1 car checks) plus the browser end-to-end script (`browser-121-e2e.mjs`, 13/13) and the migration script (`migrate-check.mjs`).
-6. Commit and push (English message), wait for CI to pass.
-7. Create the release: title = `<tag>`, notes = Chinese section + English section (see above), one jar asset, `--latest` for stable or `--prerelease` for previews.
-8. Submit the store version with the Chinese notes, then update the store app info if needed.
+6. Verify against a running Halo instance that already has the plugin — the suite now lives **in this repo**:
+
+   ```bash
+   npm install                       # 一次性：装 puppeteer-core
+   npm run verify                    # 全部套件
+   npm run verify:smoke              # 只跑冒烟（50/50）
+   npm run verify:toast              # 只跑悬浮弹窗相关
+   HALO_BASE=http://127.0.0.1:8090 npm run verify
+   ```
+
+   套件分组见 `scripts/verify/run-all.mjs`：`smoke`（冒烟 50/50）、`behavior`（提醒状态机 + 图片失效降级）、
+   `ui`（控制台功能 + 前台）、`toast`（弹窗契约/频率/关闭方式/全站作用域）、`data`（附件库范围 + 拖拽排序）。
+   脚本只通过接口与无头浏览器操作，会自建并清理测试数据。
+   文档类检查用 `npm run verify:readmes`（三份 README 与远端一致 + 所有链接可访问）。
+7. Commit and push (English message), wait for CI to pass.
+8. Create the release: title = `<tag>`, notes = Chinese section + English section (see above), one jar asset, `--latest` for stable or `--prerelease` for previews.
+9. Submit the store version with the Chinese notes, then update the store app info if needed.
 
 ## Local build notes (Windows dev box)
 
@@ -68,9 +81,13 @@ This file records how releases are prepared, so every release looks consistent.
   (error: `A problem occurred starting process 'command 'npm''`). Set `NPM_CMD` to the npm executable, e.g.
   `$env:NPM_CMD = "C:\Users\Administrator\AppData\Local\nvm\v22.20.0\npm.cmd"`, or build the UI first
   (`cd console; npm run build`) and then package with `./gradlew build -x buildFrontend`.
-- Regression scripts live outside the repo in `F:\dsh\halo-test`: start Halo with
-  `--halo.work-dir=F:/dsh/halo-test/work-xxx` (**forward slashes** — backslashes break H2's `r2dbc:///` URL) and
-  keep it running as a detached process (`Start-Process -RedirectStandardOutput ...`), not inside a job that can be killed.
+- Regression scripts live in this repo under `scripts/verify/`; they need a **running Halo instance with the plugin installed**.
+  Start Halo with a work dir that uses **forward slashes** (`--halo.work-dir=F:/dsh/halo-test/work-xxx`) — backslashes break
+  H2's `r2dbc:///` URL — and keep it as a detached process, not inside a job that can be killed.
+- **Replacing the jar on disk does not reload the plugin.** Halo keeps serving the previously loaded classes until the
+  process restarts; observed repeatedly, including one case where the file hash matched the build exactly while the
+  endpoint still answered with the old logic. Always restart Halo, and keep only one `plugin-important-dates-*.jar` in the
+  plugins directory. The reminders endpoint returns a `build` field — use it to confirm which server code is actually live.
 - After installing a new build, **hard-refresh the browser**: the Halo console caches plugin console bundles, and a
   stale bundle shows up as a missing "记得" menu, missing settings tabs or a missing dashboard widget.
 ## 版本号规则（Halo 强校验，踩过的坑）

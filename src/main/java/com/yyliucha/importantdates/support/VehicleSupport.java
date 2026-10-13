@@ -103,9 +103,10 @@ public final class VehicleSupport {
 
     // ---------- 车型能力（1.2.8）：与前端 console/src/utils/vehicle.ts 保持同一口径 ----------
 
-    /** 机动车适用的到期项（电瓶车/自行车没有保险、年检、车船税） */
+    /** 机动车适用的到期项（电瓶车/自行车没有保险、年检、车船税）。
+     *  注意必须包含 CUSTOM：自定义项是"记点别的"的唯一出口，漏掉它会让车主自建的项目（如轮胎更换）完全不提醒。 */
     private static final java.util.Set<String> MOTOR_KEYS = java.util.Set.of(
-        "INSURANCE_COMPULSORY", "INSURANCE_COMMERCIAL", "INSPECTION", "TAX", "MAINTENANCE"
+        "INSURANCE_COMPULSORY", "INSURANCE_COMMERCIAL", "INSPECTION", "TAX", "MAINTENANCE", "CUSTOM"
     );
     /** 电瓶车 / 自行车：只有保养与自定义 */
     private static final java.util.Set<String> LIGHT_KEYS = java.util.Set.of("MAINTENANCE", "CUSTOM");

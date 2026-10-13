@@ -1,0 +1,18 @@
+{
+  "name": "plugin-important-dates-verify",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "黑盒验证套件：需要一个已安装本插件的 Halo 实例（只做接口与界面验证，不修改插件代码）",
+  "scripts": {
+    "verify": "node scripts/verify/run-all.mjs",
+    "verify:smoke": "node scripts/verify/run-all.mjs smoke",
+    "verify:ui": "node scripts/verify/run-all.mjs ui",
+    "verify:toast": "node scripts/verify/run-all.mjs toast",
+    "verify:data": "node scripts/verify/run-all.mjs data",
+    "verify:readmes": "node scripts/verify/check-readmes.mjs && node scripts/verify/check-readme-links.mjs"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^25.9.0"
+  }
+}

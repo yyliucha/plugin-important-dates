@@ -78,10 +78,11 @@ export interface VehicleCapability {
 
 /**
  * 三轮/四轮机动车（保险、年检、车船税齐全）。
+ * 必须包含 CUSTOM：自定义项是"记点别的"的唯一出口，漏掉它会让车主自建的项目（如轮胎更换）在表单里选不到、也不提醒。
  * 注意：驾照换证是「人」的事、不是车的事（同一人开两辆车会重复提醒），已从座驾到期项中移除；
  * 老数据里已有的 LICENSE 项会走「保留但不展示」（见 CarFormModal 的 hiddenReminders）。
  */
-const MOTOR_KEYS = ["INSURANCE_COMPULSORY", "INSURANCE_COMMERCIAL", "INSPECTION", "TAX", "MAINTENANCE"];
+const MOTOR_KEYS = ["INSURANCE_COMPULSORY", "INSURANCE_COMMERCIAL", "INSPECTION", "TAX", "MAINTENANCE", "CUSTOM"];
 /** 电瓶车：多数地区不需要保险与年检，按当地规定可自定义 */
 const EBIKE_KEYS = ["MAINTENANCE", "CUSTOM"];
 /** 自行车：只有保养（刹车/链条/轮胎）值得记 */

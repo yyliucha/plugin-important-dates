@@ -2,6 +2,8 @@
 build/
 .idea/
 *.iml
+node_modules/
 console/node_modules/
 console/dist/
 console/.vite/
+scripts/verify/out/

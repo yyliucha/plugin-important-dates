@@ -229,6 +229,9 @@ public class ImportantDateRouter {
         result.put("toastDefaultClose", cfg.toastDefaultClose());
         result.put("toastCloseMenu", cfg.toastCloseMenu());
         result.put("toastMaxPerType", cfg.toastMaxPerType());
+        // 提示频率限制（1.3.3）：由前端按浏览器记录执行
+        result.put("toastFrequency", cfg.toastFrequency());
+        result.put("toastFrequencyN", cfg.toastFrequencyN());
         result.put("dashboardPageSize", cfg.dashboardPageSize());
         result.put("dashboardPagination", cfg.dashboardPagination());
         result.put("allowDismiss", cfg.allowDismiss());
@@ -449,12 +452,18 @@ public class ImportantDateRouter {
             boolean carFrontendSection = boolValue(c, "carFrontendSection", true);
             boolean carSkinEnabled = boolValue(c, "carSkinEnabled", true);
             int toastMaxPerType = intValue(t, "toastMaxPerType", 2);
+            // 提示频率（1.3.3）：every = 每次打开都弹；daily = 每天最多 N 次；interval = 每 N 分钟最多一次
+            String toastFrequency = textValue(t, "toastFrequency", "every");
+            if (!"daily".equals(toastFrequency) && !"interval".equals(toastFrequency)) {
+                toastFrequency = "every";
+            }
+            int toastFrequencyN = Math.max(1, Math.min(60, intValue(t, "toastFrequencyN", 3)));
             return new ReminderConfig(days, frontendReminder, showImportantTag,
                 toastCloseSeconds, toastEnabled, toastPosition, toastTitle, toastTemplate,
                 toastEmptyText, toastDefaultClose, toastCloseMenu, showAvatar,
                 carEventsEnabled, carFrontendSection, carSkinEnabled, toastMaxPerType,
                 dashboardPageSize, dashboardPagination, allowDismiss, overdueRemindDays,
-                frontendShowOverdue, toastScope);
+                frontendShowOverdue, toastScope, toastFrequency, toastFrequencyN);
         });
     }
 
@@ -498,7 +507,7 @@ public class ImportantDateRouter {
         boolean carEventsEnabled, boolean carFrontendSection, boolean carSkinEnabled,
         int toastMaxPerType, int dashboardPageSize, boolean dashboardPagination,
         boolean allowDismiss, int overdueRemindDays, boolean frontendShowOverdue,
-        String toastScope) {
+        String toastScope, String toastFrequency, int toastFrequencyN) {
     }
 }
 

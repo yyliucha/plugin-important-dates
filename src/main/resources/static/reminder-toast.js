@@ -10,12 +10,15 @@
  */
 (function () {
   // 便于排查：浏览器控制台执行 window.__ID_TOAST_VERSION 即可确认当前跑的是哪一版脚本
-  window.__ID_TOAST_VERSION = "134";
+  window.__ID_TOAST_VERSION = "135";
   var KEY_UNTIL = "id-toast-until";
   var KEY_FOREVER = "id-toast-forever";
-  /** 本浏览器**确实弹出过**的提醒指纹（只在弹窗真的显示后才记录） */
+  /** 提示频率记录（按访客浏览器计）：上次弹出的时间戳、当天已弹次数与当天日期 */
+  var KEY_LAST_SHOWN = "id-toast-last";
+  var KEY_DAY = "id-toast-day";
   var MENU_ITEMS = [
     { label: "本次关闭", value: "once" },
+    { label: "今天不再提示", value: "today" },
     { label: "3 天内不显示", value: "3d" },
     { label: "10 天内不显示", value: "10d" },
     { label: "永久关闭", value: "forever" }
@@ -63,11 +66,17 @@
     return false;
   }
 
-  /** 按选择执行关闭：once 仅收起当前弹窗；时长/永久写入 localStorage。 */
+  /** 按选择执行关闭：once 仅收起当前弹窗；today/时长/永久写入 localStorage。 */
   function applyDismiss(choice, hide) {
     if (choice === "forever") {
       lsSet(KEY_FOREVER, "1");
       lsRemove(KEY_UNTIL);
+    } else if (choice === "today") {
+      // 今天不再提示：撑到当地当天 24 点，跨天自动恢复
+      var end = new Date();
+      end.setHours(24, 0, 0, 0);
+      lsSet(KEY_UNTIL, String(end.getTime()));
+      lsRemove(KEY_FOREVER);
     } else if (choice && choice !== "once") {
       var days = { "1d": 1, "3d": 3, "7d": 7, "10d": 10, "30d": 30 }[choice];
       if (days) {
@@ -241,13 +250,48 @@
     return true;
   }
 
+  /** 今天（当地日期）的标识，用于判断"当天已弹次数"是否过期 */
+  function todayKey() {
+    var d = new Date();
+    return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
+  }
+
+  /**
+   * 提示频率是否允许现在弹（由页主设置，记录在本浏览器）：
+   *   every    每次都弹（不限制）
+   *   daily    当天最多 N 次（跨天自动清零）
+   *   interval 距上次弹出至少 N 分钟
+   */
+  function frequencyAllows(d) {
+    var mode = d.toastFrequency || "every";
+    var n = Number(d.toastFrequencyN);
+    if (!isFinite(n) || n < 1) n = 1;
+    if (mode === "daily") {
+      if (lsGet(KEY_DAY) !== todayKey()) return true;   // 新的一天，计数作废
+      return Number(lsGet(KEY_LAST_SHOWN + "-count") || 0) < n;
+    }
+    if (mode === "interval") {
+      var last = Number(lsGet(KEY_LAST_SHOWN) || 0);
+      return !last || (Date.now() - last) >= n * 60000;
+    }
+    return true;
+  }
+
+  /** 记录"刚刚弹过一次"（只在弹窗确实显示之后调用） */
+  function markShown() {
+    var today = todayKey();
+    var count = lsGet(KEY_DAY) === today ? Number(lsGet(KEY_LAST_SHOWN + "-count") || 0) : 0;
+    lsSet(KEY_DAY, today);
+    lsSet(KEY_LAST_SHOWN + "-count", String(count + 1));
+    lsSet(KEY_LAST_SHOWN, String(Date.now()));
+  }
+
   function load() {
     var run = function () {
       // 数据实时取自 /important-dates-reminders（公开 GET，匿名可访问），
       // 服务端总是给出"进入提醒期且尚未写库标记"的完整清单。
-      // "同一浏览器只弹一次"在**弹窗真的显示之后**才记到 localStorage ——
-      // 不能用服务端 cookie 交付即记账：那样只要交付过一次（哪怕当时没看见、
-      // 或被关闭期挡住），之后就一直被判为"弹过了"，用户永远收不到。
+      // 弹窗是否真的显示，由下面的频率限制 + 关闭期共同决定，全部记在访客浏览器；
+      // 服务端不做任何"交付即记账"，否则用户没看到也会被判为已弹过。
       fetch("/important-dates-reminders?ts=" + Date.now(), { credentials: "same-origin" })
         .then(function (r) {
           return r.json();
@@ -256,9 +300,9 @@
           if (!d || d.toastEnabled === false) return;
           var items = d.toastItems || [];
           if (!items.length) return;
-          // 每次打开页面都提示（页主选择的行为）：服务端每次给出完整清单，这里不再按浏览器记账。
-          // 「关闭方式」里的时长/永久选项仍然生效（记在 localStorage，见 isDismissed）。
-          show({
+          // 提示频率（页主设置）：every 每次都弹 / daily 每天最多 N 次 / interval 每 N 分钟最多一次
+          if (!frequencyAllows(d)) return;
+          if (show({
             toastPosition: d.toastPosition,
             toastTitle: d.toastTitle,
             toastTemplate: d.toastTemplate,
@@ -267,7 +311,9 @@
             toastDefaultClose: d.toastDefaultClose,
             toastCloseMenu: d.toastCloseMenu,
             reminders: items
-          });
+          })) {
+            markShown();
+          }
         })
         .catch(function () {});
     };
