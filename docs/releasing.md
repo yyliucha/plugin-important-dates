@@ -99,6 +99,14 @@ This file records how releases are prepared, so every release looks consistent.
   process restarts; observed repeatedly, including one case where the file hash matched the build exactly while the
   endpoint still answered with the old logic. Always restart Halo, and keep only one `plugin-important-dates-*.jar` in the
   plugins directory. The reminders endpoint returns a `build` field — use it to confirm which server code is actually live.
+- **Never hand-swap the jar file to test a new build.** Halo stores each plugin's load path (`status.loadLocation`) in its
+  database, so moving `plugin-important-dates-<old>.jar` away and dropping in a different filename leaves that path
+  dangling: the plugin is silently **not loaded at all** (API 404, console menu gone, phase `UNKNOWN`). The reliable
+  sequence is: **upload the new jar through Halo's own upgrade API**, then confirm `build` on the endpoint. Two traps in
+  that flow: `/plugins/{name}/upgrade` **rejects the version already installed** (HTTP 500 — bump the version to test
+  again), and `/plugins/{name}/upgrade-from-uri` fetches over HTTP, so a `file://` URI will not work.
+  If the jar filename stays the same and the version matches, stopping Halo and overwriting that exact path in place does
+  work — but only because the recorded path is unchanged.
 - After installing a new build, **hard-refresh the browser**: the Halo console caches plugin console bundles, and a
   stale bundle shows up as a missing "记得" menu, missing settings tabs or a missing dashboard widget.
 ## 版本号规则（Halo 强校验，踩过的坑）

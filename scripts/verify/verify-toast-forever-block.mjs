@@ -67,7 +67,7 @@ try {
   await check("P2 菜单关闭时，点 × 不再静默写入任何静音标记", async () => {
     await p.evaluate(() => {
       const el = document.getElementById("id-toast-box");
-      el.querySelector("span").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      el.querySelector("#id-toast-close").dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     await new Promise((r) => setTimeout(r, 600));
     const st = await p.evaluate(() => ({ forever: localStorage.getItem("id-toast-forever"), until: localStorage.getItem("id-toast-until") }));
@@ -97,7 +97,7 @@ try {
     assert(await waitBox(), "未弹出");
     await p.evaluate(() => {
       const el = document.getElementById("id-toast-box");
-      el.querySelector("span").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      el.querySelector("#id-toast-close").dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     await new Promise((r) => setTimeout(r, 600));
     const st = await p.evaluate(() => ({ forever: localStorage.getItem("id-toast-forever"), until: localStorage.getItem("id-toast-until") }));

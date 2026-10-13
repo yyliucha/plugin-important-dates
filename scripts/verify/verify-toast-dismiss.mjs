@@ -45,9 +45,10 @@ const writeToast = async (over) => {
   if (![200, 201].includes(res.status)) throw new Error(`写设置失败 ${res.status}: ${res.text.slice(0, 160)}`);
   return res.status;
 };
-// 显式写死本次要用的取值，别依赖实例上残留的设置（上一次跑或手工调试留下的
-// toastDurations 会让 D1/D2/D3 这些"按默认菜单"的用例莫名其妙地失败）
-await writeToast({ toastDurations: "3,5,7,30" });
+// 显式写死本次要用的取值，别依赖实例上残留的设置 —— 上一轮跑（或手工调试）留下的
+// toastCloseMenu=false / toastDurations 会让 D1~D3 这些"按默认菜单"的用例莫名其妙地失败。
+// 这类"合并式写入"的默认值必须全部显式给出，否则用例的结果取决于上一个人留下了什么。
+await writeToast({ toastCloseMenu: true, toastDurations: "3,5,7,30", toastDefaultClose: "once", toastFrequency: "every" });
 await new Promise((r) => setTimeout(r, 3500));
 const DATE_BASE = "/apis/importantdates.halo.run/v1alpha1/importantdates";
 const d0 = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })();
@@ -81,7 +82,7 @@ const clearMarks = async () => {
 const openMenu = async () => {
   await p.goto(`${base}/`, { waitUntil: "domcontentloaded", timeout: 60000 });
   assert(await waitBox(), "未弹出");
-  await p.evaluate(() => document.querySelector("#id-toast-box span").dispatchEvent(new MouseEvent("click", { bubbles: true })));
+  await p.evaluate(() => document.querySelector("#id-toast-close").dispatchEvent(new MouseEvent("click", { bubbles: true })));
   await new Promise((r) => setTimeout(r, 700));
   return p.evaluate(() => {
     const btns = [...document.querySelectorAll("#id-toast-box button")];
@@ -115,8 +116,21 @@ try {
   await check("D2 选「3 天内不显示」→ 记 3 天，且刷新后不再弹", async () => {
     await p.goto(`${base}/`, { waitUntil: "domcontentloaded", timeout: 60000 });
     assert(await waitBox(), "未弹出");
-    await p.evaluate(() => document.querySelector("#id-toast-box span").dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    await p.evaluate(() => document.querySelector("#id-toast-close").dispatchEvent(new MouseEvent("click", { bubbles: true })));
     await new Promise((r) => setTimeout(r, 700));
+    const diag = await p.evaluate(async () => {
+      const box = document.getElementById("id-toast-box");
+      const served = await (await fetch("/important-dates-reminders?ts=" + Date.now())).json();
+      return {
+        boxExists: !!box,
+        menuTexts: box ? [...box.querySelectorAll("button")].map((b) => b.innerText.trim()) : [],
+        // 菜单没出现时这几个值基本能直接指出原因（多半是设置被上一轮跑带偏了）
+        servedCloseMenu: served.toastCloseMenu,
+        servedDefault: served.toastDefaultClose,
+        servedDurations: served.toastDurations,
+      };
+    });
+    if (!diag.menuTexts.length) throw new Error(`菜单未出现。诊断=${JSON.stringify(diag)}`);
     await clickMenu("3 天内不显示");
     await new Promise((r) => setTimeout(r, 500));
     const st = await marks();
@@ -132,7 +146,7 @@ try {
     await clearMarks();
     await p.goto(`${base}/`, { waitUntil: "domcontentloaded", timeout: 60000 });
     assert(await waitBox(), "未弹出");
-    await p.evaluate(() => document.querySelector("#id-toast-box span").dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    await p.evaluate(() => document.querySelector("#id-toast-close").dispatchEvent(new MouseEvent("click", { bubbles: true })));
     await new Promise((r) => setTimeout(r, 700));
     await clickMenu("30 天内不显示");
     await new Promise((r) => setTimeout(r, 500));
@@ -145,7 +159,7 @@ try {
     await clearMarks();
     await p.goto(`${base}/`, { waitUntil: "domcontentloaded", timeout: 60000 });
     assert(await waitBox(), "未弹出");
-    await p.evaluate(() => document.querySelector("#id-toast-box span").dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    await p.evaluate(() => document.querySelector("#id-toast-close").dispatchEvent(new MouseEvent("click", { bubbles: true })));
     await new Promise((r) => setTimeout(r, 700));
     await clickMenu("今天不再提示");
     await new Promise((r) => setTimeout(r, 500));
@@ -163,7 +177,7 @@ try {
     await clearMarks();
     await p.goto(`${base}/`, { waitUntil: "domcontentloaded", timeout: 60000 });
     assert(await waitBox(), "未弹出");
-    await p.evaluate(() => document.querySelector("#id-toast-box span").dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    await p.evaluate(() => document.querySelector("#id-toast-close").dispatchEvent(new MouseEvent("click", { bubbles: true })));
     await new Promise((r) => setTimeout(r, 700));
     await clickMenu("本次关闭");
     await new Promise((r) => setTimeout(r, 500));

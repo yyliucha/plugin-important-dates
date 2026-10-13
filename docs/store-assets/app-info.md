@@ -26,4 +26,4 @@
 | 备用封面 | `docs/store-assets/cover-legacy-important-dates.png` | 1600×900，历史版本封面（已不使用） |
 | README | `README.store.md` | 应用市场 README 字段（图片绝对地址，可整段粘贴；该字段支持 Markdown） |
 | Logo | `docs/store-assets/logo.png` | 沿用现有日历图标 |
-| 版本说明 | `docs/release-notes-1.3.1.md`（正式版 1.3.1） | |
+| 版本说明 | `docs/release-notes-1.3.3.md`（正式版 1.3.3；英文版 `docs/release-notes-1.3.3.en.md`） | |

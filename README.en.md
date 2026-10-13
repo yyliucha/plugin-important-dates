@@ -105,6 +105,7 @@ A Halo 2.x plugin that remembers things for you: anniversaries, birthdays and th
 - **Position**: bottom-right / bottom-left / top-right / top-left / bottom-centre / screen-centre (default bottom-right)
 - **Placeholders**: `{title}`, `{whenText}`, `{daysUntil}`, `{dateText}`, `{nextSolarDate}`
 - **Behaviour**: **the popup appears on every page load** (since 1.3.1; previously once per browser); auto-close (8s by default, with countdown and progress bar); the × menu offers **this time / not today / hide for N days**
+- **A nudge, not a wall of items** (since 1.3.3): **one line per vehicle** (the soonest item, plus "this vehicle has N items due"); anything folded away or beyond the per-kind cap is summarised as **"N more"**, with a link at the bottom straight to the 记得 page. Full dates stay visible in the **front banner, dashboard widget and 记得 page** — the popup just stops throwing a dozen decisions at you at once
 - **Close menu** (on by default): pressing × offers those choices; with the menu switched off, × only dismisses the popup that is on screen and never silences the reminder behind your back
   - The durations are selectable in the settings (default **3 / 5 / 7 / 30 days**)
   - **There is no "never show again"**: every silence has an expiry, so nobody can mute the popup for good with one careless click
@@ -129,9 +130,9 @@ cd plugin-important-dates
 ./gradlew build
 ```
 
-The artifact is written to `build/libs/plugin-important-dates-<version>.jar` (current version: `1.3.1`; previous stable: `1.3.0`). Hard-refresh your browser once after installing a new build, and restart the Halo process.
+The artifact is written to `build/libs/plugin-important-dates-<version>.jar` (current version: `1.3.3`; previous stable: `1.3.1`). Hard-refresh your browser once after installing a new build, and restart the Halo process.
 
-> Release notes: **1.3.1** fixes a chain of defects that stopped the site-wide popup from ever appearing, shows the popup on every page load, and stops a stray × from muting the reminder silently.
+> Release notes: **1.3.3** teaches the popup to ask for fewer decisions — **one line per vehicle** with its item count, everything folded away summarised as **"N more"**, and a link straight to the 记得 page. The close menu keeps only choices that expire (**"never show again" is gone**, and a stale permanent-mute flag left in a visitor's browser is cleared automatically), adds a **"not today"** option, and the new reminder-frequency cap limits how often the popup can appear. It also fixes custom vehicle due-dates never triggering a reminder.
 >
 > Previous: **1.3.1** fixed a chain of defects that stopped the popup from appearing and made it show on every page load; **1.3.0** tiered the vehicle form by vehicle type, kept data across a type switch, and rebuilt the edit dialog.
 

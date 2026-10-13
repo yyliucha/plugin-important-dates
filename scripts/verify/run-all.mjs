@@ -28,6 +28,7 @@ const GROUPS = {
     "verify-toast-dismiss.mjs",
     "verify-toast-forever-block.mjs",
     "verify-toast-site.mjs",
+    "verify-toast-grouping.mjs",
   ],
   data: ["verify-album-scope.mjs", "verify-sort-save.mjs"],
 };

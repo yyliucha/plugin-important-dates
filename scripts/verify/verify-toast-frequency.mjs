@@ -120,7 +120,7 @@ try {
     // 点 × 打开菜单，检查选项文案
     await p.evaluate(() => {
       const el = document.getElementById("id-toast-box");
-      el.querySelector("span").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      el.querySelector("#id-toast-close").dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     await new Promise((r) => setTimeout(r, 400));
     const labels = await p.evaluate(() => {

@@ -46,7 +46,7 @@ public class ImportantDateRouter {
      * 用于确认站点上**实际生效**的是哪一版（插件目录里可能残留多个 jar，
      * Halo 有时会加载到旧的，光看插件页显示的版本号不足以判断）。
      */
-    private static final String BUILD_MARKER = "1.3.1";
+    private static final String BUILD_MARKER = "1.3.3";
 
     private final ImportantDateFinder importantDateFinder;
     private final ReactiveSettingFetcher settingFetcher;
@@ -231,6 +231,8 @@ public class ImportantDateRouter {
         // 关闭菜单里"N 天内不显示"的可选天数（没有「永久」项）
         result.put("toastDurations", cfg.toastDurations());
         result.put("toastMaxPerType", cfg.toastMaxPerType());
+        // 弹窗底部的详情入口文案（留空则不显示这一行）
+        result.put("toastMoreText", cfg.toastMoreText());
         // 提示频率限制（1.3.3）：由前端按浏览器记录执行
         result.put("toastFrequency", cfg.toastFrequency());
         result.put("toastFrequencyN", cfg.toastFrequencyN());
@@ -322,7 +324,6 @@ public class ImportantDateRouter {
                         List<Map<String, Object>> limited = new java.util.ArrayList<>();
                         int dateShown = 0;
                         int carShown = 0;
-                        int overflow = 0;
                         for (Map<String, Object> item : merged) {
                             boolean isDate = "date".equals(item.get("type"));
                             if (isDate ? dateShown < max : carShown < max) {
@@ -332,12 +333,9 @@ public class ImportantDateRouter {
                                 } else {
                                     carShown++;
                                 }
-                            } else {
-                                overflow++;
                             }
                         }
                         result.put("reminders", limited);
-                        result.put("overflowCount", overflow);
                         // 悬浮提示数据：每次实时计算，页面脚本拉取后弹出。
                         // 这里**不做交付去重** —— "同一浏览器只弹一次"由脚本在弹窗真的显示之后
                         // 记到 localStorage。曾经用 cookie 在服务端"交付即记账"，结果是：
@@ -346,11 +344,28 @@ public class ImportantDateRouter {
                         // 阈值与"提前提醒天数"一致：进入提醒期就弹，不要求正好落在 15/7/3/1/0 节点上
                         // （节点只管主动提醒的节奏，不该决定弹窗能否出现）。
                         java.util.List<Map<String, Object>> toastItems = new java.util.ArrayList<>();
+                        // 每辆车一共有几项到期（含超出窗口的），这些项不会被逐条显示，只体现在「共 N 项」里
+                        java.util.Map<String, Integer> carTotals = new java.util.HashMap<>();
+                        for (Map<String, Object> m : merged) {
+                            if ("car".equals(m.get("type"))) {
+                                carTotals.merge(carKey(m), 1, Integer::sum);
+                            }
+                        }
+                        // 弹窗里一辆车只占一行：留最近到期的那一项，其余折进「共 N 项」。
+                        // 弹窗是"提醒"不是"清单"—— 交强险/商业险/车船税/年检各占一行会变成 4 个决定，
+                        // 而它们其实是同一个动作。完整日期在横幅、仪表盘与「记得」页照旧逐条可见。
+                        java.util.Map<String, Integer> carGroupCount = new java.util.HashMap<>();
+                        // eligible = 若不设任何条数限制，弹窗本该显示多少条。
+                        // 「还有 N 项」只应该数**被限制挡掉的**那些，不能把逾期/已办/未到期
+                        // 这类本来就不该出现在弹窗里的项算进去 —— 否则数字会虚高，用户被吓一跳。
+                        int eligible = 0;
                         for (Map<String, Object> m : merged) {
                             // 只有座驾到期项带 status（"PENDING"/"TODO"/…）；纪念日与生日没有这个字段，
                             // 不能因此被过滤掉，否则悬浮提示对纪念日/生日永远不弹。
-                            if ("car".equals(m.get("type")) && !"PENDING".equals(m.get("status"))) {
-                                continue;
+                            if ("car".equals(m.get("type"))) {
+                                if (!"PENDING".equals(m.get("status"))) {
+                                    continue;
+                                }
                             }
                             Object daysObj = m.get("daysUntil");
                             if (!(daysObj instanceof Number num) || num.longValue() < 0) {
@@ -359,9 +374,26 @@ public class ImportantDateRouter {
                             if (Boolean.TRUE.equals(m.get("stageNotified"))) {
                                 continue;
                             }
-                            toastItems.add(m);
+                            eligible++;
+                            if (!"car".equals(m.get("type"))) {
+                                toastItems.add(m);
+                                continue;
+                            }
+                            String key = carKey(m);
+                            Integer seen = carGroupCount.get(key);
+                            if (seen == null) {
+                                carGroupCount.put(key, 1);
+                                Map<String, Object> copy = new LinkedHashMap<>(m);
+                                // 该车一共有几项到期：让弹窗能说「共 N 项」，而不是只显示手里这一条
+                                copy.put("groupTotal", carTotals.getOrDefault(key, 1));
+                                toastItems.add(copy);
+                            } else {
+                                carGroupCount.put(key, seen + 1);
+                            }
                         }
                         result.put("toastItems", toastItems);
+                        // 被限制挡掉、没能显示出来的条数（一辆车折叠掉的和每类超出上限的都算）
+                        result.put("overflowCount", Math.max(0, eligible - toastItems.size()));
                         // 待处理（逾期超过窗口）：不再主动提醒，但计入总览，永远不会静默消失
                         long todoCount = merged.stream()
                             .filter(m -> "TODO".equals(m.get("status")))
@@ -454,6 +486,7 @@ public class ImportantDateRouter {
             boolean carFrontendSection = boolValue(c, "carFrontendSection", true);
             boolean carSkinEnabled = boolValue(c, "carSkinEnabled", true);
             int toastMaxPerType = intValue(t, "toastMaxPerType", 2);
+            String toastMoreText = textValue(t, "toastMoreText", "点这里看全部");
             // 提示频率（1.3.3）：every = 每次打开都弹；daily = 每天最多 N 次；interval = 每 N 分钟最多一次
             String toastFrequency = textValue(t, "toastFrequency", "every");
             if (!"daily".equals(toastFrequency) && !"interval".equals(toastFrequency)) {
@@ -468,8 +501,17 @@ public class ImportantDateRouter {
                 carEventsEnabled, carFrontendSection, carSkinEnabled, toastMaxPerType,
                 dashboardPageSize, dashboardPagination, allowDismiss, overdueRemindDays,
                 frontendShowOverdue, toastScope, toastFrequency, toastFrequencyN,
-                toastDurations);
+                toastDurations, toastMoreText);
         });
+    }
+
+    /** 同一辆车的分组键：优先用车辆 ID，没有时退回车名。 */
+    private static String carKey(Map<String, Object> item) {
+        Object id = item.get("carId");
+        if (id != null && !String.valueOf(id).isBlank()) {
+            return String.valueOf(id);
+        }
+        return String.valueOf(item.get("carName"));
     }
 
     private static JsonNode emptyNode() {
@@ -513,7 +555,7 @@ public class ImportantDateRouter {
         int toastMaxPerType, int dashboardPageSize, boolean dashboardPagination,
         boolean allowDismiss, int overdueRemindDays, boolean frontendShowOverdue,
         String toastScope, String toastFrequency, int toastFrequencyN,
-        List<Integer> toastDurations) {
+        List<Integer> toastDurations, String toastMoreText) {
     }
 
     /** 关闭菜单里可选的时长（天）兜底值：没有任何「永久不再提示」。 */

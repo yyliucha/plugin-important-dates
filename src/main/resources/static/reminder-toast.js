@@ -11,7 +11,7 @@
  */
 (function () {
   // 便于排查：浏览器控制台执行 window.__ID_TOAST_VERSION 即可确认当前跑的是哪一版脚本
-  window.__ID_TOAST_VERSION = "136";
+  window.__ID_TOAST_VERSION = "137";
   var KEY_UNTIL = "id-toast-until";
   /** 1.3.1 及更早版本写下的「永久静音」标记：现在不再支持，读到就清掉 */
   var KEY_FOREVER_LEGACY = "id-toast-forever";
@@ -56,6 +56,11 @@
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
+  }
+
+  /** 取配置里的文本，空白/缺失时用兜底值 */
+  function value(v, fallback) {
+    return v == null || String(v).trim() === "" ? fallback : String(v);
   }
 
   function lsGet(k) {
@@ -194,9 +199,16 @@
     var items = d.reminders || [];
     var body;
     if (items.length) {
-      // 服务端已给出人性化文案（节点式，逐日不同）时直接用；否则回退到模板
+      // 服务端已给出人性化文案（节点式，逐日不同）时直接用；否则回退到模板。
+      // 座驾项可能带 groupTotal：同一辆车的其余到期项被折叠了，补一句「共 N 项」，
+      // 免得用户以为这辆车只有这一件事。
       body = items.map(function (r) {
-        return '<div>' + (r.text ? esc(r.text) : applyTemplate(d.toastTemplate, r)) + "</div>";
+        var line = r.text ? esc(r.text) : applyTemplate(d.toastTemplate, r);
+        var total = Number(r.groupTotal) || 0;
+        if (total > 1) {
+          line += ' <span style="opacity:.7;font-size:12px;">（这辆车共 ' + total + " 项到期）</span>";
+        }
+        return "<div>" + line + "</div>";
       }).join("");
     } else {
       var emptyText = d.toastEmptyText == null ? "" : String(d.toastEmptyText);
@@ -213,12 +225,27 @@
       "padding:12px 40px 12px 16px;font-size:14px;color:#9a3412;font-family:inherit;" +
       "opacity:0;transition:opacity .3s;" +
       positionStyle(d.toastPosition);
+    // 被"每类最多 N 条"裁掉的项数：不说出来的话，用户不知道自己看到的是残缺的
+    var overflow = Number(d.overflowCount) || 0;
+    // 详情页：点弹窗任意位置可以去「记得」页看全部。管理员进后台，访客进前台的「记得」页
+    var moreText = value(d.toastMoreText, "点这里看全部");
+    var moreHref = value(d.toastMoreUrl, "/important-dates");
+    var more = overflow > 0
+      ? '<div style="margin-top:6px;padding-top:6px;border-top:1px dashed #fdba74;opacity:.8;">还有 ' +
+        overflow + " 项</div>"
+      : "";
     box.innerHTML =
       '<div style="font-weight:600;margin-bottom:4px;">' + esc(title) + "</div>" +
       '<div style="line-height:1.9;">' + body + "</div>" +
-      '<span style="position:absolute;top:8px;right:10px;cursor:pointer;opacity:.6;' +
+      more +
+      '<div style="margin-top:6px;font-size:12px;">' +
+      '<a href="' + esc(moreHref) + '" style="color:#c2410c;text-decoration:underline;">' + esc(moreText) + "</a></div>" +
+      '<span id="id-toast-close" class="id-toast-close" style="position:absolute;top:8px;right:10px;cursor:pointer;opacity:.6;' +
       'font-size:18px;line-height:1;padding:2px 4px;" aria-label="关闭">×</span>';
     document.body.appendChild(box);
+    // 关闭按钮用固定的 id/class 定位，不要靠「第一个 span」这类结构选择器：
+    // 正文里一旦新增 span（比如「这辆车共 N 项到期」），结构选择器就会点到别的东西上。
+    var closeBtn = box.querySelector("#id-toast-close");
     var closed = false;
     function hide() {
       if (closed) return;
@@ -232,7 +259,7 @@
     var defaultChoice = d.toastDefaultClose || "once";
     var menuEnabled = d.toastCloseMenu !== false;
     var durations = normalizeDurations(d.toastDurations);
-    box.querySelector("span").addEventListener("click", function () {
+    box.querySelector("#id-toast-close").addEventListener("click", function () {
       if (menuEnabled) {
         // 有菜单：点 × 先给选择，5 秒未选则按默认行为执行
         showCloseMenu(box, defaultChoice, hide, durations);
@@ -276,6 +303,18 @@
       setTimeout(hide, secs * 1000);
     }
     return true;
+  }
+
+  /**
+   * 弹窗里「看全部」要跳去哪。
+   * 正在看后台的话（网址以 /console 开头）就去后台「记得」，否则去前台「记得」页；
+   * 服务端也允许用 toastMoreUrl 覆盖成别的地址（比如主题自定义页面）。
+   */
+  function moreUrl(d) {
+    var custom = d.toastMoreUrl == null ? "" : String(d.toastMoreUrl).trim();
+    if (custom) return custom;
+    var inConsole = location.pathname.indexOf("/console") === 0;
+    return inConsole ? "/console/important-dates" : "/important-dates";
   }
 
   /** 今天（当地日期）的标识，用于判断"当天已弹次数"是否过期 */
@@ -339,6 +378,10 @@
             toastDefaultClose: d.toastDefaultClose,
             toastCloseMenu: d.toastCloseMenu,
             toastDurations: d.toastDurations,
+            // 被裁掉的条数 + 详情入口（默认：管理员进后台「记得」，访客进前台「记得」页）
+            overflowCount: d.overflowCount,
+            toastMoreText: d.toastMoreText,
+            toastMoreUrl: moreUrl(d),
             reminders: items
           })) {
             markShown();

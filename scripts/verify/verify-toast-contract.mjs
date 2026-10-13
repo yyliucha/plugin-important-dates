@@ -114,7 +114,7 @@ try {
     await watch();
     await p.evaluate(() => {
       const el = document.getElementById("id-toast-box");
-      if (el) el.querySelector("span").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      if (el) el.querySelector("#id-toast-close").dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     await new Promise((r) => setTimeout(r, 600));
     const st = await p.evaluate(() => ({ f: localStorage.getItem("id-toast-forever"), u: localStorage.getItem("id-toast-until") }));
