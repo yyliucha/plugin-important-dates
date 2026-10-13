@@ -1,11 +1,9 @@
-# 记得 · 重要日期与爱车（plugin-important-dates）
+# 记得（plugin-important-dates）
 
 [![build](https://github.com/yyliucha/plugin-important-dates/actions/workflows/build.yaml/badge.svg)](https://github.com/yyliucha/plugin-important-dates/actions/workflows/build.yaml)
 [![plugin](https://img.shields.io/badge/Halo-2.x-1f6feb?logo=halo&color=1f6feb)](https://github.com/halo-dev/halo)
 
 一个 Halo 2.x 插件：记录纪念日、生日与家人朋友，也管好你的座驾（汽车 / 电瓶车 / 自行车）——保险、年检、保养到期自动提醒；支持阳历/农历、多图相册、前台「生活 / 爱车」双视图、隐私脱敏，**零系统配置写入、零主题文件写入**。
-
-> **更名说明**：原名「重要日期」，1.2.0 起更名「**记得**」——功能已从"记日期"扩展到"记日子、记人、记爱车"，旧名装不下。插件 ID（`plugin-important-dates`）不变，**数据、设置、前台地址（`/important-dates`）与升级路径均不受影响**。
 
 [English README](https://github.com/yyliucha/plugin-important-dates/blob/main/README.en.md) ｜ [Releases](https://github.com/yyliucha/plugin-important-dates/releases) ｜ [问题反馈](https://github.com/yyliucha/plugin-important-dates/issues) ｜ 作者：[yyliucha](https://github.com/yyliucha)
 
@@ -129,14 +127,6 @@ cd plugin-important-dates
 ./gradlew build
 ```
 
-构建结果位于 `build/libs/plugin-important-dates-<版本>.jar`（当前版本：`1.3.1`）。
+构建结果位于 `build/libs/plugin-important-dates-<版本>.jar`（当前版本：`1.3.2`）。
 
-> 版本说明：**最新正式版** `1.3.1`（修复悬浮提醒不出现的一串问题——纪念日/生日被过滤、渲染时提前记账、上报接口 403、全站作用域取不到数据；弹窗改为**每次打开页面都提示**；点 × 不再被静默静音；并补上接口的版本标记便于排查）。装包后请**强刷浏览器**并**完整重启 Halo 服务**。
->
-> 更早：`1.3.0` 座驾按车型分档（电瓶车锁定纯电、自行车不留车牌与能源）、改车型保留数据、编辑弹窗折叠分区、移除座驾上的「驾照换证」，并修复后台座驾卡片到期项标签整块消失的缺陷。
->
-> 更早：`1.2.6` 提醒状态机（已办才滚动、逾期逐日提醒、节点式提醒、保养项「已办」= 刚做完保养、一键撤销）与 `1.2.5` 写操作加固与图片失效降级、`1.2.4` 拖拽 503 修复、`1.2.3` 卡片样式修复、`1.2.2` 附件库范围修复。
-
-## License
-
-[MIT](https://github.com/yyliucha/plugin-important-dates/blob/main/LICENSE)
+> 版本说明：**最新正式版** `1.3.2`（对外文案统一为「记得」，不再出现原名；插件标识、数据与升级路径均不变。功能与 `1.3.1` 一致）。装包后请**强刷浏览器**。

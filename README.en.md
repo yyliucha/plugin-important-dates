@@ -1,11 +1,9 @@
-# 记得 · Remember — Important Dates & My Vehicles (plugin-important-dates)
+# Remember · 记得 (plugin-important-dates)
 
 [![build](https://github.com/yyliucha/plugin-important-dates/actions/workflows/build.yaml/badge.svg)](https://github.com/yyliucha/plugin-important-dates/actions/workflows/build.yaml)
 [![plugin](https://img.shields.io/badge/Halo-2.x-1f6feb?logo=halo&color=1f6feb)](https://github.com/halo-dev/halo)
 
 A Halo 2.x plugin that remembers things for you: anniversaries, birthdays and the people you care about — plus your vehicles (cars / e-bikes / bicycles) with insurance, inspection and maintenance due dates. Solar & lunar calendar support, photo albums, a public "Life / Garage" page, and privacy-first defaults. **No system config writes, no theme file writes.**
-
-> **Renamed**: formerly “Important Dates” (重要日期), renamed to “**记得**” (Remember) in 1.2.0 — the plugin grew from "dates" to "dates, people and vehicles". The plugin ID (`plugin-important-dates`), your data, settings, frontend URL (`/important-dates`) and upgrade path are unchanged.
 
 [中文版 README](README.md) ｜ [Releases](https://github.com/yyliucha/plugin-important-dates/releases) ｜ [Issues](https://github.com/yyliucha/plugin-important-dates/issues) ｜ Author: [yyliucha](https://github.com/yyliucha)
 
@@ -129,12 +127,6 @@ cd plugin-important-dates
 ./gradlew build
 ```
 
-The artifact is written to `build/libs/plugin-important-dates-<version>.jar` (current version: `1.3.1`; previous stable: `1.3.0`). Hard-refresh your browser once after installing a new build, and restart the Halo process.
+The artifact is written to `build/libs/plugin-important-dates-<version>.jar` (current version: `1.3.2`; previous stable: `1.3.1`). Hard-refresh your browser once after installing a new build, and restart the Halo process.
 
-> Release notes: **1.3.1** fixes a chain of defects that stopped the site-wide popup from ever appearing (date items were filtered out, nodes were marked as delivered before the script could fetch them, the report endpoint is 403 for visitors, and a scope mismatch hid the data on every page but one), shows the popup on every page load, and stops a stray × from muting the reminder silently.
->
-> Previous: **1.3.0** tiers the vehicle form by what the vehicle actually has (e-bike locked to EV, bicycle without plate or energy type), keeps data when the type changes, rebuilds the dialog around collapsible sections, and drops driver licence renewal from vehicle reminders.
-
-## License
-
-[MIT](LICENSE)
+> Release notes: **1.3.2** is copy only: every public description now says "记得" and nothing else. The plugin id, data and upgrade path are unchanged, and behaviour matches 1.3.1.
