@@ -100,8 +100,10 @@ try {
   });
 } finally {
   await api(`${DATE_BASE}/${name}`, { method: "DELETE" });
+  // 带当前版本号还原（乐观锁：用启动时的旧版本会 409，设置就留在测试值上了）
+  const now = JSON.parse((await api(CM)).text);
   await api(CM, { method: "PUT", body: JSON.stringify({ apiVersion: "v1alpha1", kind: "ConfigMap",
-    metadata: { name: "plugin-important-dates-configmap", ...meta }, data: orig })});
+    metadata: { name: "plugin-important-dates-configmap", ...(now.metadata || {}) }, data: orig })});
   console.log(`\n结果: ${pass} 通过 / ${fail} 失败`);
   await browser.close();
   process.exit(fail > 0 ? 1 : 0);

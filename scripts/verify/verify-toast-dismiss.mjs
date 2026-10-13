@@ -30,11 +30,24 @@ const api = (p, i = {}) => page.evaluate(async (path, init) => {
 }, p, i);
 const CM = "/api/v1alpha1/configmaps/plugin-important-dates-configmap";
 const cm = await api(CM); const meta = JSON.parse(cm.text).metadata || {}; const orig = JSON.parse(cm.text).data || {};
-const writeToast = (over) => api(CM, { method: "PUT", body: JSON.stringify({ apiVersion: "v1alpha1", kind: "ConfigMap",
-  metadata: { name: "plugin-important-dates-configmap", ...meta },
-  data: Object.assign({}, orig, { toast: JSON.stringify(Object.assign({}, JSON.parse(orig.toast || "{}"),
-    { toastEnabled: true, toastScope: "SITE", toastCloseSeconds: 30 }, over)) })})});
-await writeToast({});
+/**
+ * 写入悬浮提醒设置。基于**最新**的 configmap 重新读取再合并：ConfigMap 是乐观锁
+ * （metadata.version 不匹配就 409），用启动时抓的旧副本反复 PUT 会在几次写入后开始失败。
+ */
+const writeToast = async (over) => {
+  const fresh = JSON.parse((await api(CM)).text);
+  const toast = Object.assign({}, JSON.parse((fresh.data || {}).toast || "{}"),
+    { toastEnabled: true, toastScope: "SITE", toastCloseSeconds: 30 }, over);
+  const res = await api(CM, { method: "PUT", body: JSON.stringify({
+    apiVersion: "v1alpha1", kind: "ConfigMap",
+    metadata: { name: "plugin-important-dates-configmap", ...(fresh.metadata || {}) },
+    data: Object.assign({}, fresh.data || orig, { toast: JSON.stringify(toast) }) }) });
+  if (![200, 201].includes(res.status)) throw new Error(`写设置失败 ${res.status}: ${res.text.slice(0, 160)}`);
+  return res.status;
+};
+// 显式写死本次要用的取值，别依赖实例上残留的设置（上一次跑或手工调试留下的
+// toastDurations 会让 D1/D2/D3 这些"按默认菜单"的用例莫名其妙地失败）
+await writeToast({ toastDurations: "3,5,7,30" });
 await new Promise((r) => setTimeout(r, 3500));
 const DATE_BASE = "/apis/importantdates.halo.run/v1alpha1/importantdates";
 const d0 = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })();
@@ -55,10 +68,15 @@ const waitBox = async () => {
   }
   return false;
 };
-const clearMarks = async () => p.evaluate(() => {
-  ["id-toast-until", "id-toast-forever", "id-toast-last", "id-toast-last-count", "id-toast-day"]
-    .forEach((k) => localStorage.removeItem(k));
-});
+// 只在站点页面里清：在登录页/空白页调 localStorage 会抛 SecurityError，整个用例会平白失败
+const clearMarks = async () => {
+  await p.evaluate(() => {
+    try {
+      ["id-toast-until", "id-toast-forever", "id-toast-last", "id-toast-last-count", "id-toast-day"]
+        .forEach((k) => localStorage.removeItem(k));
+    } catch (e) { /* 当前页面拿不到存储就跳过，不影响用例本身 */ }
+  });
+};
 /** 打开页面 → 点 × → 等菜单出现 → 取下所有菜单文案 */
 const openMenu = async () => {
   await p.goto(`${base}/`, { waitUntil: "domcontentloaded", timeout: 60000 });
@@ -83,6 +101,8 @@ const daysFromNow = (ms) => (ms - Date.now()) / 86400000;
 
 try {
   await check("D1 菜单包含 3/5/7/30 天，且没有任何「永久」选项", async () => {
+    // 先落到站点页面再清记录（登录页访问 localStorage 会抛 SecurityError）
+    await p.goto(`${base}/`, { waitUntil: "domcontentloaded", timeout: 60000 });
     await clearMarks();
     const labels = await openMenu();
     const want = ["本次关闭", "今天不再提示", "3 天内不显示", "5 天内不显示", "7 天内不显示", "30 天内不显示"];
@@ -155,11 +175,15 @@ try {
   });
 
   await check("D6 时长改成自定义（只填 10）→ 菜单按设置变化", async () => {
-    await writeToast({ toastDurations: "10" });
+    const putStatus = await writeToast({ toastDurations: "10" });
     await new Promise((r) => setTimeout(r, 3000));
     await clearMarks();
     const labels = await openMenu();
-    assert(labels.includes("10 天内不显示"), `菜单缺少「10 天内不显示」：${JSON.stringify(labels)}`);
+    const served = await p.evaluate(async () => {
+      const d = await (await fetch("/important-dates-reminders?ts=" + Date.now())).json();
+      return d.toastDurations;
+    });
+    assert(labels.includes("10 天内不显示"), `菜单缺少「10 天内不显示」：菜单=${JSON.stringify(labels)} 端点下发=${JSON.stringify(served)} 写入状态=${putStatus}`);
     assert(!labels.includes("3 天内不显示"), `菜单仍显示未勾选的 3 天：${JSON.stringify(labels)}`);
     await clickMenu("10 天内不显示");
     await new Promise((r) => setTimeout(r, 500));
@@ -180,8 +204,11 @@ try {
   });
 } finally {
   await api(`${DATE_BASE}/${nm}`, { method: "DELETE" });
+  // ConfigMap 是乐观锁：必须带上**当前**版本号再还原，用启动时抓的旧版本会 409，
+  // 结果设置留在测试值上，污染下一个用例。下同。
+  const now = JSON.parse((await api(CM)).text);
   await api(CM, { method: "PUT", body: JSON.stringify({ apiVersion: "v1alpha1", kind: "ConfigMap",
-    metadata: { name: "plugin-important-dates-configmap", ...meta }, data: orig })});
+    metadata: { name: "plugin-important-dates-configmap", ...(now.metadata || {}) }, data: orig })});
   console.log(`\n结果: ${pass} 通过 / ${fail} 失败`);
   await browser.close();
   process.exit(fail > 0 ? 1 : 0);
