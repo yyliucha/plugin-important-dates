@@ -11,7 +11,7 @@
  */
 (function () {
   // 便于排查：浏览器控制台执行 window.__ID_TOAST_VERSION 即可确认当前跑的是哪一版脚本
-  window.__ID_TOAST_VERSION = "138";
+  window.__ID_TOAST_VERSION = "139";
   var KEY_UNTIL = "id-toast-until";
   /** 1.3.1 及更早版本写下的「永久静音」标记：现在不再支持，读到就清掉 */
   var KEY_FOREVER_LEGACY = "id-toast-forever";
