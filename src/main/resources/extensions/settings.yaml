@@ -49,6 +49,13 @@ spec:
     - group: toast
       label: 全站悬浮提醒
       formSchema:
+        # 这两块是插件自带的自定义 UI（console 入口注册的 FormKit 输入组件）：
+        # 自检卡片帮用户自己定位"提醒为什么没弹"，帮助面板把用法写进插件本身
+        # （从应用市场安装的用户看不到仓库里的 README）。两者都不保存任何值。
+        - $formkit: idReminderSelfCheck
+          name: _selfCheck
+        - $formkit: idReminderHelp
+          name: _help
         - $formkit: checkbox
           name: toastEnabled
           label: 启用

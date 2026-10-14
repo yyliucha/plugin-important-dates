@@ -4,7 +4,7 @@ metadata:
   name: plugin-important-dates
 spec:
   enabled: true
-  version: 1.3.3
+  version: 2.0.0
   requires: ">=2.26.0"
   author:
     name: yyliucha
@@ -14,7 +14,7 @@ spec:
   repo: https://github.com/yyliucha/plugin-important-dates
   issues: https://github.com/yyliucha/plugin-important-dates/issues
   displayName: "记得"
-  description: "记得 - 记日子、记人、记爱车：记录纪念日与生日（阳历/农历含闰月、每年自动循环）和家人朋友档案；管理座驾（汽车/电瓶车/自行车）的保险、年检、保养到期，按车型只显示适用的项目；支持人员大头贴与座驾相册、拖拽排序、三处到期提醒（仪表盘小组件/前台横幅/全站悬浮弹窗）、提醒状态机（已办顺延、逾期待办、一键撤销）与隐私脱敏。完全按 Halo 2.26 官方文档与扩展点实现，零系统配置写入、零主题文件写入。"
+  description: "把容易忘的事记下来：纪念日与生日、家人朋友、爱车的保险年检保养到期，到点提醒你，愿意公开的还能展示在博客前台。"
   settingName: plugin-important-dates-settings
   configMapName: plugin-important-dates-configmap
   license:

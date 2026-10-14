@@ -4,6 +4,7 @@ await requireInstance();
 // 关闭方式菜单：只有「本次关闭 / 今天不再提示 / N 天内不显示」，
 // 没有任何「永久不再提示」；每个时长都按天数生效，到期自动恢复。
 import puppeteer from "puppeteer-core";
+import { cleanupTestData } from "./_cleanup.mjs";
 
 const RUN = Date.now();
 let pass = 0, fail = 0;
@@ -28,6 +29,15 @@ const api = (p, i = {}) => page.evaluate(async (path, init) => {
   if (init.body) h["Content-Type"] = "application/json";
   const r = await fetch(path, { ...init, headers: h }); return { status: r.status, text: await r.text() };
 }, p, i);
+
+// 先清掉历史残留：堆积的测试数据会把本次用例的数据挤出弹窗显示窗口，
+// 报出来的错却和真正的原因毫不相干。
+const cleaned = await cleanupTestData(api);
+if (cleaned.dates || cleaned.cars || cleaned.persons) {
+  console.log(
+    "[cleanup] 清掉历史测试数据：日期 " + cleaned.dates + " / 座驾 " + cleaned.cars + " / 人员 " + cleaned.persons
+  );
+}
 const CM = "/api/v1alpha1/configmaps/plugin-important-dates-configmap";
 const cm = await api(CM); const meta = JSON.parse(cm.text).metadata || {}; const orig = JSON.parse(cm.text).data || {};
 /**

@@ -89,9 +89,13 @@ This file records how releases are prepared, so every release looks consistent.
   `$env:NPM_CMD = "C:\nvm4w\nodejs\npm.cmd"`, or build the UI first
   (`cd console; npm run build`) and then package with `./gradlew build -x buildFrontend`.
   A long-lived Gradle daemon also pins the `PATH` it was started with, so a freshly installed node may be invisible to it;
-  `./gradlew --stop` (or `NPM_CMD`) clears that up. `console/build/dist` must not be empty — an empty dist silently ships a
-  plugin whose settings page and dashboard widget are missing. Windows also needs a JDK 17+ for Gradle itself: the box defaults
-  to JDK 11, so pass `JAVA_HOME="C:\Program Files\Java\jdk-23"` (the plugin targets Java 17 bytecode).
+  `./gradlew --stop` (or `NPM_CMD`) clears that up.
+  **`gradlew clean` does *not* wipe `console/build/dist`** (it is a separate build tree), so a stale dist can survive and get
+  packaged: building the console explicitly first is what actually guarantees the UI in the jar matches the sources —
+  `cd console && npm run build`, then `./gradlew build -x buildFrontend`. Verify before shipping that the jar really contains
+  the console bundle (an empty dist would otherwise ship a plugin whose settings page and dashboard widget are missing).
+  Windows also needs a JDK 17+ for Gradle itself: the box defaults to JDK 11, so pass
+  `JAVA_HOME="C:\Program Files\Java\jdk-23"` (the plugin targets Java 17 bytecode).
 - Regression scripts live in this repo under `scripts/verify/`; they need a **running Halo instance with the plugin installed**.
   Start Halo with a work dir that uses **forward slashes** (`--halo.work-dir=F:/dsh/halo-test/work-xxx`) — backslashes break
   H2's `r2dbc:///` URL — and keep it as a detached process, not inside a job that can be killed.

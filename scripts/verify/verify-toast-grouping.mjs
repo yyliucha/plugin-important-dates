@@ -7,6 +7,7 @@ await requireInstance();
 //   ③ 弹窗底部有可点的详情入口，跳「记得」页
 // 完整日期在横幅/仪表盘/记得页仍然逐条可见 —— 弹窗只负责"提醒"，不负责"清单"。
 import puppeteer from "puppeteer-core";
+import { cleanupTestData } from "./_cleanup.mjs";
 
 const RUN = Date.now();
 let pass = 0, fail = 0;
@@ -31,6 +32,15 @@ const api = (p, i = {}) => page.evaluate(async (path, init) => {
   if (init.body) h["Content-Type"] = "application/json";
   const r = await fetch(path, { ...init, headers: h }); return { status: r.status, text: await r.text() };
 }, p, i);
+
+// 先清掉历史残留：堆积的测试数据会把本次用例的数据挤出弹窗显示窗口，
+// 报出来的错却和真正的原因毫不相干。
+const cleaned = await cleanupTestData(api);
+if (cleaned.dates || cleaned.cars || cleaned.persons) {
+  console.log(
+    "[cleanup] 清掉历史测试数据：日期 " + cleaned.dates + " / 座驾 " + cleaned.cars + " / 人员 " + cleaned.persons
+  );
+}
 
 const CM = "/api/v1alpha1/configmaps/plugin-important-dates-configmap";
 const writeToast = async (over) => {
@@ -171,6 +181,28 @@ try {
     assert(menus.length > 0, `点 × 没有弹出关闭方式菜单（菜单项=[]）—— 关闭按钮的点击目标可能被正文抢走了`);
     assert(menus.includes("本次关闭"), `菜单内容不对: ${JSON.stringify(menus)}`);
     return `点 × 弹出 ${menus.length} 项菜单`;
+  });
+
+  await check("G8 Esc 只收起当前弹窗，不写任何静音记录", async () => {
+    // 按键盘的习惯动作不该产生"以后都不提醒我"的后果
+    await p.goto(`${base}/`, { waitUntil: "domcontentloaded", timeout: 60000 });
+    assert(await waitBox(), "弹窗未出现");
+    await p.evaluate(() => {
+      ["id-toast-until", "id-toast-forever"].forEach((k) => localStorage.removeItem(k));
+    });
+    await p.keyboard.press("Escape");
+    await new Promise((r) => setTimeout(r, 900));
+    const after = await p.evaluate(() => {
+      const el = document.getElementById("id-toast-box");
+      return {
+        stillVisible: !!(el && el.getBoundingClientRect().width > 0),
+        until: localStorage.getItem("id-toast-until"),
+        forever: localStorage.getItem("id-toast-forever"),
+      };
+    });
+    assert(!after.stillVisible, "按 Esc 后弹窗还在");
+    assert(!after.until && !after.forever, `Esc 不该写静音记录: ${JSON.stringify(after)}`);
+    return "已收起，且未写静音记录";
   });
 
   await check("G6 完整清单未受影响：记得页仍能逐条看到该车的各项", async () => {

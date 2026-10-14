@@ -31,6 +31,7 @@ const GROUPS = {
     "verify-toast-grouping.mjs",
   ],
   data: ["verify-album-scope.mjs", "verify-sort-save.mjs"],
+  settings: ["verify-settings-panels.mjs"],
 };
 
 const picked = process.argv.slice(2).filter((a) => !a.startsWith("-"));

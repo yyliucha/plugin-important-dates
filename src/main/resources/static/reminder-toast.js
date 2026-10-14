@@ -11,7 +11,7 @@
  */
 (function () {
   // 便于排查：浏览器控制台执行 window.__ID_TOAST_VERSION 即可确认当前跑的是哪一版脚本
-  window.__ID_TOAST_VERSION = "137";
+  window.__ID_TOAST_VERSION = "138";
   var KEY_UNTIL = "id-toast-until";
   /** 1.3.1 及更早版本写下的「永久静音」标记：现在不再支持，读到就清掉 */
   var KEY_FOREVER_LEGACY = "id-toast-forever";
@@ -218,7 +218,9 @@
     var title = d.toastTitle == null || String(d.toastTitle) === "" ? "重要日期提醒" : String(d.toastTitle);
     var box = document.createElement("div");
     box.id = "id-toast-box";
-    box.setAttribute("role", "alert");
+    // 用 status 而不是 alert：这是提醒不是报错，读屏软件不该打断用户正在听的内容
+    box.setAttribute("role", "status");
+    box.setAttribute("aria-live", "polite");
     box.style.cssText =
       "position:fixed;z-index:999999;max-width:360px;min-width:220px;background:#fff7ed;" +
       "border:1px solid #fdba74;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.22);" +
@@ -240,8 +242,10 @@
       more +
       '<div style="margin-top:6px;font-size:12px;">' +
       '<a href="' + esc(moreHref) + '" style="color:#c2410c;text-decoration:underline;">' + esc(moreText) + "</a></div>" +
-      '<span id="id-toast-close" class="id-toast-close" style="position:absolute;top:8px;right:10px;cursor:pointer;opacity:.6;' +
-      'font-size:18px;line-height:1;padding:2px 4px;" aria-label="关闭">×</span>';
+      // 用真正的 <button>：可 Tab 聚焦、可回车触发，读屏软件也能正确朗读
+      '<button type="button" id="id-toast-close" class="id-toast-close" aria-label="关闭提醒" title="关闭提醒"' +
+      ' style="position:absolute;top:8px;right:10px;cursor:pointer;opacity:.6;border:0;background:transparent;' +
+      'color:inherit;font:inherit;font-size:18px;line-height:1;padding:2px 4px;">×</button>';
     document.body.appendChild(box);
     // 关闭按钮用固定的 id/class 定位，不要靠「第一个 span」这类结构选择器：
     // 正文里一旦新增 span（比如「这辆车共 N 项到期」），结构选择器就会点到别的东西上。
@@ -251,6 +255,7 @@
       if (closed) return;
       closed = true;
       if (countdownTimer) clearInterval(countdownTimer);
+      document.removeEventListener("keydown", onKeydown);
       box.style.opacity = "0";
       setTimeout(function () {
         if (box.parentNode) box.parentNode.removeChild(box);
@@ -259,7 +264,7 @@
     var defaultChoice = d.toastDefaultClose || "once";
     var menuEnabled = d.toastCloseMenu !== false;
     var durations = normalizeDurations(d.toastDurations);
-    box.querySelector("#id-toast-close").addEventListener("click", function () {
+    closeBtn.addEventListener("click", function () {
       if (menuEnabled) {
         // 有菜单：点 × 先给选择，5 秒未选则按默认行为执行
         showCloseMenu(box, defaultChoice, hide, durations);
@@ -270,6 +275,13 @@
         hide();
       }
     });
+    // Esc 只收起当前弹窗，不写任何静音记录：按键盘的习惯动作不该产生"以后都不提醒我"的后果
+    function onKeydown(e) {
+      if (e.key === "Escape" || e.key === "Esc") {
+        hide();
+      }
+    }
+    document.addEventListener("keydown", onKeydown);
     requestAnimationFrame(function () {
       box.style.opacity = "1";
     });

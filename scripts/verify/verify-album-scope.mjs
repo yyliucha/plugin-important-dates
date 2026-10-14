@@ -118,19 +118,50 @@ const setAttachment = async (obj) => {
 };
 
 // ---------- 2. 打开座驾弹窗的附件库 ----------
+// 自己造一辆车来编辑，不依赖实例上"恰好存在"的车：
+// 之前是优先找「E2E表单车」，找不到就退而取第一辆车 —— 实例上没有任何车时（例如刚清过
+// 测试数据）整个套件会因为"未找到座驾卡片"直接挂掉，而失败原因和本用例要验证的东西无关。
+const OWN_CAR = `car-albumscope-${RUN}`;
+const ownCarRes = await api("/apis/importantdates.halo.run/v1alpha1/cars", {
+  method: "POST",
+  body: JSON.stringify({
+    apiVersion: "importantdates.halo.run/v1alpha1",
+    kind: "Car",
+    metadata: { name: OWN_CAR },
+    spec: {
+      displayName: `相册用例车-${RUN}`,
+      vehicleType: "SEDAN",
+      status: "IN_USE",
+      visible: true,
+      important: true,
+      photos: [],
+      reminders: [],
+    },
+  }),
+});
+if (![200, 201].includes(ownCarRes.status)) {
+  throw new Error(`创建相册用例车失败 ${ownCarRes.status}: ${ownCarRes.text.slice(0, 160)}`);
+}
+
 const openCarLibrary = async () => {
   await page.goto(`${base}/console/important-dates`, { waitUntil: "domcontentloaded", timeout: 180000 });
   await new Promise((r) => setTimeout(r, 8000));
-  await page.evaluate(() => [...document.querySelectorAll("button.tab-btn")].find((b) => b.innerText.startsWith("座驾"))?.click());
-  await new Promise((r) => setTimeout(r, 2000));
-  const clicked = await page.evaluate(() => {
-    const card = [...document.querySelectorAll(".car-card")].find((c) => (c.innerText || "").includes("E2E表单车"))
-      || document.querySelector(".car-card");
-    if (!card) return false;
-    [...card.querySelectorAll("button")].find((b) => (b.innerText || "").trim() === "编辑")?.click();
-    return true;
-  });
-  if (!clicked) throw new Error("未找到座驾卡片");
+  // 等卡片真的渲染出来再点：整套连着跑时实例比较慢，写死一个等待时间会随机失败
+  let clicked = false;
+  for (let i = 0; i < 20 && !clicked; i++) {
+    clicked = await page.evaluate((carName) => {
+      // 每次重试都确保「座驾」页签是激活的
+      [...document.querySelectorAll("button.tab-btn")].find((b) => b.innerText.startsWith("座驾"))?.click();
+      const card = [...document.querySelectorAll(".car-card")].find((c) => (c.innerText || "").includes(carName));
+      if (!card) return false;
+      const edit = [...card.querySelectorAll("button")].find((b) => (b.innerText || "").trim() === "编辑");
+      if (!edit) return false;
+      edit.click();
+      return true;
+    }, `相册用例车-${RUN}`);
+    if (!clicked) await new Promise((r) => setTimeout(r, 1000));
+  }
+  if (!clicked) throw new Error(`未找到座驾卡片（等了 20 秒，车名 相册用例车-${RUN}）`);
   await new Promise((r) => setTimeout(r, 2500));
   const opened = await page.evaluate(async () => {
     const modal = [...document.querySelectorAll(".modal, [role='dialog'], .vc-modal")].find((m) => (m.innerText || "").includes("编辑座驾"));
@@ -263,6 +294,9 @@ await check("控制台无脚本错误", async () => {
   if (errs.length) throw new Error(errs.slice(0, 3).join(" | "));
   return "无 pageerror";
 });
+
+// 收尾：删掉本用例自己造的车，别把数据留给下一次运行
+await api(`/apis/importantdates.halo.run/v1alpha1/cars/${OWN_CAR}`, { method: "DELETE" });
 
 await browser.close();
 await new Promise((r) => setTimeout(r, 3000));

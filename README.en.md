@@ -130,11 +130,11 @@ cd plugin-important-dates
 ./gradlew build
 ```
 
-The artifact is written to `build/libs/plugin-important-dates-<version>.jar` (current version: `1.3.3`; previous stable: `1.3.1`). Hard-refresh your browser once after installing a new build, and restart the Halo process.
+The artifact is written to `build/libs/plugin-important-dates-<version>.jar` (current version: `2.0.0`; previous stable: `1.3.3`). Hard-refresh your browser once after installing a new build, and restart the Halo process.
 
-> Release notes: **1.3.3** teaches the popup to ask for fewer decisions — **one line per vehicle** with its item count, everything folded away summarised as **"N more"**, and a link straight to the 记得 page. The close menu keeps only choices that expire (**"never show again" is gone**, and a stale permanent-mute flag left in a visitor's browser is cleared automatically), adds a **"not today"** option, and the new reminder-frequency cap limits how often the popup can appear. It also fixes custom vehicle due-dates never triggering a reminder.
+> Release notes: **2.0.0** is the final feature release. It adds a **built-in self-check** (one click tells you which link in the chain is broken when a reminder does not appear), **in-plugin usage help** (no need to open the repository docs), an **urgency filter and a "days left" column** on the 记得 page for long lists, **Esc to close** the popup with a keyboard-focusable close button and better screen-reader semantics, and fixes drag-reordering scrambling the order of items hidden by a filter. The plugin description is now a single sentence.
 >
-> Previous: **1.3.1** fixed a chain of defects that stopped the popup from appearing and made it show on every page load; **1.3.0** tiered the vehicle form by vehicle type, kept data across a type switch, and rebuilt the edit dialog.
+> Previous: **1.3.3** taught the popup to ask for fewer decisions (one line per vehicle, "N more", a link into the 记得 page), removed "never show again", and fixed custom vehicle due-dates never reminding; **1.3.1** fixed a chain of defects that stopped the popup from appearing and made it show on every page load; **1.3.0** tiered the vehicle form by vehicle type, kept data across a type switch, and rebuilt the edit dialog.
 
 ## License
 

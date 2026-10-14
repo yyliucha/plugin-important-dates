@@ -75,14 +75,40 @@
             {{ filteredDates.length }} / {{ dates.length }} 条
           </span>
         </div>
-        <VCard>
+
+        <!-- 临近程度筛选：条目一多，"最近有什么"比"都有什么"更常看 -->
+        <div class="filter-bar urgency-bar">
+          <label class="filter-label">按临近程度：</label>
+          <div class="urgency-chips">
+            <button
+              v-for="c in URGENCY_FILTERS"
+              :key="c.value"
+              type="button"
+              class="urgency-chip"
+              :class="{ active: urgencyFilter === c.value }"
+              @click="urgencyFilter = c.value"
+            >
+              {{ c.label }}
+              <span class="urgency-chip__n">{{ c.count }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div v-if="!filteredDates.length" style="padding: 30px 0">
+          <VEmpty
+            title="当前筛选下没有条目"
+            message="换一个临近程度或人员筛选试试。"
+          />
+        </div>
+        <VCard v-else>
           <table class="dates-table">
             <thead>
               <tr>
                 <th style="width: 14%">名称</th>
                 <th style="width: 8%">类型</th>
                 <th style="width: 15%">日期</th>
-                <th style="width: 16%">最近一次</th>
+                <th style="width: 10%">还有</th>
+                <th style="width: 14%">最近一次</th>
                 <th style="width: 12%">关联人</th>
                 <th style="width: 8%">重要</th>
                 <th style="width: 8%">前台</th>
@@ -116,6 +142,23 @@
                   <template v-else>
                     {{ lunarText(item.spec.lunarMonth || 1, item.spec.lunarDay || 1, !!item.spec.isLeapMonth) }}
                   </template>
+                </td>
+                <td>
+                  <span
+                    v-if="daysLeftOf(item) === null"
+                    class="muted"
+                    title="日期不完整，无法计算"
+                  >—</span>
+                  <span
+                    v-else
+                    class="days-left"
+                    :class="{
+                      'is-now': (daysLeftOf(item) ?? 0) <= 0,
+                      'is-soon': (daysLeftOf(item) ?? 0) > 0 && (daysLeftOf(item) ?? 0) <= 7,
+                    }"
+                  >
+                    {{ daysLeftText(daysLeftOf(item) as number) }}
+                  </span>
                 </td>
                 <td>
                   <template v-if="item.spec.dateType === 'SOLAR'">
@@ -730,10 +773,58 @@ function linkedDateCount(personName: string): number {
   return dates.value.filter((d) => d.spec.personNames?.includes(personName)).length;
 }
 
+/** 临近程度筛选：条目一多，"最近有什么"比"都有什么"更常看 */
+const urgencyFilter = ref<"all" | "today" | "week" | "month" | "later">("all");
+
+/** 每条日期距今天数（与提醒口径一致），无法计算时为 null */
+function daysLeftOf(item: ImportantDate): number | null {
+  return daysUntilOf(item.spec);
+}
+
+/** 「还有 N 天」的显示文案 */
+function daysLeftText(n: number): string {
+  if (n < 0) return `已过 ${-n} 天`;
+  if (n === 0) return "就是今天";
+  if (n === 1) return "明天";
+  return `${n} 天后`;
+}
+
+const URGENCY_FILTERS = computed(() => {
+  const counts = { today: 0, week: 0, month: 0, later: 0 };
+  for (const d of sortedDates.value) {
+    const n = daysLeftOf(d);
+    if (n === null) continue;
+    if (n <= 0) counts.today++;
+    else if (n <= 7) counts.week++;
+    else if (n <= 30) counts.month++;
+    else counts.later++;
+  }
+  return [
+    { value: "all" as const, label: "全部", count: sortedDates.value.length },
+    { value: "today" as const, label: "今天", count: counts.today },
+    { value: "week" as const, label: "7 天内", count: counts.week },
+    { value: "month" as const, label: "30 天内", count: counts.month },
+    { value: "later" as const, label: "30 天以后", count: counts.later },
+  ];
+});
+
 const filteredDates = computed(() => {
-  const sorted = sortedDates.value;
-  if (!personFilter.value) return sorted;
-  return sorted.filter((d) => d.spec.personNames?.includes(personFilter.value));
+  let list = sortedDates.value;
+  if (personFilter.value) {
+    list = list.filter((d) => d.spec.personNames?.includes(personFilter.value));
+  }
+  if (urgencyFilter.value !== "all") {
+    const mode = urgencyFilter.value;
+    list = list.filter((d) => {
+      const n = daysLeftOf(d);
+      if (n === null) return false; // 日期缺失的条目只在「全部」里出现，避免被当成"今天"
+      if (mode === "today") return n <= 0;
+      if (mode === "week") return n > 0 && n <= 7;
+      if (mode === "month") return n > 7 && n <= 30;
+      return n > 30;
+    });
+  }
+  return list;
 });
 
 /** 排序：拖拽权重（sortOrder）升序，创建时间倒序（同级） */
@@ -1031,14 +1122,40 @@ function dragStartDate(item: ImportantDate) {
 
 function dropDate(targetIndex: number) {
   if (!dragDateName) return;
-  const arr = filteredDates.value;
-  const srcIdx = arr.findIndex((d) => d.metadata.name === dragDateName);
+  // 注意：filteredDates 可能是**被筛选后**的子集。曾经直接把子集的顺序整份写回 sortOrder，
+  // 于是被筛掉的条目顺序被抹平、在列表里悄悄跳位（人一多、再叠加一个筛选就很明显）。
+  // 这里只移动可见的那几项，其余条目保持原有相对位置。
+  const moving = dragDateName;
   dragDateName = null;
-  if (srcIdx < 0 || srcIdx === targetIndex) return;
-  const reordered = [...arr];
-  const [moved] = reordered.splice(srcIdx, 1);
-  reordered.splice(targetIndex, 0, moved);
-  void persistOrder("date", reordered.map((d) => d.metadata.name));
+  reorderWithin(sortByOrder(dates.value), filteredDates.value, moving, targetIndex, "date");
+}
+
+/**
+ * 在「可见子集」里移动一项，并把结果合并回完整列表，保持未显示条目的相对顺序不变。
+ * @param all      完整列表（已按当前 sortOrder 排序）
+ * @param visible  可见子集（all 的子序列）
+ * @param moveName 被拖动条目的 metadata.name
+ * @param toIndex  在 visible 里的目标下标
+ */
+function reorderWithin<T extends { metadata: { name: string } }>(
+  all: T[],
+  visible: T[],
+  moveName: string,
+  toIndex: number,
+  kind: "date"
+) {
+  const srcIdx = visible.findIndex((d) => d.metadata.name === moveName);
+  if (srcIdx < 0 || srcIdx === toIndex) return;
+  const reorderedVisible = [...visible];
+  const [moved] = reorderedVisible.splice(srcIdx, 1);
+  reorderedVisible.splice(toIndex, 0, moved);
+  // 把重排后的可见项按顺序填回它们在完整列表里占的槽位
+  const visibleNames = new Set(visible.map((d) => d.metadata.name));
+  let cursor = 0;
+  const merged = all.map((item) =>
+    visibleNames.has(item.metadata.name) ? reorderedVisible[cursor++] : item
+  );
+  void persistOrder(kind, merged.map((d) => d.metadata.name));
 }
 
 function dragStartPerson(p: Person) {
@@ -1829,6 +1946,59 @@ function closeImportModal() {
 .filter-count {
   font-size: 13px;
   color: #9ca3af;
+}
+
+/* 临近程度筛选 chips */
+.urgency-bar {
+  flex-wrap: wrap;
+}
+.urgency-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.urgency-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  background: transparent;
+  color: #4b5563;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  line-height: 1.6;
+}
+.urgency-chip:hover {
+  border-color: #fdba74;
+  color: #c2410c;
+}
+.urgency-chip.active {
+  border-color: #f97316;
+  background: #fff7ed;
+  color: #c2410c;
+  font-weight: 600;
+}
+.urgency-chip__n {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+/* 「还有 N 天」 */
+.days-left {
+  white-space: nowrap;
+  font-size: 13px;
+  color: #6b7280;
+}
+.days-left.is-soon {
+  color: #d97706;
+  font-weight: 600;
+}
+.days-left.is-now {
+  color: #dc2626;
+  font-weight: 600;
 }
 
 .dates-table {

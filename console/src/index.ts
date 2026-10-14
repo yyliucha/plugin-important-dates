@@ -1,10 +1,24 @@
 import { definePlugin } from "@halo-dev/console-shared";
-import { markRaw } from "vue";
+import { createInput } from "@formkit/vue";
+import { defineAsyncComponent, markRaw } from "vue";
 import { IconCalendar } from "@halo-dev/components";
 import ReminderWidget from "./components/ReminderWidget.vue";
 import ImportantDatesView from "./views/ImportantDatesView.vue";
 
 export default definePlugin({
+  // 设置页里的两块自定义 UI（Halo 2.25+ 支持 formkit.inputs）：
+  // 自检卡片帮用户自己判断"提醒为什么没弹"，帮助面板把用法写在插件里 ——
+  // 从应用市场装插件的用户看不到 GitHub 上的 README。两者都不持久化任何值。
+  formkit: {
+    inputs: {
+      idReminderSelfCheck: createInput(
+        defineAsyncComponent(() => import("./components/SettingsSelfCheck.vue")),
+      ),
+      idReminderHelp: createInput(
+        defineAsyncComponent(() => import("./components/SettingsHelpPanel.vue")),
+      ),
+    },
+  },
   routes: [
     {
       parentName: "Root",

@@ -131,6 +131,22 @@ await ensureSetup();
 await login();
 console.log("已登录, cookies:", Object.keys(cookies).join(", "));
 
+// ---- 清掉历史残留的测试数据 ----
+// 套件结尾会删掉自己造的数据，但如果上一次运行中途失败/被中断，残留就会一直堆着。
+// 堆到一定程度会让断言失败，而报出来的错和真正的原因毫不相干（例如提醒列表里
+// 全是历史"就是今天"，本次用例的数据被挤出显示窗口）。
+// 只删名字带 13 位时间戳后缀的条目，不会碰用户真实创建的数据。
+await (async () => {
+  const cleaned = await cleanupTestData((path, init = {}) =>
+    fetch(`${base}${path}`, { ...init, headers: buildHeaders(init.headers || {}) }).then(async (r) => ({
+      status: r.status,
+      text: await r.text(),
+    }))
+  );
+  const total = cleaned.dates + cleaned.cars + cleaned.persons;
+  console.log(`清理历史测试数据：日期 ${cleaned.dates} / 座驾 ${cleaned.cars} / 人员 ${cleaned.persons}` + (total ? "" : "（无残留）"));
+})();
+
 // ---- 把插件设置恢复到默认值 ----
 // 冒烟里有一部分断言是在验证"默认行为"（弹窗默认关闭、默认标题/位置等）。
 // 实例若被之前的手工测试改过设置，这些断言就会误报，所以先归零一次，让本套件自洽。
@@ -148,7 +164,8 @@ await (async () => {
 })();
 
 // ---- 上传安装插件 ----
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { cleanupTestData } from "./_cleanup.mjs";
 await check("上传安装插件", async () => {
   // 取 build/libs 下最新的 jar（版本号随构建变化，避免写死文件名的脚本在升级后失效）
   const jarDir = `${REPO}/build/libs`;
